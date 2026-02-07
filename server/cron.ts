@@ -1,0 +1,936 @@
+import cron from "node-cron";
+import { storage } from "./storage";
+import {
+  sendSubscriptionReminderEmail,
+  sendSubscriptionExpiredEmail,
+} from "./email";
+import {
+  sendEventReminders,
+  sendTelegramSubscriptionReminder,
+  sendTelegramSubscriptionExpired,
+  sendTelegramAppointmentReminder,
+} from "./telegram";
+import { generateDailyBedtimeStory } from "./bedtimeStories";
+import { generateAndSaveParentMessage } from "./parentMessages";
+import { db } from "./db";
+import {
+  enrollments,
+  appointments,
+  flashcardCategories,
+  flashcards,
+  parents,
+  pushSubscriptions,
+} from "@shared/schema";
+import { eq, and, lte, gte, lt, isNull, or } from "drizzle-orm";
+import OpenAI from "openai";
+import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
+import webpush from "web-push";
+
+const SOMALI_VOCABULARY: Record<
+  string,
+  Array<{ somali: string; english: string }>
+> = {
+  Khudaar: [
+    { somali: "Baradho", english: "Potato" },
+    { somali: "Karooto", english: "Carrot" },
+    { somali: "Kaabash", english: "Cabbage" },
+    { somali: "Basal", english: "Onion" },
+    { somali: "Yaanyo", english: "Tomato" },
+    { somali: "Basbaas", english: "Chili pepper" },
+    { somali: "Qajaar", english: "Cucumber" },
+    { somali: "Toon", english: "Garlic" },
+    { somali: "Bamiyo", english: "Okra" },
+    { somali: "Digir", english: "Beans" },
+  ],
+  Miro: [
+    { somali: "Muus", english: "Banana" },
+    { somali: "Liin macaan", english: "Orange" },
+    { somali: "Cambe", english: "Mango" },
+    { somali: "Babaay", english: "Papaya" },
+    { somali: "Qare", english: "Watermelon" },
+    { somali: "Cananaas", english: "Pineapple" },
+    { somali: "Tufaax", english: "Apple" },
+    { somali: "Canab", english: "Grapes" },
+    { somali: "Liindhanaan", english: "Lemon" },
+    { somali: "Timir", english: "Date" },
+  ],
+  Xayawaan: [
+    { somali: "Libaax", english: "Lion" },
+    { somali: "Maroodi", english: "Elephant" },
+    { somali: "Geri", english: "Giraffe" },
+    { somali: "Eey", english: "Dog" },
+    { somali: "Bisad", english: "Cat" },
+    { somali: "Lo'", english: "Cow" },
+    { somali: "Ri'", english: "Goat" },
+    { somali: "Ido", english: "Sheep" },
+    { somali: "Geel", english: "Camel" },
+    { somali: "Digaag", english: "Chicken" },
+    { somali: "Shimbir", english: "Bird" },
+    { somali: "Faras", english: "Horse" },
+    { somali: "Dameer", english: "Donkey" },
+  ],
+  Jidhka: [
+    { somali: "Madax", english: "Head" },
+    { somali: "Il", english: "Eye" },
+    { somali: "Dheg", english: "Ear" },
+    { somali: "San", english: "Nose" },
+    { somali: "Af", english: "Mouth" },
+    { somali: "Ilig", english: "Tooth" },
+    { somali: "Gacan", english: "Hand" },
+    { somali: "Cag", english: "Foot" },
+    { somali: "Far", english: "Finger" },
+    { somali: "Laab", english: "Chest" },
+    { somali: "Calool", english: "Stomach" },
+    { somali: "Dhabar", english: "Back" },
+  ],
+  Midab: [
+    { somali: "Cad", english: "White" },
+    { somali: "Madow", english: "Black" },
+    { somali: "Cas", english: "Red" },
+    { somali: "Cagaar", english: "Green" },
+    { somali: "Buluug", english: "Blue" },
+    { somali: "Jaalle", english: "Yellow" },
+    { somali: "Buni", english: "Brown" },
+  ],
+  Nambarro: [
+    { somali: "Eber", english: "Zero" },
+    { somali: "Kow", english: "One" },
+    { somali: "Laba", english: "Two" },
+    { somali: "Saddex", english: "Three" },
+    { somali: "Afar", english: "Four" },
+    { somali: "Shan", english: "Five" },
+    { somali: "Lix", english: "Six" },
+    { somali: "Toddoba", english: "Seven" },
+    { somali: "Siddeed", english: "Eight" },
+    { somali: "Sagaal", english: "Nine" },
+    { somali: "Toban", english: "Ten" },
+  ],
+  Guriga: [
+    { somali: "Kursi", english: "Chair" },
+    { somali: "Miis", english: "Table" },
+    { somali: "Sariir", english: "Bed" },
+    { somali: "Albaab", english: "Door" },
+    { somali: "Daaqad", english: "Window" },
+    { somali: "Guri", english: "House" },
+    { somali: "Koob", english: "Cup" },
+    { somali: "Saxan", english: "Plate" },
+  ],
+  Qoys: [
+    { somali: "Hooyo", english: "Mother" },
+    { somali: "Aabbe", english: "Father" },
+    { somali: "Walaal", english: "Sibling" },
+    { somali: "Wiil", english: "Boy" },
+    { somali: "Gabadh", english: "Girl" },
+    { somali: "Nin", english: "Man" },
+    { somali: "Naag", english: "Woman" },
+  ],
+};
+
+async function checkExpiringSubscriptions() {
+  console.log("[CRON] Checking for expiring subscriptions...");
+
+  try {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const expiringEnrollments = await db
+      .select()
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.status, "active"),
+          lte(enrollments.accessEnd, sevenDaysFromNow),
+          gte(enrollments.accessEnd, now),
+        ),
+      );
+
+    for (const enrollment of expiringEnrollments) {
+      if (!enrollment.parentId || !enrollment.accessEnd) continue;
+
+      const parent = await storage.getParent(enrollment.parentId);
+      if (!parent) continue;
+
+      const course = await storage.getCourse(enrollment.courseId);
+      if (!course) continue;
+
+      const msRemaining = enrollment.accessEnd.getTime() - now.getTime();
+      const hoursRemaining = msRemaining / (1000 * 60 * 60);
+      const daysRemaining = Math.ceil(hoursRemaining / 24);
+
+      if (hoursRemaining <= 25 && !enrollment.reminder25HourSent) {
+        console.log(
+          `[CRON] Sending 25-hour reminder to ${parent.email} for ${course.title}`,
+        );
+        if (parent.email) {
+          await sendSubscriptionReminderEmail(
+            parent.email,
+            parent.name,
+            course.title,
+            0,
+            Math.round(hoursRemaining),
+          );
+        }
+        if (parent.telegramChatId && parent.telegramOptin) {
+          await sendTelegramSubscriptionReminder(
+            parent.telegramChatId,
+            parent.name,
+            course.title,
+            0,
+            Math.round(hoursRemaining),
+          );
+        }
+        await db
+          .update(enrollments)
+          .set({ reminder25HourSent: now })
+          .where(eq(enrollments.id, enrollment.id));
+      } else if (
+        daysRemaining <= 3 &&
+        daysRemaining > 1 &&
+        !enrollment.reminder3DaySent
+      ) {
+        console.log(
+          `[CRON] Sending 3-day reminder to ${parent.email} for ${course.title}`,
+        );
+        if (parent.email) {
+          await sendSubscriptionReminderEmail(
+            parent.email,
+            parent.name,
+            course.title,
+            daysRemaining,
+          );
+        }
+        if (parent.telegramChatId && parent.telegramOptin) {
+          await sendTelegramSubscriptionReminder(
+            parent.telegramChatId,
+            parent.name,
+            course.title,
+            daysRemaining,
+          );
+        }
+        await db
+          .update(enrollments)
+          .set({ reminder3DaySent: now })
+          .where(eq(enrollments.id, enrollment.id));
+      } else if (
+        daysRemaining <= 7 &&
+        daysRemaining > 3 &&
+        !enrollment.reminder7DaySent
+      ) {
+        console.log(
+          `[CRON] Sending 7-day reminder to ${parent.email} for ${course.title}`,
+        );
+        if (parent.email) {
+          await sendSubscriptionReminderEmail(
+            parent.email,
+            parent.name,
+            course.title,
+            daysRemaining,
+          );
+        }
+        if (parent.telegramChatId && parent.telegramOptin) {
+          await sendTelegramSubscriptionReminder(
+            parent.telegramChatId,
+            parent.name,
+            course.title,
+            daysRemaining,
+          );
+        }
+        await db
+          .update(enrollments)
+          .set({ reminder7DaySent: now })
+          .where(eq(enrollments.id, enrollment.id));
+      }
+    }
+  } catch (error) {
+    console.error("[CRON] Error checking expiring subscriptions:", error);
+  }
+}
+
+// AI Tip Generator - generates daily parenting tips in Somali
+async function generateAiParentingTip() {
+  console.log("[CRON] Generating AI parenting tip...");
+
+  const openaiApiKey =
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+
+  if (!openaiApiKey) {
+    console.log(
+      "[CRON] OpenAI API key not configured - skipping AI tip generation",
+    );
+    return;
+  }
+
+  try {
+    const openai = new OpenAI({
+      apiKey: openaiApiKey,
+      baseURL: openaiBaseUrl,
+    });
+
+    const ageRanges = [
+      "0-6 bilood",
+      "6-12 bilood",
+      "1-2 sano",
+      "2-4 sano",
+      "4-6 sano",
+    ];
+    const categories = [
+      "feeding",
+      "sleep",
+      "play",
+      "health",
+      "emotional",
+      "behavior",
+      "learning",
+    ];
+
+    const randomAgeRange =
+      ageRanges[Math.floor(Math.random() * ageRanges.length)];
+    const randomCategory =
+      categories[Math.floor(Math.random() * categories.length)];
+
+    const categoryNames: Record<string, string> = {
+      feeding: "Quudinta",
+      sleep: "Hurdada",
+      play: "Ciyaarta",
+      health: "Caafimaadka",
+      emotional: "Dareenka",
+      behavior: "Dabeecadda",
+      learning: "Barashada",
+    };
+
+    const prompt = `Waxaad tahay khabiir ku takhasusay barbaarinta carruurta oo Soomaali ku hadla.
+    
+Samee talo kooban oo wanaagsan oo ku saabsan ${categoryNames[randomCategory]} ee carruurta da'doodu tahay ${randomAgeRange}.
+
+Qoraalka:
+- Ha ku qor Af-Soomaali faseex oo sahal ah
+- Talo hal ama laba tixraac ah oo macquul ah
+- Ha ka dhigin mid aad u dheer - 2-4 xarig kaliya
+- Ha ku dar emoji hal ama laba
+- Ha ku dar "Mahadsanid, Barbaarintasan Academy" dhamaadka
+
+Haddii aad ka hadlaysid "behavior" (dabeecadda), u qor sida waalidka uga caawin karaan ilmahooda inuu dabeecad wanaagsan yeesha.
+
+Qor talo cusub oo aan loo aqoon:`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_completion_tokens: 300,
+    });
+
+    const tipContent = response.choices[0]?.message?.content?.trim();
+    if (!tipContent) {
+      console.log("[CRON] No content received from OpenAI");
+      return;
+    }
+
+    // Generate a title based on category
+    const title = `${categoryNames[randomCategory]} - ${randomAgeRange}`;
+
+    // Calculate publish date (tomorrow)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const publishDate = tomorrow.toISOString().split("T")[0];
+
+    // Store the tip for admin review
+    const tip = await storage.createAiGeneratedTip({
+      title,
+      content: tipContent,
+      ageRange: randomAgeRange,
+      category: randomCategory,
+      publishDate,
+    });
+
+    console.log(`[CRON] AI tip generated successfully: ${tip.id} - ${title}`);
+  } catch (error) {
+    console.error("[CRON] Error generating AI tip:", error);
+  }
+}
+
+async function generateAiFlashcards() {
+  console.log("[CRON] Generating AI flashcard images...");
+
+  const openaiApiKey =
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+
+  if (!openaiApiKey) {
+    console.log(
+      "[CRON] OpenAI API key not configured - skipping flashcard generation",
+    );
+    return;
+  }
+
+  try {
+    const openai = new OpenAI({
+      apiKey: openaiApiKey,
+      baseURL: openaiBaseUrl,
+    });
+
+    const allCategories = await db
+      .select()
+      .from(flashcardCategories)
+      .where(eq(flashcardCategories.isActive, true));
+    if (allCategories.length === 0) {
+      console.log("[CRON] No active flashcard categories found");
+      return;
+    }
+
+    const existingFlashcards = await db
+      .select({ nameSomali: flashcards.nameSomali })
+      .from(flashcards);
+    const existingNames = new Set(
+      existingFlashcards.map((f) => f.nameSomali.toLowerCase()),
+    );
+
+    const categoryToDbCategory: Record<string, (typeof allCategories)[0]> = {};
+    for (const cat of allCategories) {
+      categoryToDbCategory[cat.name] = cat;
+    }
+
+    const pendingWords: Array<{
+      categoryName: string;
+      categoryId: string;
+      somali: string;
+      english: string;
+    }> = [];
+
+    for (const [categoryName, words] of Object.entries(SOMALI_VOCABULARY)) {
+      const dbCategory = categoryToDbCategory[categoryName];
+      if (!dbCategory) continue;
+
+      for (const word of words) {
+        if (!existingNames.has(word.somali.toLowerCase())) {
+          pendingWords.push({
+            categoryName,
+            categoryId: dbCategory.id,
+            somali: word.somali,
+            english: word.english,
+          });
+        }
+      }
+    }
+
+    if (pendingWords.length === 0) {
+      console.log("[CRON] All vocabulary words already have flashcards");
+      return;
+    }
+
+    const shuffled = pendingWords.sort(() => Math.random() - 0.5);
+    const toGenerate = shuffled.slice(0, 5);
+
+    console.log(
+      `[CRON] Generating ${toGenerate.length} flashcard images from ${pendingWords.length} pending words`,
+    );
+
+    for (const word of toGenerate) {
+      try {
+        console.log(
+          `[CRON] Generating image for: ${word.somali} (${word.english})`,
+        );
+
+        const imagePrompt = `Create a simple, colorful, child-friendly educational flashcard image for the word "${word.english}". 
+The image should:
+- Show a clear, cute illustration of ${word.english.toLowerCase()}
+- Use bright, vibrant colors
+- Have a clean white or light pastel background
+- Be suitable for young children learning vocabulary
+- NOT include any text or labels
+- Be in a flat, modern cartoon style
+- Be centered and easily recognizable`;
+
+        const response = await openai.images.generate({
+          model: "gpt-image-1",
+          prompt: imagePrompt,
+          n: 1,
+          size: "1024x1024",
+        });
+
+        const imageBase64 = response.data[0]?.b64_json;
+        if (!imageBase64) {
+          console.log(`[CRON] No image generated for ${word.somali}`);
+          continue;
+        }
+
+        const imageBuffer = Buffer.from(imageBase64, "base64");
+
+        const publicSearchPaths = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
+        const firstPath = publicSearchPaths.split(",")[0]?.trim();
+        if (!firstPath) {
+          console.log("[CRON] PUBLIC_OBJECT_SEARCH_PATHS not configured");
+          continue;
+        }
+
+        const pathParts = firstPath.split("/").filter(Boolean);
+        const bucketName = pathParts[0];
+        const timestamp = Date.now();
+        const fileName = `flashcards/${word.categoryName.toLowerCase()}/${word.somali.toLowerCase().replace(/\s+/g, "-")}-${timestamp}.png`;
+
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(`public/${fileName}`);
+
+        await file.save(imageBuffer, {
+          contentType: "image/png",
+          metadata: {
+            cacheControl: "public, max-age=31536000",
+          },
+        });
+
+        const imageUrl = `/public-files/${fileName}`;
+
+        const existingCount = await db
+          .select({ count: flashcards.id })
+          .from(flashcards)
+          .where(eq(flashcards.categoryId, word.categoryId));
+        const order = existingCount.length;
+
+        await storage.createFlashcard({
+          categoryId: word.categoryId,
+          nameSomali: word.somali,
+          nameEnglish: word.english,
+          imageUrl,
+          order,
+          isActive: true,
+        });
+
+        console.log(
+          `[CRON] Flashcard created successfully: ${word.somali} (${word.english})`,
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } catch (wordError) {
+        console.error(
+          `[CRON] Error generating flashcard for ${word.somali}:`,
+          wordError,
+        );
+      }
+    }
+
+    console.log("[CRON] AI flashcard generation completed");
+  } catch (error) {
+    console.error("[CRON] Error generating AI flashcards:", error);
+  }
+}
+
+async function expireSubscriptions() {
+  console.log("[CRON] Checking for expired subscriptions...");
+
+  try {
+    const expiredEnrollments = await storage.getExpiredEnrollments();
+
+    for (const enrollment of expiredEnrollments) {
+      console.log(`[CRON] Expiring enrollment ${enrollment.id}`);
+      await storage.updateEnrollmentStatus(enrollment.id, "expired");
+
+      if (enrollment.parentId) {
+        const parent = await storage.getParent(enrollment.parentId);
+        const course = await storage.getCourse(enrollment.courseId);
+
+        if (parent && course) {
+          if (parent.email) {
+            console.log(`[CRON] Sending expiration email to ${parent.email}`);
+            await sendSubscriptionExpiredEmail(
+              parent.email,
+              parent.name,
+              course.title,
+            );
+          }
+          if (parent.telegramChatId && parent.telegramOptin) {
+            console.log(
+              `[CRON] Sending expiration Telegram to ${parent.telegramChatId}`,
+            );
+            await sendTelegramSubscriptionExpired(
+              parent.telegramChatId,
+              parent.name,
+              course.title,
+            );
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[CRON] Error expiring subscriptions:", error);
+  }
+}
+
+// Send Telegram reminders 1 hour before appointments
+async function checkAppointmentReminders() {
+  console.log("[CRON] Checking for upcoming appointment reminders...");
+
+  try {
+    const now = new Date();
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+
+    // Get all approved appointments that haven't received 1h reminder
+    const upcomingAppointments = await db
+      .select()
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.status, "approved"),
+          isNull(appointments.reminder1hSentAt),
+        ),
+      );
+
+    for (const apt of upcomingAppointments) {
+      // Parse appointment datetime
+      const aptDateTime = new Date(
+        `${apt.appointmentDate}T${apt.appointmentTime}`,
+      );
+      const minutesUntilAppt =
+        (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+
+      // Send reminder if appointment is between 30 and 90 minutes away (to catch the 1-hour mark)
+      if (minutesUntilAppt > 30 && minutesUntilAppt <= 90) {
+        const parent = await storage.getParent(apt.parentId);
+
+        if (parent && parent.telegramChatId && parent.telegramOptin) {
+          console.log(
+            `[CRON] Sending 1-hour appointment reminder to ${parent.name} via Telegram`,
+          );
+
+          await sendTelegramAppointmentReminder(
+            parent.telegramChatId,
+            parent.name,
+            apt.teacherName,
+            apt.appointmentDate,
+            apt.appointmentTime,
+            apt.topic || undefined,
+            apt.meetingLink || undefined,
+          );
+
+          // Mark reminder as sent
+          await db
+            .update(appointments)
+            .set({ reminder1hSentAt: now })
+            .where(eq(appointments.id, apt.id));
+
+          console.log(`[CRON] Appointment reminder sent for ${apt.id}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[CRON] Error checking appointment reminders:", error);
+  }
+}
+
+// Send daily study reminders to parents who enabled them
+async function sendDailyStudyReminders() {
+  try {
+    const now = new Date();
+    const currentHour = now.getHours().toString().padStart(2, "0") + ":00";
+
+    console.log(
+      `[CRON] Checking for daily study reminders at ${currentHour}...`,
+    );
+
+    // Get all parents with daily reminder enabled for this hour
+    const parentsWithReminders = await db
+      .select()
+      .from(parents)
+      .where(
+        and(
+          eq(parents.dailyReminderEnabled, true),
+          eq(parents.dailyReminderTime, currentHour),
+        ),
+      );
+
+    if (parentsWithReminders.length === 0) {
+      console.log(`[CRON] No parents have reminders set for ${currentHour}`);
+      return;
+    }
+
+    console.log(
+      `[CRON] Found ${parentsWithReminders.length} parents with reminders at ${currentHour}`,
+    );
+
+    // Check if VAPID keys are configured
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      console.log(
+        "[CRON] VAPID keys not configured - skipping push notifications",
+      );
+      return;
+    }
+
+    // Set VAPID details if not already set
+    try {
+      webpush.setVapidDetails(
+        "mailto:info@barbaarintasan.com",
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY,
+      );
+    } catch (e) {
+      // Already set
+    }
+
+    const motivationalMessages = [
+      "Waa wakhtigii waxbarashada! Casharada cusub ayaa ku sugaya.",
+      "Maalin wanaagsan! Waxaa waqti u ah inaad ilmahaaga wax la barato.",
+      "Xusuus: Cashar kasta waa qalab cusub oo waxbarasho ah!",
+      "Waxbarasho yar oo maalin kasta wax weyn bay keentaa.",
+      "Carruurta waxbarashada waqti siiya! Casharada waa diyaar.",
+    ];
+
+    const randomMessage =
+      motivationalMessages[
+        Math.floor(Math.random() * motivationalMessages.length)
+      ];
+
+    for (const parent of parentsWithReminders) {
+      const title = "Xusuusin Waxbarasho";
+
+      // Save notification to inbox
+      await storage.createParentNotification({
+        parentId: parent.id,
+        title,
+        body: randomMessage,
+        type: "reminder",
+        payload: JSON.stringify({ url: "/courses" }),
+      });
+
+      await sendPushToParent(parent.id, parent.name, {
+        title,
+        body: randomMessage,
+        url: "/courses",
+      });
+    }
+  } catch (error) {
+    console.error("[CRON] Error sending daily study reminders:", error);
+  }
+}
+
+async function sendPushToParent(parentId: string, parentName: string, payload: object) {
+  const subscriptions = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.parentId, parentId));
+
+  if (subscriptions.length === 0) return;
+
+  let sent = false;
+  for (const sub of subscriptions) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth },
+        },
+        JSON.stringify(payload),
+      );
+      if (!sent) {
+        console.log(`[CRON] Sent push notification to ${parentName}`);
+        sent = true;
+      }
+      break;
+    } catch (err: any) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        await storage.deletePushSubscription(parentId, sub.endpoint);
+        console.log(`[CRON] Removed expired subscription for ${parentName}`);
+      } else {
+        console.error(`[CRON] Failed push to ${parentName}:`, err.message);
+      }
+    }
+  }
+}
+
+async function sendBedtimeStoryNotification() {
+  try {
+    const todayStory = await storage.getTodayBedtimeStory();
+    if (!todayStory) {
+      console.log("[CRON] No bedtime story available for today, skipping notification");
+      return;
+    }
+
+    const allParents = await db.select().from(parents);
+    const title = "Waqtigii Sheekada Hurdo! 🌙";
+    const body = `Sheeko cusub: ${todayStory.titleSomali}`;
+
+    for (const parent of allParents) {
+      await storage.createParentNotification({
+        parentId: parent.id,
+        title,
+        body,
+        type: "bedtime_story",
+        payload: JSON.stringify({ url: "/maaweelo", storyId: todayStory.id }),
+      });
+
+      await sendPushToParent(parent.id, parent.name, {
+        title,
+        body,
+        url: "/maaweelo",
+        icon: "🌙",
+      });
+    }
+    console.log(`[CRON] Bedtime story notifications sent to ${allParents.length} parents`);
+  } catch (error) {
+    console.error("[CRON] Error sending bedtime story notifications:", error);
+  }
+}
+
+async function sendInactiveParentNotifications() {
+  try {
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      console.log("[CRON] VAPID keys not configured - skipping inactive parent notifications");
+      return;
+    }
+
+    try {
+      webpush.setVapidDetails(
+        "mailto:info@barbaarintasan.com",
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY,
+      );
+    } catch (e) {}
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const inactiveParents = await db
+      .select()
+      .from(parents)
+      .where(
+        and(
+          or(
+            lt(parents.lastActiveAt, twentyFourHoursAgo),
+            isNull(parents.lastActiveAt),
+          ),
+          or(
+            lt(parents.lastEngagementNotifiedAt, twentyFourHoursAgo),
+            isNull(parents.lastEngagementNotifiedAt),
+          ),
+        )
+      );
+
+    if (inactiveParents.length === 0) {
+      console.log("[CRON] No inactive parents found for re-engagement notification");
+      return;
+    }
+
+    console.log(`[CRON] Found ${inactiveParents.length} inactive parents (24h+), sending re-engagement notifications...`);
+
+    const reEngagementMessages = [
+      "Waalid, waan ku xiisanay! Waalidiinta kale ayaa appka ka faa'iidaysanaya - adna kaalay oo wakhtigaaga waxbarasho geli!",
+      "Barbaarintasan waa ku sugaysa! Casharado cusub iyo waalidiinta kale ayaa ku sugaya – na soo booqo maanta!",
+      "Ilmahaagu wuxuu kugu amaani doono, markuu koro, inaad wax baran jirtay - kaalay oo waqti waxbarasho oo tayo leh geli maanta!",
+      "Waalidiinta badan ayaa maanta wax ka bartay Barbaarintasan - adna ku soo biir oo casharadaada sii wad!",
+      "Ma ogtahay? Waxbarasho yar oo maalin kasta ah wax weyn bay keentaa - soo booqo appka oo cashar cusub baro!",
+      "Waalid, muddo ayaad maqnayd! Waalidiinta kale ayaa casharado badan dhammaystay - adna soo laabo!",
+      "Carruurta waalidkood wax barto waa kuwa guuleysta - kaalay oo waxbaro oo bilow maanta!",
+      "Waalid qiimo leh, waalidiin kale ayaa maanta waxbarashadooda horumarinaya. Adigana waan kuu xiisaynay — soo booqo app-ka oo ilmahaaga u hur wakhti qiimo leh.",
+    ];
+
+    const randomMessage = reEngagementMessages[Math.floor(Math.random() * reEngagementMessages.length)];
+    const title = "❤️ Waan kuu xiisaynay!";
+
+    let sentCount = 0;
+    let failCount = 0;
+
+    for (const parent of inactiveParents) {
+      try {
+        await storage.createParentNotification({
+          parentId: parent.id,
+          title,
+          body: randomMessage,
+          type: "engagement",
+          payload: JSON.stringify({ url: "/" }),
+        });
+
+        await sendPushToParent(parent.id, parent.name, {
+          title,
+          body: randomMessage,
+          url: "/",
+        });
+        sentCount++;
+        await db
+          .update(parents)
+          .set({ lastEngagementNotifiedAt: new Date() })
+          .where(eq(parents.id, parent.id));
+      } catch (err) {
+        console.error(`[CRON] Error processing inactive notification for parent ${parent.id}:`, err);
+      }
+    }
+
+    console.log(`[CRON] Inactive parent notifications complete: ${sentCount} sent, ${failCount} failed, ${inactiveParents.length} parents targeted`);
+  } catch (error) {
+    console.error("[CRON] Error sending inactive parent notifications:", error);
+  }
+}
+
+export function startCronJobs() {
+  console.log("[CRON] Starting subscription management cron jobs...");
+
+  // Check subscriptions every hour
+  cron.schedule("0 * * * *", async () => {
+    await checkExpiringSubscriptions();
+    await expireSubscriptions();
+    await sendDailyStudyReminders();
+  });
+
+  // Send event reminders every 30 minutes
+  cron.schedule("*/30 * * * *", async () => {
+    await sendEventReminders();
+  });
+
+  // Check appointment reminders every 15 minutes
+  cron.schedule("*/15 * * * *", async () => {
+    await checkAppointmentReminders();
+  });
+
+  // Generate AI parenting tip daily at 6:00 AM
+  cron.schedule("0 6 * * *", async () => {
+    await generateAiParentingTip();
+  });
+
+  // Generate AI flashcard images daily at 7:00 AM
+  cron.schedule("0 7 * * *", async () => {
+    await generateAiFlashcards();
+  });
+
+  // Generate daily parent message (Dhambaalka Waalidka) at 8:00 AM East Africa Time
+  cron.schedule("0 8 * * *", async () => {
+    console.log("[CRON] Generating daily parent message (Dhambaalka Waalidka)...");
+    try {
+      await generateAndSaveParentMessage();
+      console.log("[CRON] Daily parent message generated successfully");
+    } catch (error) {
+      console.error("[CRON] Failed to generate daily parent message:", error);
+    }
+  }, { timezone: "Africa/Mogadishu" });
+
+  // Generate daily bedtime story at 8:00 AM East Africa Time (same time as parent message)
+  cron.schedule("0 8 * * *", async () => {
+    console.log("[CRON] Generating daily bedtime story...");
+    try {
+      await generateDailyBedtimeStory();
+      console.log("[CRON] Daily bedtime story generated successfully");
+    } catch (error) {
+      console.error("[CRON] Failed to generate daily bedtime story:", error);
+    }
+  }, { timezone: "Africa/Mogadishu" });
+
+  // Send bedtime story notification at 6:00 PM East Africa Time
+  cron.schedule("0 18 * * *", async () => {
+    console.log("[CRON] Sending bedtime story notifications...");
+    await sendBedtimeStoryNotification();
+  }, { timezone: "Africa/Mogadishu" });
+
+  // Send re-engagement notifications to inactive parents every 6 hours
+  cron.schedule("0 */6 * * *", async () => {
+    console.log("[CRON] Checking for inactive parents (24h+) to send re-engagement notifications...");
+    await sendInactiveParentNotifications();
+  });
+
+  console.log(
+    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips 6AM, flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h)",
+  );
+
+  setTimeout(async () => {
+    console.log("[CRON] Running initial subscription check...");
+    await checkExpiringSubscriptions();
+    await expireSubscriptions();
+  }, 10000);
+}
+
+// Export for manual trigger from admin
+export { generateAiParentingTip, generateAiFlashcards };

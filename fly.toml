@@ -1,0 +1,44 @@
+# Barbaarintasan Academy - Fly.io Configuration
+# Staging deployment: staging.appbarbaarintasan.com
+
+app = "barbaarintasan-staging"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  NODE_OPTIONS = "--max-old-space-size=1024"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+  
+  # Allow long-running requests for cron jobs (AI content generation)
+  [http_service.http_options]
+    idle_timeout = 300  # 5 minutes for AI content generation
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 80
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8080
+    path = "/api/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
