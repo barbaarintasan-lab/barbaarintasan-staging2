@@ -336,7 +336,12 @@ export async function streamVideoFile(fileId: string, rangeHeader?: string): Pro
           end = fileSize - 1;
         } else {
           start = parseInt(rangeMatch[1], 10);
-          end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : fileSize - 1;
+          end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : Math.min(start + 5 * 1024 * 1024 - 1, fileSize - 1);
+        }
+
+        const maxChunk = 5 * 1024 * 1024;
+        if (end - start + 1 > maxChunk) {
+          end = start + maxChunk - 1;
         }
 
         if (start >= fileSize || end >= fileSize || start > end) {
