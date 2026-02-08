@@ -4223,7 +4223,7 @@ ${baseUrl}/maaweelo`;
               <span>Sheeko</span>
             </Button>
             <Button
-              variant={["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test"].includes(activeTab) ? "default" : "outline"}
+              variant={["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events"].includes(activeTab) ? "default" : "outline"}
               className="flex items-center justify-center gap-1.5 h-10 text-xs sm:text-sm px-2 sm:px-3 rounded-lg shadow-sm hover:shadow-md transition-all"
               onClick={() => setActiveTab("homepage")}
               data-testid="nav-settings"
@@ -4455,7 +4455,7 @@ ${baseUrl}/maaweelo`;
             )}
             
             {/* Settings sub-tabs */}
-            {["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test"].includes(activeTab) && (
+            {["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events"].includes(activeTab) && (
               <>
                 <Button
                   variant={activeTab === "homepage" ? "secondary" : "ghost"}
@@ -4510,6 +4510,15 @@ ${baseUrl}/maaweelo`;
                   data-testid="tab-email-test"
                 >
                   <Send className="w-3 h-3 mr-1" /> Email Test
+                </Button>
+                <Button
+                  variant={activeTab === "meet-events" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setActiveTab("meet-events")}
+                  data-testid="tab-meet-events"
+                >
+                  <Video className="w-3 h-3 mr-1" /> Kulanka Meet
                 </Button>
               </>
             )}
@@ -6207,22 +6216,27 @@ ${baseUrl}/maaweelo`;
                                                   clearInterval(pollInterval);
                                                   pollCompleted = true;
                                                   setIsGeneratingVideo(false);
-                                                  const generatedVideos = statusData.response?.generatedVideos || 
-                                                    statusData.response?.generateVideoResponse?.generatedSamples;
-                                                  const videoData = generatedVideos?.[0]?.video;
-                                                  if (videoData?.uri) {
-                                                    setGeneratedVideoUrl(videoData.uri);
-                                                    toast.success("Video waa la sameeyay!");
-                                                  } else if (videoData?.videoBytes) {
-                                                    const blob = new Blob(
-                                                      [Uint8Array.from(atob(videoData.videoBytes), c => c.charCodeAt(0))],
-                                                      { type: 'video/mp4' }
-                                                    );
-                                                    setGeneratedVideoUrl(URL.createObjectURL(blob));
-                                                    toast.success("Video waa la sameeyay!");
+                                                  if (statusData._r2VideoUrl) {
+                                                    setGeneratedVideoUrl(statusData._r2VideoUrl);
+                                                    toast.success("Video waa la sameeyay oo la keydiyay!");
                                                   } else {
-                                                    console.log("[AI-VIDEO] Response structure:", JSON.stringify(statusData.response));
-                                                    toast.error("Video-ga lama helin natiijada");
+                                                    const generatedVideos = statusData.response?.generatedVideos || 
+                                                      statusData.response?.generateVideoResponse?.generatedSamples;
+                                                    const videoData = generatedVideos?.[0]?.video;
+                                                    if (videoData?.uri) {
+                                                      setGeneratedVideoUrl(videoData.uri);
+                                                      toast.success("Video waa la sameeyay!");
+                                                    } else if (videoData?.videoBytes) {
+                                                      const blob = new Blob(
+                                                        [Uint8Array.from(atob(videoData.videoBytes), c => c.charCodeAt(0))],
+                                                        { type: 'video/mp4' }
+                                                      );
+                                                      setGeneratedVideoUrl(URL.createObjectURL(blob));
+                                                      toast.success("Video waa la sameeyay!");
+                                                    } else {
+                                                      console.log("[AI-VIDEO] Response structure:", JSON.stringify(statusData.response));
+                                                      toast.error("Video-ga lama helin natiijada");
+                                                    }
                                                   }
                                                 }
                                               } catch {
@@ -10106,6 +10120,10 @@ ${baseUrl}/maaweelo`;
 
             <TabsContent value="email-test">
               <EmailTestTab />
+            </TabsContent>
+
+            <TabsContent value="meet-events">
+              <MeetEventsAdmin />
             </TabsContent>
 
             <TabsContent value="voice-spaces">
@@ -14280,6 +14298,349 @@ function EmailTestTab() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function MeetEventsAdmin() {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [title, setTitle] = useState("Kulanka Bahda Tarbiyadda Caruurta");
+  const [description, setDescription] = useState("");
+  const [meetLink, setMeetLink] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
+  const { data: events = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/meet-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/meet-events", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch events");
+      return res.json();
+    },
+  });
+
+  const resetForm = () => {
+    setTitle("Kulanka Bahda Tarbiyadda Caruurta");
+    setDescription("");
+    setMeetLink("");
+    setEventDate("");
+    setStartTime("");
+    setEndTime("");
+    setIsActive(true);
+    setEditingEvent(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (event: any) => {
+    setEditingEvent(event);
+    setTitle(event.title);
+    setDescription(event.description || "");
+    setMeetLink(event.meetLink);
+    setEventDate(event.eventDate);
+    setStartTime(event.startTime);
+    setEndTime(event.endTime);
+    setIsActive(event.isActive);
+    setShowForm(true);
+  };
+
+  const handleGenerateMeetLink = async () => {
+    if (!eventDate || !startTime) {
+      toast.error("Fadlan marka hore geli taariikhda iyo waqtiga bilowga");
+      return;
+    }
+    setIsGeneratingLink(true);
+    try {
+      const startDateTime = `${eventDate}T${startTime}:00`;
+      const durationMinutes = startTime && endTime
+        ? Math.max(30, Math.round((new Date(`2000-01-01T${endTime}`).getTime() - new Date(`2000-01-01T${startTime}`).getTime()) / 60000))
+        : 60;
+      const res = await fetch("/api/admin/create-meet-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: title || "Kulanka Bahda Tarbiyadda Caruurta",
+          description: description || "",
+          startDateTime,
+          durationMinutes,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.meetLink) {
+        setMeetLink(data.meetLink);
+        toast.success("Google Meet link waa la abuuray!");
+      } else {
+        toast.error(data.error || "Meet link abuurista way guul darreysatay");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Khalad ayaa dhacay");
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!meetLink.trim() || !eventDate || !startTime || !endTime) {
+      toast.error("Fadlan buuxi dhammaan meelaha lagama maarmaanka ah");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const body = { title, description: description || null, meetLink, eventDate, startTime, endTime, isActive };
+      const url = editingEvent ? `/api/admin/meet-events/${editingEvent.id}` : "/api/admin/meet-events";
+      const method = editingEvent ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save event");
+      toast.success(editingEvent ? "Kulanka waa la cusbooneysiiyay" : "Kulanka cusub waa la abuuray");
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      resetForm();
+    } catch (err: any) {
+      toast.error(err.message || "Khalad ayaa dhacay");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Ma hubtaa inaad tirtireyso kulanka?")) return;
+    try {
+      const res = await fetch(`/api/admin/meet-events/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast.success("Kulanka waa la tiray");
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+    } catch {
+      toast.error("Khalad ayaa dhacay");
+    }
+  };
+
+  const handleToggleActive = async (event: any) => {
+    try {
+      const res = await fetch(`/api/admin/meet-events/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isActive: !event.isActive }),
+      });
+      if (!res.ok) throw new Error("Failed to toggle");
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      toast.success(event.isActive ? "Kulanka waa la damiyay" : "Kulanka waa la shaqeeyay");
+    } catch {
+      toast.error("Khalad ayaa dhacay");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Video className="w-5 h-5 text-blue-600" />
+              Kulannada Google Meet
+            </CardTitle>
+            <Button
+              onClick={() => { resetForm(); setShowForm(true); }}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-add-meet-event"
+            >
+              <Plus className="w-4 h-4 mr-1" /> Kulan Cusub
+            </Button>
+          </div>
+          <CardDescription>
+            Maaree kulannada toos ah ee Google Meet ee bulshada waalidka
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {showForm && (
+            <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-4">
+              <h3 className="font-semibold text-blue-800 text-sm">
+                {editingEvent ? "Wax ka Badal Kulanka" : "Kulan Cusub Abuur"}
+              </h3>
+              <div>
+                <Label className="text-xs">Cinwaanka Kulanka</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Kulanka Bahda Tarbiyadda Caruurta"
+                  className="mt-1"
+                  data-testid="input-meet-title"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Faahfaahin (ikhtiyaari)</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Sharaxaad kooban oo ku saabsan kulanka..."
+                  className="mt-1"
+                  rows={3}
+                  data-testid="input-meet-description"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Taariikhda *</Label>
+                  <Input
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-meet-date"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Bilow *</Label>
+                  <Input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-meet-start"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Dhammaad *</Label>
+                  <Input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-meet-end"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Google Meet Link *</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={meetLink}
+                    onChange={(e) => setMeetLink(e.target.value)}
+                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                    className="flex-1"
+                    data-testid="input-meet-link"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateMeetLink}
+                    disabled={isGeneratingLink}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
+                    data-testid="btn-generate-meet-link"
+                  >
+                    {isGeneratingLink ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Video className="w-4 h-4 mr-1" />}
+                    Samee Link
+                  </Button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Riix "Samee Link" si uu Google Meet link cusub kuu abuuro, ama geli link-ka aad haysatid.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={isActive} onCheckedChange={setIsActive} />
+                <span className="text-sm text-gray-700">Firfircoon</span>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-green-600 hover:bg-green-700" data-testid="btn-save-meet-event">
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                  {editingEvent ? "Cusboonaysii" : "Kaydi"}
+                </Button>
+                <Button onClick={resetForm} variant="outline" size="sm" data-testid="btn-cancel-meet-event">
+                  <X className="w-4 h-4 mr-1" /> Jooji
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Video className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">Wali kulan lama abuurin</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event: any) => {
+                const eventDateTime = new Date(`${event.eventDate}T${event.startTime}`);
+                const isPast = eventDateTime < new Date();
+                return (
+                  <div
+                    key={event.id}
+                    className={`p-4 rounded-xl border ${event.isActive ? 'border-blue-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'} ${isPast ? 'opacity-70' : ''}`}
+                    data-testid={`meet-event-${event.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-sm truncate">{event.title}</h4>
+                          {event.isActive ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px]">Firfircoon</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-500 text-[10px]">Damisan</Badge>
+                          )}
+                          {isPast && <Badge variant="secondary" className="bg-orange-100 text-orange-700 text-[10px]">Dhamaaday</Badge>}
+                        </div>
+                        {event.description && <p className="text-xs text-gray-600 mb-2 line-clamp-2">{event.description}</p>}
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{event.eventDate}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{event.startTime} - {event.endTime}</span>
+                        </div>
+                        <a href={event.meetLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                          <ExternalLink className="w-3 h-3 inline mr-1" />{event.meetLink}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(event)}
+                          className="h-8 w-8 p-0"
+                          data-testid={`btn-toggle-meet-${event.id}`}
+                        >
+                          {event.isActive ? <EyeOff className="w-3.5 h-3.5 text-gray-500" /> : <Eye className="w-3.5 h-3.5 text-green-600" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(event)}
+                          className="h-8 w-8 p-0"
+                          data-testid={`btn-edit-meet-${event.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(event.id)}
+                          className="h-8 w-8 p-0"
+                          data-testid={`btn-delete-meet-${event.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

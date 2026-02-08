@@ -37,14 +37,28 @@ interface Course {
   courseId: string;
 }
 
+interface MeetEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  meetLink: string;
+  eventDate: string;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
 type CalendarEvent = {
   id: string;
   title: string;
   date: Date;
-  type: "live" | "assignment";
+  type: "live" | "assignment" | "meet";
   courseTitle: string;
   lessonId?: string;
   liveUrl?: string | null;
+  startTime?: string;
+  endTime?: string;
+  description?: string | null;
 };
 
 function parseDate(dateStr: string): Date | null {
@@ -99,6 +113,15 @@ export default function Calendar() {
     enabled: !!parent,
   });
 
+  const { data: meetEvents = [] } = useQuery<MeetEvent[]>({
+    queryKey: ["/api/meet-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/meet-events");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const enrolledCourseIds = useMemo(() => {
     if (!enrollments || !Array.isArray(enrollments)) return new Set<string>();
     return new Set(enrollments.map((e: any) => e.courseId));
@@ -125,8 +148,25 @@ export default function Calendar() {
       }
     });
 
+    meetEvents.filter(e => e.isActive).forEach(event => {
+      const date = parseDate(event.eventDate);
+      if (date) {
+        result.push({
+          id: `meet-${event.id}`,
+          title: event.title,
+          date,
+          type: "meet",
+          courseTitle: "Google Meet",
+          liveUrl: event.meetLink,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          description: event.description,
+        });
+      }
+    });
+
     return result;
-  }, [lessons, courses]);
+  }, [lessons, courses, meetEvents]);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -278,7 +318,7 @@ export default function Calendar() {
                         <div
                           key={i}
                           className={`w-1.5 h-1.5 rounded-full ${
-                            event.type === "live" ? "bg-red-500" : "bg-orange-500"
+                            event.type === "meet" ? "bg-blue-500" : event.type === "live" ? "bg-red-500" : "bg-orange-500"
                           }`}
                         />
                       ))}
@@ -290,10 +330,14 @@ export default function Calendar() {
           </div>
         </div>
 
-        <div className="flex gap-4 mt-4 px-2">
+        <div className="flex gap-4 mt-4 px-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500" />
             <span className="text-xs text-gray-600">{t("calendar.liveLessons")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <span className="text-xs text-gray-600">Kulanka Meet</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-orange-500" />
@@ -314,53 +358,115 @@ export default function Calendar() {
               </div>
             ) : (
               <div className="space-y-3">
-                {selectedEvents.map(event => (
-                  <div 
-                    key={event.id}
-                    className={`bg-white rounded-xl p-4 border-l-4 shadow-sm ${
-                      event.type === "live" ? "border-l-red-500" : "border-l-orange-500"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        event.type === "live" ? "bg-red-100" : "bg-orange-100"
-                      }`}>
-                        {event.type === "live" ? (
-                          <Video className={`w-5 h-5 ${event.type === "live" ? "text-red-600" : ""}`} />
-                        ) : (
-                          <FileText className="w-5 h-5 text-orange-600" />
+                {selectedEvents.map(event => {
+                  const borderColor = event.type === "meet" ? "border-l-blue-500" : event.type === "live" ? "border-l-red-500" : "border-l-orange-500";
+                  const bgColor = event.type === "meet" ? "bg-blue-100" : event.type === "live" ? "bg-red-100" : "bg-orange-100";
+                  const iconColor = event.type === "meet" ? "text-blue-600" : event.type === "live" ? "text-red-600" : "text-orange-600";
+
+                  const formatTime12 = (t: string) => {
+                    const [h, m] = t.split(":").map(Number);
+                    const ampm = h >= 12 ? "PM" : "AM";
+                    return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${ampm}`;
+                  };
+
+                  let canJoinMeet = false;
+                  let isLiveMeet = false;
+                  let meetDiffMs = 0;
+                  let meetDiffHours = 0;
+                  if (event.type === "meet" && event.startTime && event.endTime && selectedDate) {
+                    const now = new Date();
+                    const eventStart = new Date(`${event.date.toISOString().split("T")[0]}T${event.startTime}`);
+                    const eventEnd = new Date(`${event.date.toISOString().split("T")[0]}T${event.endTime}`);
+                    const diffMin = (eventStart.getTime() - now.getTime()) / 60000;
+                    meetDiffMs = eventStart.getTime() - now.getTime();
+                    meetDiffHours = meetDiffMs / 3600000;
+                    isLiveMeet = now >= eventStart && now <= eventEnd;
+                    canJoinMeet = diffMin <= 15 && now <= eventEnd;
+                  }
+
+                  return (
+                    <div 
+                      key={event.id}
+                      className={`bg-white rounded-xl p-4 border-l-4 shadow-sm ${borderColor}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgColor}`}>
+                          {event.type === "assignment" ? (
+                            <FileText className={`w-5 h-5 ${iconColor}`} />
+                          ) : (
+                            <Video className={`w-5 h-5 ${iconColor}`} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-500 mb-1">
+                            {event.courseTitle}
+                          </p>
+                          <h4 className="font-semibold text-gray-900">{event.title}</h4>
+                          {event.description && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{event.description}</p>
+                          )}
+                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {event.type === "meet" && event.startTime && event.endTime
+                                ? `${formatTime12(event.startTime)} - ${formatTime12(event.endTime)}`
+                                : event.type === "live" ? t("calendar.liveSession") : t("calendar.task")}
+                            </span>
+                            {isLiveMeet && (
+                              <span className="ml-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">LIVE</span>
+                            )}
+                            {!isLiveMeet && meetDiffHours <= 6 && meetDiffHours > 0 && (
+                              <span className="ml-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce">
+                                {Math.floor(meetDiffHours) > 0 ? `${Math.floor(meetDiffHours)}h ${Math.floor((meetDiffMs % 3600000) / 60000)}m` : `${Math.floor(meetDiffMs / 60000)} daq`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {event.type === "meet" && event.liveUrl && (
+                          parent ? (
+                            canJoinMeet ? (
+                              <a 
+                                href={event.liveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`px-3 py-1.5 text-white text-xs font-medium rounded-lg transition-colors ${isLiveMeet ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}
+                              >
+                                {isLiveMeet ? "Ku Biir" : "Ku Biir"}
+                              </a>
+                            ) : (
+                              <span className="px-3 py-1.5 bg-gray-100 text-gray-400 text-xs font-medium rounded-lg">
+                                Wali ma furina
+                              </span>
+                            )
+                          ) : (
+                            <Link href="/parent/register">
+                              <span className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 cursor-pointer">
+                                Isdiiwaangeli
+                              </span>
+                            </Link>
+                          )
+                        )}
+                        {event.type === "live" && event.liveUrl && (
+                          <a 
+                            href={event.liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            {t("calendar.join")}
+                          </a>
+                        )}
+                        {event.type === "assignment" && event.lessonId && (
+                          <Link href={`/lesson/${event.lessonId}`}>
+                            <Button size="sm" variant="outline" className="text-xs">
+                              {t("calendar.view")}
+                            </Button>
+                          </Link>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-gray-500 mb-1">
-                          {event.courseTitle}
-                        </p>
-                        <h4 className="font-semibold text-gray-900">{event.title}</h4>
-                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
-                          <Clock className="w-3 h-3" />
-                          <span>{event.type === "live" ? t("calendar.liveSession") : t("calendar.task")}</span>
-                        </div>
-                      </div>
-                      {event.type === "live" && event.liveUrl && (
-                        <a 
-                          href={event.liveUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          {t("calendar.join")}
-                        </a>
-                      )}
-                      {event.type === "assignment" && event.lessonId && (
-                        <Link href={`/lesson/${event.lessonId}`}>
-                          <Button size="sm" variant="outline" className="text-xs">
-                            {t("calendar.view")}
-                          </Button>
-                        </Link>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -376,42 +482,70 @@ export default function Calendar() {
                 .filter(event => event.date >= today)
                 .sort((a, b) => a.date.getTime() - b.date.getTime())
                 .slice(0, 5)
-                .map(event => (
-                  <div 
-                    key={event.id}
-                    className={`bg-white rounded-xl p-4 border-l-4 shadow-sm ${
-                      event.type === "live" ? "border-l-red-500" : "border-l-orange-500"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        event.type === "live" ? "bg-red-100" : "bg-orange-100"
-                      }`}>
-                        {event.type === "live" ? (
-                          <Video className="w-5 h-5 text-red-600" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-orange-600" />
+                .map(event => {
+                  const borderColor = event.type === "meet" ? "border-l-blue-500" : event.type === "live" ? "border-l-red-500" : "border-l-orange-500";
+                  const bgColor = event.type === "meet" ? "bg-blue-100" : event.type === "live" ? "bg-red-100" : "bg-orange-100";
+                  const iconColor = event.type === "meet" ? "text-blue-600" : event.type === "live" ? "text-red-600" : "text-orange-600";
+                  return (
+                    <div 
+                      key={event.id}
+                      className={`bg-white rounded-xl p-4 border-l-4 shadow-sm ${borderColor}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgColor}`}>
+                          {event.type === "assignment" ? (
+                            <FileText className={`w-5 h-5 ${iconColor}`} />
+                          ) : (
+                            <Video className={`w-5 h-5 ${iconColor}`} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-500 mb-1">
+                            {event.date.getDate()} {months[event.date.getMonth()]} - {event.courseTitle}
+                          </p>
+                          <h4 className="font-semibold text-gray-900">{event.title}</h4>
+                          {event.type === "meet" && event.startTime && event.endTime && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                              <Clock className="w-3 h-3" />
+                              <span>{event.startTime} - {event.endTime}</span>
+                            </div>
+                          )}
+                        </div>
+                        {event.type === "live" && event.liveUrl && (
+                          <a 
+                            href={event.liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            {t("calendar.join")}
+                          </a>
                         )}
+                        {event.type === "meet" && event.liveUrl && (() => {
+                          const now2 = new Date();
+                          const evStart = new Date(`${event.date.toISOString().split("T")[0]}T${event.startTime}`);
+                          const evEnd = new Date(`${event.date.toISOString().split("T")[0]}T${event.endTime}`);
+                          const dMin = (evStart.getTime() - now2.getTime()) / 60000;
+                          const cJoin = dMin <= 15 && now2 <= evEnd;
+                          if (!parent) {
+                            return (
+                              <Link href="/parent/register">
+                                <span className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg cursor-pointer">Isdiiwaangeli</span>
+                              </Link>
+                            );
+                          }
+                          return cJoin ? (
+                            <a href={event.liveUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                              Ku Biir
+                            </a>
+                          ) : (
+                            <span className="px-3 py-1.5 bg-gray-100 text-gray-400 text-xs font-medium rounded-lg">Wali ma furina</span>
+                          );
+                        })()}
                       </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-gray-500 mb-1">
-                          {event.date.getDate()} {months[event.date.getMonth()]} - {event.courseTitle}
-                        </p>
-                        <h4 className="font-semibold text-gray-900">{event.title}</h4>
-                      </div>
-                      {event.type === "live" && event.liveUrl && (
-                        <a 
-                          href={event.liveUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          {t("calendar.join")}
-                        </a>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
         )}

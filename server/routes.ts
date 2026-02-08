@@ -16086,6 +16086,75 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
+  // ==================== GOOGLE MEET EVENTS ====================
+
+  app.get("/api/meet-events", async (req, res) => {
+    try {
+      const events = await storage.getActiveGoogleMeetEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching meet events:", error);
+      res.status(500).json({ error: "Failed to fetch meet events" });
+    }
+  });
+
+  app.get("/api/admin/meet-events", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getGoogleMeetEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching meet events:", error);
+      res.status(500).json({ error: "Failed to fetch meet events" });
+    }
+  });
+
+  app.post("/api/admin/meet-events", requireAuth, async (req, res) => {
+    try {
+      const { title, description, meetLink, eventDate, startTime, endTime, isActive } = req.body;
+      if (!meetLink || !eventDate || !startTime || !endTime) {
+        return res.status(400).json({ error: "Meet link, date, start time, and end time are required" });
+      }
+      const event = await storage.createGoogleMeetEvent({
+        title: title || "Kulanka Bahda Tarbiyadda Caruurta",
+        description: description || null,
+        meetLink,
+        eventDate,
+        startTime,
+        endTime,
+        isActive: isActive !== undefined ? isActive : true,
+      });
+      res.json(event);
+    } catch (error) {
+      console.error("Error creating meet event:", error);
+      res.status(500).json({ error: "Failed to create meet event" });
+    }
+  });
+
+  app.patch("/api/admin/meet-events/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.updateGoogleMeetEvent(id, req.body);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating meet event:", error);
+      res.status(500).json({ error: "Failed to update meet event" });
+    }
+  });
+
+  app.delete("/api/admin/meet-events/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteGoogleMeetEvent(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting meet event:", error);
+      res.status(500).json({ error: "Failed to delete meet event" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   initializeWebSocket(httpServer);

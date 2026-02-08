@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2 } from "lucide-react";
+import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink } from "lucide-react";
 import { VoiceSpaces } from "@/components/VoiceSpaces";
 import { InstallBanner } from "@/components/InstallBanner";
 import { Input } from "@/components/ui/input";
@@ -738,6 +738,166 @@ function CourseCard({ course, onComingSoonClick }: { course: Course; onComingSoo
   return (
     <div onClick={() => onComingSoonClick?.(course)}>
       {cardContent}
+    </div>
+  );
+}
+
+function MeetEventsSection({ parent }: { parent: any }) {
+  const { data: events = [] } = useQuery<any[]>({
+    queryKey: ["/api/meet-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/meet-events");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const activeEvents = events.filter((e: any) => e.isActive);
+  if (activeEvents.length === 0) return null;
+
+  const now = new Date();
+
+  const formatSomaliDate = (dateStr: string) => {
+    const months = ["Janaayo", "Febraayo", "Maarso", "Abriil", "May", "Juun", "Luuliyo", "Ogost", "Sebtembar", "Oktoobar", "Nofembar", "Desembar"];
+    const days = ["Axad", "Isniin", "Talaado", "Arbaco", "Khamiis", "Jimce", "Sabti"];
+    const d = new Date(dateStr + "T00:00:00");
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  const formatTime12 = (time: string) => {
+    const [h, m] = time.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${m.toString().padStart(2, "0")} ${ampm}`;
+  };
+
+  return (
+    <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+          <Video className="w-4 h-4 text-white" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-900">Kulannada Tooska ah</h2>
+      </div>
+      <div className="space-y-3">
+        {activeEvents.map((event: any) => {
+          const eventStart = new Date(`${event.eventDate}T${event.startTime}`);
+          const eventEnd = new Date(`${event.eventDate}T${event.endTime}`);
+          const diffMs = eventStart.getTime() - now.getTime();
+          const diffMin = diffMs / 60000;
+          const isLive = now >= eventStart && now <= eventEnd;
+          const canJoin = diffMin <= 15 && now <= eventEnd;
+          const isPast = now > eventEnd;
+
+          const handleJoin = () => {
+            if (!parent) {
+              window.location.assign("/parent/register");
+              return;
+            }
+            if (canJoin) {
+              window.open(event.meetLink, "_blank");
+            }
+          };
+
+          const handleAddToCalendar = () => {
+            const startDate = eventStart.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+            const endDate = eventEnd.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+            const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(event.description || "")}`;
+            window.open(calUrl, "_blank");
+          };
+
+          if (isPast) return null;
+
+          return (
+            <div
+              key={event.id}
+              className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-4 shadow-sm"
+              data-testid={`meet-card-${event.id}`}
+            >
+              {(() => {
+                const diffHours = diffMs / 3600000;
+                const showLiveBadge = isLive || (diffHours <= 6 && diffHours > 0);
+                if (!showLiveBadge) return null;
+                return (
+                  <div className={`absolute top-3 right-3 flex items-center gap-1.5 text-white text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    isLive ? "bg-red-600 animate-pulse" : "bg-red-500 animate-bounce"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-white" : "bg-white/80"}`}></span>
+                    {isLive ? "LIVE" : (() => {
+                      const h = Math.floor(diffHours);
+                      const m = Math.floor((diffMs % 3600000) / 60000);
+                      return h > 0 ? `${h}h ${m}m` : `${m} daqiiqo`;
+                    })()}
+                  </div>
+                );
+              })()}
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Video className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm text-gray-900 mb-1">{event.title}</h3>
+                  {event.description && (
+                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">{event.description}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
+                    <span className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full">
+                      <Calendar className="w-3 h-3 text-blue-500" />
+                      {formatSomaliDate(event.eventDate)}
+                    </span>
+                    <span className="flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-full">
+                      <Clock className="w-3 h-3 text-indigo-500" />
+                      {formatTime12(event.startTime)} - {formatTime12(event.endTime)}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {!parent ? (
+                      <button
+                        onClick={() => window.location.assign("/parent/register")}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all"
+                        data-testid={`btn-join-meet-${event.id}`}
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        Isdiiwaangeli si aad u gasho
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleJoin}
+                        disabled={!canJoin}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          isLive
+                            ? "bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-200"
+                            : canJoin
+                            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"
+                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        }`}
+                        data-testid={`btn-join-meet-${event.id}`}
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        {isLive ? "Ku Biir Hadda" : canJoin ? "Ku Biir" : "Wali ma furina"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!parent) {
+                          window.location.assign("/parent/register");
+                          return;
+                        }
+                        handleAddToCalendar();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all"
+                      data-testid={`btn-calendar-meet-${event.id}`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      Kalandarka
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2213,6 +2373,9 @@ export default function Home() {
         </Link>
       </div>
       )}
+
+      {/* Google Meet Events Section */}
+      <MeetEventsSection parent={parent} />
 
       {/* BSAv.1 Sheeko - Voice Spaces Section (below stats) */}
       <SheekoSection />

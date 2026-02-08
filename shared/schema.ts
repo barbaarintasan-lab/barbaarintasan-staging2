@@ -2058,3 +2058,19 @@ export const contentProgress = pgTable("content_progress", {
 export const insertContentProgressSchema = createInsertSchema(contentProgress).omit({ id: true, completedAt: true });
 export type InsertContentProgress = z.infer<typeof insertContentProgressSchema>;
 export type ContentProgress = typeof contentProgress.$inferSelect;
+
+export const googleMeetEvents = pgTable("google_meet_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull().default("Kulanka Bahda Tarbiyadda Caruurta"),
+  description: text("description"),
+  meetLink: text("meet_link").notNull(),
+  eventDate: text("event_date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertGoogleMeetEventSchema = createInsertSchema(googleMeetEvents).omit({ id: true, createdAt: true });
+export type InsertGoogleMeetEvent = z.infer<typeof insertGoogleMeetEventSchema>;
+export type GoogleMeetEvent = typeof googleMeetEvents.$inferSelect;
