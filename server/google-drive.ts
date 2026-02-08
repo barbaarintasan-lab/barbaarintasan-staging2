@@ -83,17 +83,24 @@ export async function getAccessToken(): Promise<string> {
     try {
       return await getAccessTokenViaReplit();
     } catch (err) {
-      console.log('[Google Drive] Replit connector failed, trying OAuth fallback...');
+      console.log('[Google Drive] Replit connector failed, trying other methods...');
     }
   }
   
-  try {
-    return await getAccessTokenViaOAuth();
-  } catch (err: any) {
-    console.log('[Google Drive] OAuth access token failed:', err.message, '- trying Service Account...');
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      return await getAccessTokenViaServiceAccount();
+    } catch (err: any) {
+      console.log('[Google Drive] Service Account token failed:', err.message, '- trying OAuth...');
+    }
   }
 
-  return await getAccessTokenViaServiceAccount();
+  const hasDriveRefreshToken = !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+  if (hasDriveRefreshToken) {
+    return await getAccessTokenViaOAuth();
+  }
+
+  throw new Error('No Google Drive credentials available for access token');
 }
 
 async function getDriveClientViaReplit() {
@@ -170,17 +177,24 @@ async function getDriveClient() {
     try {
       return await getDriveClientViaReplit();
     } catch (err) {
-      console.log('[Google Drive] Replit connector failed for Drive client, trying OAuth fallback...');
+      console.log('[Google Drive] Replit connector failed for Drive client, trying other methods...');
     }
   }
   
-  try {
-    return await getDriveClientViaOAuth();
-  } catch (err: any) {
-    console.log('[Google Drive] OAuth failed:', err.message, '- trying Service Account fallback...');
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      return await getDriveClientViaServiceAccount();
+    } catch (err: any) {
+      console.log('[Google Drive] Service Account failed:', err.message, '- trying OAuth fallback...');
+    }
   }
 
-  return await getDriveClientViaServiceAccount();
+  const hasDriveRefreshToken = !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+  if (hasDriveRefreshToken) {
+    return await getDriveClientViaOAuth();
+  }
+
+  throw new Error('No Google Drive credentials available');
 }
 
 export interface DriveFile {
