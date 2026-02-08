@@ -417,6 +417,26 @@ export default function LessonView() {
     (p: any) => p.lessonId === lessonId && p.completed
   );
 
+  // Check if entire course is completed (all lessons done)
+  const isCourseFullyCompleted = courseLessons.length > 0 && courseLessons.every(
+    (l: any) => progressData.some((p: any) => p.lessonId === l.id && p.completed)
+  );
+
+  // Auto-show celebration for fully completed course (once per course)
+  useEffect(() => {
+    if (!isCourseFullyCompleted || !lesson?.courseId) return;
+    const storageKey = `celebration_shown_${lesson.courseId}`;
+    if (localStorage.getItem(storageKey)) return;
+    localStorage.setItem(storageKey, "true");
+    setCelebration({
+      isOpen: true,
+      type: "course_complete",
+      title: t("lessonView.success"),
+      subtitle: course?.title || "",
+      description: t("lessonView.founderMessage"),
+    });
+  }, [isCourseFullyCompleted, lesson?.courseId]);
+
   // Scheduling status for 0-6 course (daily/weekly lesson limits)
   const { data: schedulingStatus, refetch: refetchScheduling } = useQuery({
     queryKey: ["schedulingStatus", courseSlug],
@@ -2029,9 +2049,45 @@ export default function LessonView() {
           )}
 
           {hasAccess && isLessonCompleted && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
-              <CheckCircle className="w-6 h-6 text-green-500" />
-              <span className="text-green-700 font-bold">{t("lessonView.lessonCompleted")}</span>
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-6 h-6 text-green-500" />
+                <span className="text-green-700 font-bold">{t("lessonView.lessonCompleted")}</span>
+              </div>
+              {isCourseFullyCompleted && (
+                <div className="mt-3 pt-3 border-t border-green-200 space-y-2">
+                  <p className="text-green-800 font-bold text-sm">🎓 Koorsada dhan waad dhamaysay! Hambalyo!</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-yellow-50 border-yellow-400 text-yellow-800 hover:bg-yellow-100"
+                      onClick={() => {
+                        localStorage.removeItem(`celebration_shown_${lesson?.courseId}`);
+                        setCelebration({
+                          isOpen: true,
+                          type: "course_complete",
+                          title: t("lessonView.success"),
+                          subtitle: course?.title || "",
+                          description: t("lessonView.founderMessage"),
+                        });
+                      }}
+                      data-testid="button-show-celebration"
+                    >
+                      🎉 Dabaaladga
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-blue-50 border-blue-400 text-blue-800 hover:bg-blue-100"
+                      onClick={() => setLocation("/profile")}
+                      data-testid="button-view-certificate"
+                    >
+                      📜 Shahaadada
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
