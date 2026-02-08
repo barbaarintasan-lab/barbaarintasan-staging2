@@ -1,0 +1,16 @@
+{
+  "description": "Map Object Storage UUIDs to local course image files for Fly.io",
+  "mappings": {
+    "426a0ca5-a70f-4e24-83a7-0e81e552d9e1": "0-6-bilood.png",
+    "b7f9a77b-1f7e-4ca7-9a7c-6a761ea4ed49": "6-12-bilood.png",
+    "0ea8930f-6700-4e57-8bed-90ac948848bb": "1-2-sano.png",
+    "7cd94e3f-cef7-40f0-9817-6fcccdbc7eed": "2-4-sano.png",
+    "14f9e7be-3498-4f8a-8a9b-28e7a4998744": "4-7-sano.png",
+    "bc7288e8-cb41-4afe-a4c0-5c9ce358bd3b": "ilmo-is-dabira.png",
+    "e1e01539-845f-4543-8785-0f2d23dcf4d0": "caqli-sare.png",
+    "eeabb295-aed9-4ef0-9c51-5edd25f01afe": "hadalka-daaho.png",
+    "142e9fdf-35c9-4e0a-b547-a4b78031b5fd": "aabe-baraarugay.png",
+    "3e1b92dc-28c9-4ff0-b4fe-84d3552527c9": "badqabka-qoyska.png",
+    "54f52b31-6b72-4a85-84e5-21c6fe094dc7": ""
+  }
+}
