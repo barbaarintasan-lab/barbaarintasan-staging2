@@ -58,12 +58,6 @@ import { ChatRoom } from "@/components/ChatRoom";
 import { Switch } from "@/components/ui/switch";
 import { SocialNotifications } from "@/components/SocialNotifications";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
@@ -71,6 +65,7 @@ import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import {
   generateCertificate,
+  generateCertificateBlob,
   loadLogoAsBase64,
   loadSignatureAsBase64,
 } from "@/lib/certificate";
@@ -2549,175 +2544,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Completed Courses with Certificates - MOVED TO TOP */}
-      {completedCourses.length > 0 && (
-        <div id="certificates-section" className="px-4 mt-6">
-          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Award className="w-4 h-4 text-green-500" />
-            {t("profilePage.completedCourses")}
-          </h2>
-          <div className="space-y-3">
-            {completedCourses.map((course: any) => (
-              <Card
-                key={course.id}
-                className="border-none shadow-md bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-l-green-500"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-green-500">
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Trophy className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 text-sm line-clamp-1">
-                        {course.title}
-                      </h3>
-                      <p className="text-xs text-green-600 font-medium">
-                        {t("profilePage.courseCompleted")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 border-green-300 text-green-700 hover:bg-green-100"
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        const toastId = toast.loading(
-                          t("profilePage.creatingPdf"),
-                        );
-                        try {
-                          const [logoBase64, signatureBase64] =
-                            await Promise.all([
-                              loadLogoAsBase64(),
-                              loadSignatureAsBase64(),
-                            ]);
-                          const courseLessonTitles = lessons
-                            .filter((l: any) => l.courseId === course.id)
-                            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                            .map((l: any) => l.title);
-                          const enrollDate = course.enrollment?.accessStart
-                            ? new Date(course.enrollment.accessStart)
-                            : undefined;
-                          const realCompletionDate = course.courseCompletedAt
-                            ? new Date(course.courseCompletedAt)
-                            : new Date();
-                          await generateCertificate({
-                            parentName: parent?.name || t("profilePage.parent"),
-                            courseName: course.title,
-                            completionDate: realCompletionDate,
-                            enrollmentDate: enrollDate,
-                            courseDuration: course.duration || undefined,
-                            lessonTopics: courseLessonTitles,
-                            logoBase64,
-                            signatureBase64,
-                          });
-                          toast.dismiss(toastId);
-                          toast.success(t("profilePage.pdfDownloaded"));
-                        } catch (error) {
-                          toast.dismiss(toastId);
-                          toast.error(t("profilePage.pdfError"));
-                        }
-                      }}
-                      data-testid="button-download-certificate"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      {t("profilePage.certificate")}
-                    </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-100"
-                          data-testid={`button-share-achievement-${course.id}`}
-                        >
-                          <Share2 className="w-4 h-4 mr-1" />
-                          {t("profilePage.share")}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const text = `🎓 ${t("profilePage.shareSuccess")} "${course.title}" ee Barbaarintasan Academy! 🎉 https://appbarbaarintasan.com/`;
-                            const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-                            window.open(url, "_blank");
-                          }}
-                          className="cursor-pointer"
-                          data-testid="share-whatsapp"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="w-4 h-4 mr-2 fill-[#25D366]"
-                          >
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                          </svg>
-                          WhatsApp
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const text = `🎓 ${t("profilePage.shareSuccess")} "${course.title}" ee Barbaarintasan Academy! 🎉`;
-                            const url = `https://t.me/share/url?url=${encodeURIComponent("https://appbarbaarintasan.com/")}&text=${encodeURIComponent(text)}`;
-                            window.open(url, "_blank");
-                          }}
-                          className="cursor-pointer"
-                          data-testid="share-telegram"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="w-4 h-4 mr-2 fill-[#0088cc]"
-                          >
-                            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                          </svg>
-                          Telegram
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const text = `🎓 ${t("profilePage.shareSuccess")} "${course.title}" ee Barbaarintasan Academy! 🎉`;
-                            const url = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(text)}`;
-                            window.open(url, "_blank", "width=600,height=400");
-                          }}
-                          className="cursor-pointer"
-                          data-testid="share-facebook"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="w-4 h-4 mr-2 fill-[#1877F2]"
-                          >
-                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                          </svg>
-                          Facebook
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const text = `🎓 ${t("profilePage.shareSuccess")} "${course.title}" ee @Barbaarintasan Academy! 🎉`;
-                            const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-                            window.open(url, "_blank", "width=600,height=400");
-                          }}
-                          className="cursor-pointer"
-                          data-testid="share-twitter"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="w-4 h-4 mr-2 fill-black"
-                          >
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                          </svg>
-                          X (Twitter)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Assessment History Section - "Qiimaynta Waalidnimadaada iyo Heerka Ilmahaaga" */}
       <AssessmentHistorySection />
 
@@ -3296,6 +3122,163 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Completed Courses with Certificates - MOVED TO BOTTOM */}
+      {completedCourses.length > 0 && (
+        <div id="certificates-section" className="px-4 mt-6">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Award className="w-4 h-4 text-green-500" />
+            {t("profilePage.completedCourses")}
+          </h2>
+          <div className="space-y-3">
+            {completedCourses.map((course: any) => (
+              <Card
+                key={course.id}
+                className="border-none shadow-md bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-l-green-500"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-green-500">
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Trophy className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-sm line-clamp-1">
+                        {course.title}
+                      </h3>
+                      <p className="text-xs text-green-600 font-medium">
+                        {t("profilePage.courseCompleted")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-green-300 text-green-700 hover:bg-green-100"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const toastId = toast.loading(
+                          t("profilePage.creatingPdf"),
+                        );
+                        try {
+                          const [logoBase64, signatureBase64, modulesRes] =
+                            await Promise.all([
+                              loadLogoAsBase64(),
+                              loadSignatureAsBase64(),
+                              fetch(`/api/courses/${course.courseId || course.id}/modules`).then(r => r.ok ? r.json() : []).catch(() => []),
+                            ]);
+                          const courseModules = (modulesRes || [])
+                            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                            .map((m: any) => m.title);
+                          const courseLessonTitles = lessons
+                            .filter((l: any) => l.courseId === course.id)
+                            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                            .map((l: any) => l.title);
+                          const enrollDate = course.enrollment?.accessStart
+                            ? new Date(course.enrollment.accessStart)
+                            : undefined;
+                          const realCompletionDate = course.courseCompletedAt
+                            ? new Date(course.courseCompletedAt)
+                            : new Date();
+                          await generateCertificate({
+                            parentName: parent?.name || t("profilePage.parent"),
+                            courseName: course.title,
+                            completionDate: realCompletionDate,
+                            enrollmentDate: enrollDate,
+                            courseDuration: course.duration || undefined,
+                            lessonTopics: courseLessonTitles,
+                            courseSections: courseModules.length > 0 ? courseModules : undefined,
+                            logoBase64,
+                            signatureBase64,
+                          });
+                          toast.dismiss(toastId);
+                          toast.success(t("profilePage.pdfDownloaded"));
+                        } catch (error) {
+                          toast.dismiss(toastId);
+                          toast.error(t("profilePage.pdfError"));
+                        }
+                      }}
+                      data-testid="button-download-certificate"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      {t("profilePage.certificate")}
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-100"
+                      data-testid={`button-share-achievement-${course.id}`}
+                      onClick={async () => {
+                        const toastId = toast.loading("Shahaadada la diyaarinayaa...");
+                        try {
+                          const [logoBase64, signatureBase64, modulesRes] =
+                            await Promise.all([
+                              loadLogoAsBase64(),
+                              loadSignatureAsBase64(),
+                              fetch(`/api/courses/${course.courseId || course.id}/modules`).then(r => r.ok ? r.json() : []).catch(() => []),
+                            ]);
+                          const courseModules = (modulesRes || [])
+                            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                            .map((m: any) => m.title);
+                          const courseLessonTitles = lessons
+                            .filter((l: any) => l.courseId === course.id)
+                            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                            .map((l: any) => l.title);
+                          const enrollDate = course.enrollment?.accessStart
+                            ? new Date(course.enrollment.accessStart)
+                            : undefined;
+                          const realCompletionDate = course.courseCompletedAt
+                            ? new Date(course.courseCompletedAt)
+                            : new Date();
+                          const { blob, fileName } = await generateCertificateBlob({
+                            parentName: parent?.name || t("profilePage.parent"),
+                            courseName: course.title,
+                            completionDate: realCompletionDate,
+                            enrollmentDate: enrollDate,
+                            courseDuration: course.duration || undefined,
+                            lessonTopics: courseLessonTitles,
+                            courseSections: courseModules.length > 0 ? courseModules : undefined,
+                            logoBase64,
+                            signatureBase64,
+                          });
+                          toast.dismiss(toastId);
+                          const file = new File([blob], fileName, { type: "application/pdf" });
+                          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                              title: `Shahaado - ${course.title}`,
+                              text: `🎓 Waxaan ku guuleystay koorsada "${course.title}" ee Barbaarintasan Academy! 🎉`,
+                              files: [file],
+                            });
+                          } else {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = fileName;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            toast.success("PDF-ga shahaadada waa la soo dejiyay. Ku share-garee WhatsApp ama Telegram.");
+                          }
+                        } catch (error: any) {
+                          toast.dismiss(toastId);
+                          if (error?.name !== "AbortError") {
+                            toast.error("Khalad ayaa dhacay. Fadlan isku day mar kale.");
+                          }
+                        }
+                      }}
+                    >
+                      <Share2 className="w-4 h-4 mr-1" />
+                      {t("profilePage.share")}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Logout Button */}
       <div className="px-4 mt-6">

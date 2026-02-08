@@ -8,6 +8,7 @@ interface CertificateData {
   enrollmentDate?: Date;
   courseDuration?: string;
   lessonTopics?: string[];
+  courseSections?: string[];
   logoBase64?: string;
   signatureBase64?: string;
 }
@@ -215,13 +216,15 @@ export async function generateCertificate(data: CertificateData): Promise<void> 
 
   let currentY = 122;
 
-  if (data.lessonTopics && data.lessonTopics.length > 0) {
+  const topicsList = data.courseSections && data.courseSections.length > 0 ? data.courseSections : data.lessonTopics;
+  if (topicsList && topicsList.length > 0) {
     doc.setTextColor(120, 120, 120);
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
-    doc.text("Mawduucyada la baray:", centerX, currentY, { align: "center" });
+    const label = data.courseSections && data.courseSections.length > 0 ? "Qaybaha Koorsada:" : "Mawduucyada la baray:";
+    doc.text(label, centerX, currentY, { align: "center" });
     currentY += 5;
-    currentY = drawTopics(doc, data.lessonTopics, currentY, centerX, 200);
+    currentY = drawTopics(doc, topicsList, currentY, centerX, 200);
   }
 
   const detailsY = Math.max(currentY + 2, 148);
@@ -304,13 +307,15 @@ export async function generateCertificate(data: CertificateData): Promise<void> 
 
   let currentYEn = 122;
 
-  if (data.lessonTopics && data.lessonTopics.length > 0) {
+  const topicsListEn = data.courseSections && data.courseSections.length > 0 ? data.courseSections : data.lessonTopics;
+  if (topicsListEn && topicsListEn.length > 0) {
     doc.setTextColor(120, 120, 120);
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
-    doc.text("Topics covered:", centerX, currentYEn, { align: "center" });
+    const labelEn = data.courseSections && data.courseSections.length > 0 ? "Course Sections:" : "Topics covered:";
+    doc.text(labelEn, centerX, currentYEn, { align: "center" });
     currentYEn += 5;
-    currentYEn = drawTopics(doc, data.lessonTopics, currentYEn, centerX, 200);
+    currentYEn = drawTopics(doc, topicsListEn, currentYEn, centerX, 200);
   }
 
   const detailsYEn = Math.max(currentYEn + 2, 148);
@@ -341,6 +346,171 @@ export async function generateCertificate(data: CertificateData): Promise<void> 
     str.replace(/[^a-zA-Z0-9\u0600-\u06FF\s-]/g, "").replace(/\s+/g, "-").substring(0, 50);
   const fileName = `Shahaado-${sanitize(data.courseName)}-${sanitize(data.parentName)}.pdf`;
   doc.save(fileName);
+}
+
+export async function generateCertificateBlob(data: CertificateData): Promise<{ blob: Blob; fileName: string }> {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const centerX = pageWidth / 2;
+  const duration = formatDuration(data.enrollmentDate, data.completionDate, data.courseDuration);
+  const certId = `BA-${Date.now().toString(36).toUpperCase()}`;
+
+  drawDecorativeBorder(doc, pageWidth, pageHeight);
+  if (data.logoBase64) {
+    try { doc.addImage(data.logoBase64, "PNG", centerX - 12, 12, 24, 24); } catch {}
+  }
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.text("BARBAARINTASAN ACADEMY", centerX, 45, { align: "center" });
+  doc.setTextColor(180, 140, 60);
+  doc.setFontSize(16);
+  doc.text("SHAHAADADA DHAMAYSTIRKA", centerX, 55, { align: "center" });
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("Waxaan shahaado siinaa:", centerX, 68, { align: "center" });
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(24);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.parentName.toUpperCase(), centerX, 82, { align: "center" });
+  doc.setDrawColor(180, 140, 60);
+  doc.setLineWidth(0.5);
+  doc.line(centerX - 50, 86, centerX + 50, 86);
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("oo si guul leh u dhameysatay koorsadda:", centerX, 97, { align: "center" });
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.courseName, centerX, 115, { align: "center" });
+
+  let currentY = 122;
+  const topicsList = data.courseSections && data.courseSections.length > 0 ? data.courseSections : data.lessonTopics;
+  if (topicsList && topicsList.length > 0) {
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    const label = data.courseSections && data.courseSections.length > 0 ? "Qaybaha Koorsada:" : "Mawduucyada la baray:";
+    doc.text(label, centerX, currentY, { align: "center" });
+    currentY += 5;
+    currentY = drawTopics(doc, topicsList, currentY, centerX, 200);
+  }
+
+  const detailsY = Math.max(currentY + 2, 148);
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  const soDate = formatDateSomali(data.completionDate);
+  doc.text(`Taariikhda Dhamaystirka: ${soDate}`, centerX, detailsY, { align: "center" });
+  if (data.enrollmentDate) {
+    const enrollSoDate = formatDateSomali(data.enrollmentDate);
+    doc.text(`Taariikhda Diiwaangelinta: ${enrollSoDate}`, centerX, detailsY + 6, { align: "center" });
+  }
+  if (duration) {
+    doc.text(`Muddada Koorsada: ${duration}`, centerX, detailsY + (data.enrollmentDate ? 12 : 6), { align: "center" });
+  }
+
+  const sigY = detailsY + (data.enrollmentDate ? 18 : 12) + 3;
+  if (data.signatureBase64) {
+    try { doc.addImage(data.signatureBase64, "PNG", centerX - 15, sigY - 2, 30, 12); } catch {}
+  }
+  doc.setDrawColor(100, 100, 100);
+  doc.setLineWidth(0.3);
+  doc.line(centerX - 30, sigY + 11, centerX + 30, sigY + 11);
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(8);
+  doc.text("Aasaasaha Barbaarintasan Academy", centerX, sigY + 16, { align: "center" });
+  doc.setFontSize(7);
+  doc.text("Cabdiraxmaan Maxamed Cabdi (Cade)", centerX, sigY + 20, { align: "center" });
+  doc.setTextColor(180, 180, 180);
+  doc.setFontSize(6.5);
+  doc.text(`Certificate ID: ${certId}`, pageWidth - 18, pageHeight - 12, { align: "right" });
+  doc.text("www.barbaarintasan.com", 18, pageHeight - 12);
+
+  doc.addPage("a4", "landscape");
+  doc.setFillColor(255, 253, 248);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  drawDecorativeBorder(doc, pageWidth, pageHeight);
+  drawLogo(doc, centerX, 22, data.logoBase64);
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("BARBAARINTASAN ACADEMY", centerX, 50, { align: "center" });
+  doc.setTextColor(196, 164, 105);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("Online Parenting Education", centerX, 55.5, { align: "center" });
+  doc.setDrawColor(196, 164, 105);
+  doc.setLineWidth(0.4);
+  doc.line(centerX - 50, 59, centerX + 50, 59);
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(28);
+  doc.setFont("helvetica", "bold");
+  doc.text("CERTIFICATE", centerX, 71, { align: "center" });
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("This is to certify that", centerX, 79, { align: "center" });
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(24);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.parentName, centerX, 92, { align: "center" });
+  const nameWidthEn = doc.getTextWidth(data.parentName);
+  doc.setDrawColor(196, 164, 105);
+  doc.setLineWidth(0.6);
+  doc.line(centerX - nameWidthEn / 2 - 10, 96, centerX + nameWidthEn / 2 + 10, 96);
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("has successfully completed the course:", centerX, 106, { align: "center" });
+  const enCourseName = data.courseNameEnglish || data.courseName;
+  doc.setTextColor(26, 54, 93);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(enCourseName, centerX, 115, { align: "center" });
+  let currentYEn = 122;
+  const topicsListEn = data.courseSections && data.courseSections.length > 0 ? data.courseSections : data.lessonTopics;
+  if (topicsListEn && topicsListEn.length > 0) {
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    const labelEn = data.courseSections && data.courseSections.length > 0 ? "Course Sections:" : "Topics covered:";
+    doc.text(labelEn, centerX, currentYEn, { align: "center" });
+    currentYEn += 5;
+    currentYEn = drawTopics(doc, topicsListEn, currentYEn, centerX, 200);
+  }
+  const detailsYEn = Math.max(currentYEn + 2, 148);
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  const enDate = formatDateEnglish(data.completionDate);
+  doc.text(`Date of Completion: ${enDate}`, centerX, detailsYEn, { align: "center" });
+  if (duration.en) {
+    doc.text(`Course Duration: ${duration.en}`, centerX, detailsYEn + 5, { align: "center" });
+  }
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text("Completed Online at Barbaarintasan Academy", centerX, detailsYEn + (duration.en ? 11 : 6), { align: "center" });
+  const sigYEn = pageHeight - 28;
+  drawSignatureBlock(doc, centerX, sigYEn, data.signatureBase64, "Ustaad Musse Said Aw-Musse", "Founder, Barbaarintasan Academy");
+  doc.setTextColor(180, 180, 180);
+  doc.setFontSize(6.5);
+  doc.text(`Certificate ID: ${certId}`, pageWidth - 18, pageHeight - 12, { align: "right" });
+  doc.text("www.barbaarintasan.com", 18, pageHeight - 12);
+
+  const sanitize = (str: string) =>
+    str.replace(/[^a-zA-Z0-9\u0600-\u06FF\s-]/g, "").replace(/\s+/g, "-").substring(0, 50);
+  const fileName = `Shahaado-${sanitize(data.courseName)}-${sanitize(data.parentName)}.pdf`;
+  const blob = doc.output("blob");
+  return { blob, fileName };
 }
 
 export async function loadLogoAsBase64(): Promise<string | undefined> {
