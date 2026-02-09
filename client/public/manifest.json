@@ -1,0 +1,98 @@
+{
+  "name": "BSA & Sheeko - Barbaarintasan Academy",
+  "short_name": "BSA",
+  "description": "App-ka waalidka Soomaaliyeed - Cashar, Sheeko Live Audio, Maktabada, Quraanka, iyo wax badan. Somali parenting education platform with live voice rooms.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#1e40af",
+  "theme_color": "#1e40af",
+  "orientation": "portrait",
+  "scope": "/",
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "768x1408",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Home Screen - Bogga Hore"
+    },
+    {
+      "src": "/screenshot-2.png",
+      "sizes": "768x1408",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Courses - Koorsooyin"
+    },
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1408x768",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop View - Muuqaalka Desktop-ka"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Koorsooyin",
+      "short_name": "Courses",
+      "description": "Eeg koorsoyinka waxbarashada",
+      "url": "/courses",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sheeko Live",
+      "short_name": "Sheeko",
+      "description": "Ku biir sheeko voice chat",
+      "url": "/sheeko",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Maktabada",
+      "short_name": "Library",
+      "description": "Akhri buugaagta iyo maqaallada",
+      "url": "/library",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["education", "parenting", "lifestyle"],
+  "lang": "so",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}

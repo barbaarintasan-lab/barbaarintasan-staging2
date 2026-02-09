@@ -1,0 +1,132 @@
+/* Barbaarintasan Academy - Shop Page Styles */
+/* Ku dar WordPress: Appearance → Customize → Additional CSS */
+
+/* Shop Page Container */
+.woocommerce ul.products {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  gap: 24px !important;
+  padding: 20px 0 !important;
+}
+
+/* Product Card */
+.woocommerce ul.products li.product {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+  border-radius: 20px !important;
+  padding: 24px !important;
+  border: 2px solid #e2e8f0 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.woocommerce ul.products li.product:hover {
+  transform: translateY(-8px) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  border-color: #0284c7 !important;
+}
+
+/* Add decorative gradient top border */
+.woocommerce ul.products li.product::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 4px !important;
+  background: linear-gradient(90deg, #0284c7, #06b6d4, #f59e0b) !important;
+}
+
+/* Product Image */
+.woocommerce ul.products li.product img {
+  border-radius: 16px !important;
+  margin-bottom: 16px !important;
+}
+
+/* Product Title */
+.woocommerce ul.products li.product .woocommerce-loop-product__title {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #1e3a5f !important;
+  margin: 16px 0 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* Product Price */
+.woocommerce ul.products li.product .price {
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  color: #0284c7 !important;
+  margin-bottom: 16px !important;
+}
+
+.woocommerce ul.products li.product .price ins {
+  text-decoration: none !important;
+}
+
+/* Add to Cart Button */
+.woocommerce ul.products li.product .button,
+.woocommerce ul.products li.product a.add_to_cart_button {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 14px 24px !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  width: 100% !important;
+  text-align: center !important;
+  transition: all 0.3s ease !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.woocommerce ul.products li.product .button:hover,
+.woocommerce ul.products li.product a.add_to_cart_button:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+  transform: scale(1.02) !important;
+}
+
+/* Shop Page Title */
+.woocommerce-products-header__title {
+  font-size: 2.5rem !important;
+  font-weight: 800 !important;
+  color: #1e3a5f !important;
+  text-align: center !important;
+  margin-bottom: 8px !important;
+}
+
+/* Result Count Badge */
+.woocommerce-result-count {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%) !important;
+  color: white !important;
+  padding: 8px 20px !important;
+  border-radius: 50px !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+}
+
+/* Sorting Dropdown */
+.woocommerce-ordering select {
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+  font-size: 0.95rem !important;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .woocommerce ul.products {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  .woocommerce ul.products li.product {
+    padding: 20px !important;
+  }
+  
+  .woocommerce-products-header__title {
+    font-size: 1.75rem !important;
+  }
+}

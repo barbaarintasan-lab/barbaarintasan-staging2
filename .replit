@@ -1,0 +1,61 @@
+modules = ["nodejs-20", "web", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+[nix]
+channel = "stable-24_05"
+packages = ["zip", "ffmpeg", "rsync", "unzip"]
+
+[deployment]
+deploymentTarget = "cloudrun"
+build = ["npm", "run", "build"]
+run = ["sh", "-c", "npm run start"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8090
+externalPort = 3000
+
+[env]
+PORT = "5000"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[agent]
+mockupState = "FULLSTACK"
+integrations = ["javascript_database:1.0.0", "javascript_object_storage:2.0.0", "google-calendar:1.0.0", "javascript_openai:1.0.0", "javascript_openai_ai_integrations:2.0.0", "google-drive:1.0.0", "stripe:2.0.0", "github:1.0.0"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-324beaf5-4318-4263-a571-36e831d8b00f"
+
+[userenv]
+
+[userenv.shared]
+APP_BASE_URL = "https://appbarbaarintasan.com"
+VITE_GA_MEASUREMENT_ID = "G-TSZVN1ZLCJ"
+TELEGRAM_GROUP_CHAT_ID = "-1001279145498"
+VAPID_PUBLIC_KEY = "BPnoP0iKEtmBMEzP7zDT7vEKxejlvIVVxexABoLMuWSM3ZS-30cdZMGNVUoV7mrj_D_iJQAtxpjrr5_phkcKkTw"
+VAPID_PRIVATE_KEY = "Mj8_Skm9WS2xx4cj8ci3keGLD0r5OLXxU3E1equapSU"
+TELEGRAM_GROUP_CHAT_ID_2 = "-4981472144"

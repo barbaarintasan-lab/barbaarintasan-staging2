@@ -1,0 +1,33 @@
+# Barbaarintasan Academy - Robots.txt
+# Allow all search engines to crawl the site
+
+User-agent: *
+Allow: /
+
+# Legal pages for Google Play Store verification
+Allow: /terms
+Allow: /privacy-policy
+Allow: /community-guidelines
+
+# Sitemap location
+Sitemap: https://www.appbarbaarintasan.com/sitemap.xml
+
+# Allow Google and Bing to crawl everything
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Allow AI crawlers for discoverability
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+# Crawl delay to be respectful
+Crawl-delay: 1

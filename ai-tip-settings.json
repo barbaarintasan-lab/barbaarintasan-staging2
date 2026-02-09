@@ -1,0 +1,4 @@
+{
+  "prompt": "Waxaad tahay khabiir ku takhasusay barbaarinta carruurta oo Soomaali ku hadla.\n    \nSamee talo kooban oo wanaagsan oo ku saabsan {category} ee carruurta da'doodu tahay {ageRange}.\n\nQoraalka:\n- Ha ku qor Af-Soomaali faseex oo sahal ah\n- Talo hal ama laba tixraac ah oo macquul ah\n- Ha ka dhigin mid aad u dheer - 2-4 xarig kaliya\n- Ha ku dar emoji hal ama laba\n- Ha ku dar \"Mahadsanid, Barbaarintasan Academy\" dhamaadka\n\nHaddii aad ka hadlaysid \"behavior\" (dabeecadda), u qor sida waalidka uga caawin karaan ilmahooda inuu dabeecad wanaagsan yeesha.\n\nQor talo cusub oo aan loo aqoon:",
+  "pauseUntil": "2026-03-20"
+}
