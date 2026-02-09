@@ -15721,11 +15721,31 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
-  // Live stats: online users count + enrolled users count (public endpoint)
+  // Track all visitors (logged in + anonymous)
+  const activeVisitors = new Map<string, number>();
+
+  const cleanupVisitors = () => {
+    const now = Date.now();
+    for (const [key, lastSeen] of activeVisitors) {
+      if (now - lastSeen > 90000) {
+        activeVisitors.delete(key);
+      }
+    }
+  };
+
+  app.post("/api/stats/ping", (req, res) => {
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+    const visitorKey = `${ip}-${req.sessionID || "anon"}`;
+    activeVisitors.set(visitorKey, Date.now());
+    res.json({ ok: true });
+  });
+
+  // Live stats: online visitors + enrolled users count (public endpoint)
   app.get("/api/stats/live", async (req, res) => {
     try {
-      const onlineUsers = getOnlineUsers();
-      const onlineCount = onlineUsers.length;
+      cleanupVisitors();
+      const loggedInUsers = getOnlineUsers();
+      const onlineCount = Math.max(activeVisitors.size, loggedInUsers.length);
 
       const [enrollmentResult] = await db
         .select({ count: sql<number>`count(distinct ${enrollments.parentId})` })

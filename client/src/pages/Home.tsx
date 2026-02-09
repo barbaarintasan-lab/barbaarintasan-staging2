@@ -2116,6 +2116,13 @@ function GettingStartedGuide({
 }
 
 function LiveStatsBar() {
+  useEffect(() => {
+    const ping = () => fetch("/api/stats/ping", { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const { data: liveStats, isLoading } = useQuery({
     queryKey: ["liveStats"],
     queryFn: async () => {
@@ -2131,18 +2138,18 @@ function LiveStatsBar() {
 
   return (
     <div className="flex items-center justify-center gap-4 sm:gap-8" data-testid="live-stats-bar">
-      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-gray-100" data-testid="stat-online-users">
-        <span className="relative flex h-2.5 w-2.5">
+      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2.5 shadow-sm border border-gray-100" data-testid="stat-online-users">
+        <span className="relative flex h-4 w-4">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]"></span>
         </span>
-        <span className="text-sm font-bold text-gray-800">{isLoading ? "..." : onlineCount}</span>
-        <span className="text-xs text-gray-500">online</span>
+        <span className="text-base font-bold text-gray-800">{isLoading ? "..." : onlineCount}</span>
+        <span className="text-sm text-gray-500">online</span>
       </div>
-      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-gray-100" data-testid="stat-enrolled-users">
-        <GraduationCap className="w-4 h-4 text-indigo-500" />
-        <span className="text-sm font-bold text-gray-800">{isLoading ? "..." : enrolledCount}</span>
-        <span className="text-xs text-gray-500">enrolled</span>
+      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2.5 shadow-sm border border-gray-100" data-testid="stat-enrolled-users">
+        <GraduationCap className="w-5 h-5 text-indigo-500" />
+        <span className="text-base font-bold text-gray-800">{isLoading ? "..." : enrolledCount}</span>
+        <span className="text-sm text-gray-500">enrolled</span>
       </div>
     </div>
   );
