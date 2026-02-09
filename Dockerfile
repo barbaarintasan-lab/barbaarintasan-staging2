@@ -29,12 +29,10 @@ RUN npm ci --omit=dev && npm ls stripe 2>/dev/null || npm install stripe
 # dist/ contains: index.js (bundled server) and public/ (client build)
 COPY --from=builder /app/dist ./dist
 
-# Ensure course-images are in the correct location for static serving
-# (Vite should copy them, but this ensures they're present)
+# Ensure course-images directory exists for static serving
 RUN mkdir -p /app/dist/public/course-images
-COPY --from=builder /app/client/public/course-images ./dist/public/course-images
 
-# Copy static assets needed at runtime
+# Copy attached_assets if they exist (logo, icons etc)
 COPY --from=builder /app/attached_assets ./attached_assets
 
 # Create TTS audio temp directory
