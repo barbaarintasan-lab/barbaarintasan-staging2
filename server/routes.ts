@@ -9,8 +9,8 @@ import bcrypt from "bcrypt";
 import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
-import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs } from "@shared/schema";
+import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -1831,17 +1831,13 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Wadanka waa khasab" });
       }
 
-      if (!city) {
-        return res.status(400).json({ error: "Magaalada waa khasab" });
-      }
-
       // Normalize country and city names (capitalize first letter of each word)
-      const normalizeText = (text: string) => text.trim().split(' ')
+      const normalizeText = (text: string) => text ? text.trim().split(' ')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
+        .join(' ') : '';
       
       const normalizedCountry = normalizeText(country);
-      const normalizedCity = normalizeText(city);
+      const normalizedCity = city ? normalizeText(city) : '';
 
       // Check if email already exists
       const existingParent = await storage.getParentByEmail(email);
@@ -1881,6 +1877,11 @@ Ka jawaab qaabkan JSON ah:
         } catch (emailError) {
           console.error(`[REGISTRATION] Failed to send welcome email to ${parent.email}:`, emailError);
         }
+
+        // Sync new user to WordPress (non-blocking)
+        syncUserToWordPress(parent.email, parent.name, phone || '', hashedPassword).catch(err => {
+          console.error(`[WP-SYNC] Background sync failed for ${parent.email}:`, err);
+        });
       }
 
       // Generate unique session token for single-session enforcement
@@ -1931,6 +1932,39 @@ Ka jawaab qaabkan JSON ah:
     }
   });
 
+  // Helper: Verify login credentials against WordPress
+  async function verifyWithWordPress(email: string, password: string): Promise<{ verified: boolean; user?: { name: string; phone: string; email: string } }> {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-LOGIN] WORDPRESS_API_KEY not set - skipping WordPress verification');
+      return { verified: false };
+    }
+    
+    try {
+      const response = await fetch('https://barbaarintasan.com/wp-json/bsa/v1/verify-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const result = await response.json() as any;
+      
+      if (result.verified) {
+        console.log(`[WP-LOGIN] WordPress verified user: ${email}`);
+        return { verified: true, user: result.user };
+      }
+      
+      console.log(`[WP-LOGIN] WordPress verification failed for: ${email} - ${result.error || 'unknown'}`);
+      return { verified: false };
+    } catch (error) {
+      console.error(`[WP-LOGIN] Error verifying with WordPress: ${email}`, error);
+      return { verified: false };
+    }
+  }
+
   // Parent email/password login
   app.post("/api/auth/parent/login", async (req, res) => {
     try {
@@ -1940,18 +1974,46 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const parent = await storage.getParentByEmail(email);
+      const normalizedEmail = email.toLowerCase().trim();
+      let parent = await storage.getParentByEmail(normalizedEmail);
+      
       if (!parent) {
-        return res.status(401).json({ error: "Invalid email or password" });
-      }
+        // User not in app database - try WordPress verification
+        const wpVerified = await verifyWithWordPress(normalizedEmail, password);
+        if (!wpVerified.verified) {
+          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
+        }
+        
+        // WordPress verified! Auto-create account in app
+        const hashedPassword = await bcrypt.hash(password, 10);
+        parent = await storage.createParent({
+          email: normalizedEmail,
+          password: hashedPassword,
+          name: wpVerified.user?.name || normalizedEmail.split('@')[0],
+          phone: wpVerified.user?.phone || null,
+          country: null,
+          city: null,
+          inParentingGroup: false,
+        });
+        console.log(`[WP-LOGIN] Auto-created app account for WordPress user: ${normalizedEmail}, id: ${parent.id}`);
+      } else {
+        if (!parent.password) {
+          return res.status(401).json({ error: "Akoonkaan wuxuu ku sameeyay Google. Fadlan Google-ga ku gal." });
+        }
 
-      if (!parent.password) {
-        return res.status(401).json({ error: "This account was created with Google. Please register with a new password using the same email address." });
-      }
-
-      const isValid = await bcrypt.compare(password, parent.password);
-      if (!isValid) {
-        return res.status(401).json({ error: "Invalid email or password" });
+        const isValid = await bcrypt.compare(password, parent.password);
+        if (!isValid) {
+          // Also try WordPress as fallback (user may have changed password on WordPress)
+          const wpVerified = await verifyWithWordPress(normalizedEmail, password);
+          if (wpVerified.verified) {
+            // Update app password to match WordPress
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await storage.updateParentPassword(parent.id, hashedPassword);
+            console.log(`[WP-LOGIN] Updated app password from WordPress for: ${normalizedEmail}`);
+          } else {
+            return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
+          }
+        }
       }
 
       // Generate unique session token for single-session enforcement
@@ -8075,7 +8137,22 @@ Return a JSON object with:
         return res.status(404).json({ error: "Enrollment not found" });
       }
 
+      let userEmail = '';
+      if (enrollment.parentId) {
+        const parent = await storage.getParent(enrollment.parentId);
+        if (parent?.email) {
+          userEmail = parent.email;
+        }
+      }
+
       await storage.deleteEnrollment(req.params.id);
+
+      if (userEmail) {
+        syncEnrollmentDeleteToWordPress(userEmail, enrollment.courseId).catch(err => {
+          console.error('[WP-SYNC] Error syncing enrollment delete:', err);
+        });
+      }
+
       res.json({ success: true, message: "Enrollment deleted successfully" });
     } catch (error) {
       console.error("Error deleting enrollment:", error);
@@ -15051,6 +15128,139 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
+  // ==================== EXPORT USERS FOR WORDPRESS MIGRATION ====================
+  app.get("/api/admin/export-users-wp", async (req, res) => {
+    try {
+      const parentId = (req.session as any)?.parentId;
+      if (parentId) {
+        const parent = await storage.getParent(parentId);
+        if (!parent?.isAdmin) {
+          return res.status(403).json({ error: "Admin only" });
+        }
+      } else if (req.session.userId) {
+        const user = await storage.getUser(req.session.userId);
+        if (!user?.isAdmin) {
+          return res.status(403).json({ error: "Admin only" });
+        }
+      } else {
+        return res.status(401).json({ error: "Admin login required" });
+      }
+
+      console.log("[EXPORT-WP] Admin exporting users for WordPress migration");
+
+      const allParents = await storage.getAllParents();
+      const allCourses = await storage.getAllCourses();
+
+      const exportUsers = [];
+      for (const parent of allParents) {
+        const parentEnrollments = [];
+        for (const course of allCourses) {
+          const enrollment = await storage.getEnrollment(parent.id, course.id);
+          if (enrollment && enrollment.status === 'active') {
+            parentEnrollments.push({
+              courseId: course.courseId,
+              courseTitle: course.title,
+              planType: enrollment.planType,
+              accessStart: enrollment.accessStart,
+              accessEnd: enrollment.accessEnd,
+            });
+          }
+        }
+
+        exportUsers.push({
+          id: parent.id,
+          email: parent.email,
+          name: parent.name,
+          phone: parent.phone || '',
+          passwordHash: parent.password || '',
+          country: parent.country || '',
+          city: parent.city || '',
+          createdAt: parent.createdAt,
+          enrollments: parentEnrollments,
+        });
+      }
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        totalUsers: exportUsers.length,
+        totalWithEnrollments: exportUsers.filter(u => u.enrollments.length > 0).length,
+        users: exportUsers,
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="bsa-users-wp-export-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(exportData);
+
+      console.log(`[EXPORT-WP] Exported ${exportUsers.length} users (${exportData.totalWithEnrollments} with enrollments)`);
+    } catch (error: any) {
+      console.error("[EXPORT-WP] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== WORDPRESS USER SYNC ====================
+  // Sync new user registrations from App → WordPress
+  const WORDPRESS_SITE_URL = 'https://barbaarintasan.com';
+  
+  async function syncUserToWordPress(email: string, name: string, phone: string, passwordHash: string) {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-SYNC] WORDPRESS_API_KEY not set - skipping sync');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${WORDPRESS_SITE_URL}/wp-json/bsa/v1/sync-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, name, phone, password_hash: passwordHash }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log(`[WP-SYNC] User synced to WordPress: ${email} (${result.action})`);
+      } else {
+        console.error(`[WP-SYNC] Failed to sync user to WordPress: ${email}`, result);
+      }
+    } catch (error) {
+      console.error(`[WP-SYNC] Error syncing user to WordPress: ${email}`, error);
+    }
+  }
+
+  // Sync enrollment deletion from App → WordPress
+  async function syncEnrollmentDeleteToWordPress(email: string, courseId: string) {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-SYNC] WORDPRESS_API_KEY not set - skipping enrollment delete sync');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${WORDPRESS_SITE_URL}/wp-json/bsa/v1/unenroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, course_id: courseId }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log(`[WP-SYNC] Enrollment delete synced to WordPress: ${email}, course: ${courseId} (${result.action})`);
+      } else {
+        console.error(`[WP-SYNC] Failed to sync enrollment delete to WordPress: ${email}`, result);
+      }
+    } catch (error) {
+      console.error(`[WP-SYNC] Error syncing enrollment delete to WordPress: ${email}`, error);
+    }
+  }
+
   // ==================== WORDPRESS INTEGRATION APIs ====================
   // These endpoints allow WordPress to integrate with the Replit backend
   // Secured with API key authentication
@@ -15308,17 +15518,24 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       
       // Find user by email (case-insensitive)
       const normalizedEmail = email.toLowerCase().trim();
-      const parent = await storage.getParentByEmail(normalizedEmail);
+      let parent = await storage.getParentByEmail(normalizedEmail);
       
       if (!parent) {
-        // User must register via the app first
-        console.log(`[WORDPRESS API] User not found: ${email}`);
-        return res.status(404).json({ 
-          success: false,
-          error: "User not found",
-          message: "User must register in the app first before purchasing on website",
-          email: email
+        // Auto-register: create a new account for WordPress purchasers
+        const name = req.body.name || normalizedEmail.split('@')[0];
+        const tempPassword = await bcrypt.hash(Math.random().toString(36).slice(-12), 10);
+        
+        parent = await storage.createParent({
+          email: normalizedEmail,
+          password: tempPassword,
+          name: name,
+          phone: req.body.phone || null,
+          country: null,
+          city: null,
+          inParentingGroup: false,
         });
+        
+        console.log(`[WORDPRESS API] Auto-registered new user: ${normalizedEmail}, name: ${name}, id: ${parent.id}`);
       }
       
       // Calculate subscription/access end date
@@ -15411,6 +15628,55 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     } catch (error) {
       console.error("[WORDPRESS API] Error recording purchase:", error);
       res.status(500).json({ error: "Failed to record purchase" });
+    }
+  });
+
+  // WordPress → App: Receive new user registrations from WordPress
+  app.post("/api/wordpress/sync-user", verifyWordPressApiKey, async (req, res) => {
+    try {
+      const { email, name, phone, source } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ success: false, error: "Email required" });
+      }
+      
+      const normalizedEmail = email.toLowerCase().trim();
+      console.log(`[WP-SYNC] Receiving user from WordPress: ${normalizedEmail}`);
+      
+      const existingParent = await storage.getParentByEmail(normalizedEmail);
+      
+      if (existingParent) {
+        console.log(`[WP-SYNC] User already exists in app: ${normalizedEmail}`);
+        return res.json({ 
+          success: true, 
+          action: 'already_exists',
+          app_user_id: existingParent.id 
+        });
+      }
+      
+      const randomPassword = crypto.randomUUID() + crypto.randomUUID();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      
+      const parent = await storage.createParent({
+        email: normalizedEmail,
+        password: hashedPassword,
+        name: name || normalizedEmail.split('@')[0],
+        phone: phone || null,
+        country: null,
+        city: null,
+        inParentingGroup: false,
+      });
+      
+      console.log(`[WP-SYNC] User created in app from WordPress: ${normalizedEmail} (ID: ${parent.id})`);
+      
+      res.status(201).json({ 
+        success: true, 
+        action: 'created',
+        app_user_id: parent.id 
+      });
+    } catch (error: any) {
+      console.error("[WP-SYNC] Error creating user from WordPress:", error);
+      res.status(500).json({ success: false, error: "Failed to create user" });
     }
   });
 
@@ -15509,6 +15775,53 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     } catch (error) {
       console.error("[WORDPRESS API] Error fetching courses:", error);
       res.status(500).json({ error: "Failed to fetch courses" });
+    }
+  });
+
+  // Track all visitors (logged in + anonymous)
+  const activeVisitors = new Map<string, number>();
+
+  const cleanupVisitors = () => {
+    const now = Date.now();
+    for (const [key, lastSeen] of activeVisitors) {
+      if (now - lastSeen > 90000) {
+        activeVisitors.delete(key);
+      }
+    }
+  };
+
+  app.post("/api/stats/ping", (req, res) => {
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+    const visitorKey = `${ip}-${req.sessionID || "anon"}`;
+    activeVisitors.set(visitorKey, Date.now());
+    res.json({ ok: true });
+  });
+
+  // Live stats: online visitors + enrolled users count (public endpoint)
+  app.get("/api/stats/live", async (req, res) => {
+    try {
+      cleanupVisitors();
+      const loggedInUsers = getOnlineUsers();
+      const onlineCount = Math.max(activeVisitors.size, loggedInUsers.length);
+
+      const [enrollmentResult] = await db
+        .select({ count: sql<number>`count(distinct ${enrollments.parentId})` })
+        .from(enrollments);
+      const enrolledCount = Number(enrollmentResult?.count || 0);
+
+      const [totalUsersResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(parents);
+      const totalUsers = Number(totalUsersResult?.count || 0);
+
+      res.json({
+        onlineCount,
+        enrolledCount,
+        totalUsers,
+      });
+    } catch (error) {
+      console.error("Error fetching live stats:", error);
+      res.json({ onlineCount: 0, enrolledCount: 0, totalUsers: 0 });
     }
   });
 
@@ -16111,17 +16424,21 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   app.post("/api/admin/meet-events", requireAuth, async (req, res) => {
     try {
       const { title, description, meetLink, eventDate, startTime, endTime, isActive } = req.body;
-      if (!meetLink || !eventDate || !startTime || !endTime) {
-        return res.status(400).json({ error: "Meet link, date, start time, and end time are required" });
+      if (!title || !meetLink || !eventDate || !startTime || !endTime) {
+        return res.status(400).json({ error: "Title, meet link, date, start time, and end time are required" });
       }
+      const { mediaType, mediaTitle, driveFileId } = req.body;
       const event = await storage.createGoogleMeetEvent({
-        title: title || "Kulanka Bahda Tarbiyadda Caruurta",
+        title,
         description: description || null,
         meetLink,
         eventDate,
         startTime,
         endTime,
         isActive: isActive !== undefined ? isActive : true,
+        mediaType: mediaType || "video",
+        mediaTitle: mediaTitle || null,
+        driveFileId: driveFileId || null,
       });
       res.json(event);
     } catch (error) {
@@ -16141,6 +16458,79 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     } catch (error) {
       console.error("Error updating meet event:", error);
       res.status(500).json({ error: "Failed to update meet event" });
+    }
+  });
+
+  app.get("/api/meet-events/:id/stream", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.getGoogleMeetEvent(id);
+      if (!event || !event.driveFileId) {
+        return res.status(404).json({ error: "Media not found" });
+      }
+
+      const { streamVideoFile, streamAudioFile } = await import("./google-drive");
+
+      if (event.mediaType === "audio") {
+        const result = await streamAudioFile(event.driveFileId);
+        if (!result) return res.status(502).json({ error: "Failed to stream audio" });
+        res.set({
+          "Content-Type": result.mimeType,
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "private, max-age=3600",
+        });
+        if (result.size) res.set("Content-Length", result.size);
+        (result.stream as any).pipe(res);
+      } else {
+        const rangeHeader = req.headers.range;
+        const result = await streamVideoFile(event.driveFileId, rangeHeader);
+        if (!result) return res.status(502).json({ error: "Failed to stream video" });
+
+        if (result.isPartial && result.start !== undefined && result.end !== undefined) {
+          res.writeHead(206, {
+            "Content-Type": result.mimeType,
+            "Content-Range": `bytes ${result.start}-${result.end}/${result.size}`,
+            "Content-Length": result.end - result.start + 1,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "private, max-age=3600",
+          });
+        } else {
+          res.writeHead(200, {
+            "Content-Type": result.mimeType,
+            "Content-Length": result.size,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "private, max-age=3600",
+          });
+        }
+        (result.stream as any).pipe(res);
+      }
+    } catch (error) {
+      console.error("Error streaming meet media:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to stream media" });
+    }
+  });
+
+  app.get("/api/meet-events/archived", async (req, res) => {
+    try {
+      const events = await storage.getArchivedGoogleMeetEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching archived meet events:", error);
+      res.status(500).json({ error: "Failed to fetch archived events" });
+    }
+  });
+
+  app.post("/api/admin/meet-events/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.archiveGoogleMeetEvent(id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error archiving meet event:", error);
+      res.status(500).json({ error: "Failed to archive event" });
     }
   });
 
