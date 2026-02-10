@@ -47,46 +47,12 @@ flyctl
 # github-update folder (old backup)
 github-update/
 
-# Attached assets - only keep essential files used by the app
-# Logo files and generated_images used in code are kept
-attached_assets/stock_images/
-attached_assets/Pasted-*
-attached_assets/parentMessages_*
-attached_assets/Dockerfile_*
-attached_assets/manifest_*
-attached_assets/google*
-attached_assets/client_secret_*
-attached_assets/IMG_*
-attached_assets/GOOGLE_*
-attached_assets/After_payment_*
-attached_assets/prev_*
-attached_assets/player_*
-attached_assets/sidaas_*
-attached_assets/dev_*
-attached_assets/too_*
-attached_assets/nor_*
-attached_assets/sheko_*
-attached_assets/sheko1_*
-attached_assets/maaw1_*
-attached_assets/dham1_*
-attached_assets/0.5_*
-attached_assets/10_*
-attached_assets/11_*
-attached_assets/101_*
-attached_assets/102_*
-attached_assets/1_17*
-attached_assets/2_17*
-attached_assets/3_17*
-attached_assets/4_17*
-attached_assets/40_*
-attached_assets/41_*
-attached_assets/43_*
+# Attached assets - not needed in repo
+attached_assets/
 
 # Large public assets (served from CDN/R2 in production)
 client/public/course-images/
 client/public/google-play-header.png
-attached_assets/generated_images/google_play_header_4096x2304.png
-attached_assets/course-images/
 
 # WordPress plugin archives
 wordpress-plugin/*.zip

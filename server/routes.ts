@@ -1932,6 +1932,39 @@ Ka jawaab qaabkan JSON ah:
     }
   });
 
+  // Helper: Verify login credentials against WordPress
+  async function verifyWithWordPress(email: string, password: string): Promise<{ verified: boolean; user?: { name: string; phone: string; email: string } }> {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-LOGIN] WORDPRESS_API_KEY not set - skipping WordPress verification');
+      return { verified: false };
+    }
+    
+    try {
+      const response = await fetch('https://barbaarintasan.com/wp-json/bsa/v1/verify-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const result = await response.json() as any;
+      
+      if (result.verified) {
+        console.log(`[WP-LOGIN] WordPress verified user: ${email}`);
+        return { verified: true, user: result.user };
+      }
+      
+      console.log(`[WP-LOGIN] WordPress verification failed for: ${email} - ${result.error || 'unknown'}`);
+      return { verified: false };
+    } catch (error) {
+      console.error(`[WP-LOGIN] Error verifying with WordPress: ${email}`, error);
+      return { verified: false };
+    }
+  }
+
   // Parent email/password login
   app.post("/api/auth/parent/login", async (req, res) => {
     try {
@@ -1941,18 +1974,46 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const parent = await storage.getParentByEmail(email);
+      const normalizedEmail = email.toLowerCase().trim();
+      let parent = await storage.getParentByEmail(normalizedEmail);
+      
       if (!parent) {
-        return res.status(401).json({ error: "Invalid email or password" });
-      }
+        // User not in app database - try WordPress verification
+        const wpVerified = await verifyWithWordPress(normalizedEmail, password);
+        if (!wpVerified.verified) {
+          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
+        }
+        
+        // WordPress verified! Auto-create account in app
+        const hashedPassword = await bcrypt.hash(password, 10);
+        parent = await storage.createParent({
+          email: normalizedEmail,
+          password: hashedPassword,
+          name: wpVerified.user?.name || normalizedEmail.split('@')[0],
+          phone: wpVerified.user?.phone || null,
+          country: null,
+          city: null,
+          inParentingGroup: false,
+        });
+        console.log(`[WP-LOGIN] Auto-created app account for WordPress user: ${normalizedEmail}, id: ${parent.id}`);
+      } else {
+        if (!parent.password) {
+          return res.status(401).json({ error: "Akoonkaan wuxuu ku sameeyay Google. Fadlan Google-ga ku gal." });
+        }
 
-      if (!parent.password) {
-        return res.status(401).json({ error: "This account was created with Google. Please register with a new password using the same email address." });
-      }
-
-      const isValid = await bcrypt.compare(password, parent.password);
-      if (!isValid) {
-        return res.status(401).json({ error: "Invalid email or password" });
+        const isValid = await bcrypt.compare(password, parent.password);
+        if (!isValid) {
+          // Also try WordPress as fallback (user may have changed password on WordPress)
+          const wpVerified = await verifyWithWordPress(normalizedEmail, password);
+          if (wpVerified.verified) {
+            // Update app password to match WordPress
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await storage.updateParentPassword(parent.id, hashedPassword);
+            console.log(`[WP-LOGIN] Updated app password from WordPress for: ${normalizedEmail}`);
+          } else {
+            return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
+          }
+        }
       }
 
       // Generate unique session token for single-session enforcement

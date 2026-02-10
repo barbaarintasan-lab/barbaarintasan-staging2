@@ -547,3 +547,81 @@ class Barbaarintasan_Sync {
 }
 
 new Barbaarintasan_Sync();
+
+class Barbaarintasan_Verify_Login {
+    
+    public function __construct() {
+        add_action('rest_api_init', array($this, 'register_routes'));
+    }
+    
+    public function register_routes() {
+        register_rest_route('bsa/v1', '/verify-login', array(
+            'methods'  => 'POST',
+            'callback' => array($this, 'verify_login'),
+            'permission_callback' => array($this, 'check_api_key'),
+        ));
+    }
+    
+    public function check_api_key($request) {
+        $api_key = $request->get_header('X-API-Key');
+        $expected = get_option('barbaarintasan_api_key', '');
+        
+        if (empty($expected) || empty($api_key)) {
+            return false;
+        }
+        
+        return trim($api_key) === trim($expected);
+    }
+    
+    public function verify_login($request) {
+        $email = sanitize_email($request->get_param('email'));
+        $password = $request->get_param('password');
+        
+        if (empty($email) || empty($password)) {
+            return new WP_REST_Response(array(
+                'verified' => false,
+                'error' => 'Email and password required'
+            ), 400);
+        }
+        
+        $user = get_user_by('email', $email);
+        
+        if (!$user) {
+            return new WP_REST_Response(array(
+                'verified' => false,
+                'error' => 'User not found'
+            ), 200);
+        }
+        
+        $legacy_hash = get_user_meta($user->ID, 'legacy_bcrypt', true);
+        $password_valid = false;
+        
+        if (!empty($legacy_hash) && password_verify($password, $legacy_hash)) {
+            $password_valid = true;
+            wp_set_password($password, $user->ID);
+            delete_user_meta($user->ID, 'legacy_bcrypt');
+        }
+        
+        if (!$password_valid) {
+            $password_valid = wp_check_password($password, $user->user_pass, $user->ID);
+        }
+        
+        if ($password_valid) {
+            return new WP_REST_Response(array(
+                'verified' => true,
+                'user' => array(
+                    'email' => $user->user_email,
+                    'name' => $user->display_name,
+                    'phone' => get_user_meta($user->ID, 'billing_phone', true) ?: get_user_meta($user->ID, 'phone', true) ?: '',
+                )
+            ), 200);
+        }
+        
+        return new WP_REST_Response(array(
+            'verified' => false,
+            'error' => 'Invalid password'
+        ), 200);
+    }
+}
+
+new Barbaarintasan_Verify_Login();
