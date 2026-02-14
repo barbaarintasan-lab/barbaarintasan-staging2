@@ -4121,17 +4121,7 @@ Ka jawaab qaabkan JSON ah:
         });
       }
 
-      // Check if video watch is required and not met
-      if (lesson.videoWatchRequired && lesson.videoUrl && lesson.videoUrl.trim() !== '') {
-        const currentProgress = await storage.getLessonProgress(req.session.parentId, lessonId);
-        const videoWatched = currentProgress?.videoWatchedPercent && currentProgress.videoWatchedPercent >= 80;
-        if (!videoWatched) {
-          return res.status(403).json({ 
-            error: "Video not watched", 
-            message: "Fadlan daawo video-ga ugu yaraan 80% intaadan u gudbin casharka xiga" 
-          });
-        }
-      }
+      // Video watch requirement removed - parents can now proceed to next lesson without watching 80% of the video
 
       const progress = await storage.markLessonComplete(
         req.session.parentId,
@@ -5158,18 +5148,7 @@ Ka jawaab qaabkan JSON ah:
         });
       }
       
-      // Check if previous lesson is completed (sequential access requirement)
-      const prerequisiteCheck = await storage.checkPreviousLessonCompleted(req.session.parentId, lesson);
-      if (!prerequisiteCheck.canAccess) {
-        const course = await storage.getCourse(lesson.courseId);
-        return res.status(403).json({
-          error: "Dhammee Casharkii hore",
-          code: "PREREQUISITE_INCOMPLETE",
-          previousLessonId: prerequisiteCheck.previousLessonId,
-          previousLessonTitle: prerequisiteCheck.previousLessonTitle,
-          courseSlug: course?.courseId || null
-        });
-      }
+      // Prerequisite check removed - parents can now access any lesson without completing previous ones
       
       res.json(lesson);
     } catch (error) {
