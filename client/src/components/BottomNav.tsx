@@ -286,7 +286,11 @@ export default function BottomNav() {
             location !== "/sheeko" &&
             location !== "/ai-caawiye" &&
             location !== "/homework-helper" &&
-            location !== "/tarbiya-helper"
+            location !== "/tarbiya-helper" &&
+            location !== "/register" &&
+            location !== "/login" &&
+            location !== "/forgot-password" &&
+            !location.startsWith("/reset-password")
             ? "max-h-20 opacity-100"
             : "max-h-0 opacity-0 py-0 border-t-0",
         )}
@@ -431,7 +435,11 @@ export default function BottomNav() {
       </nav>
 
       {/* Floating Scroll to Top Button */}
-      {showScrollTop && (
+      {showScrollTop && 
+       location !== "/register" && 
+       location !== "/login" && 
+       location !== "/forgot-password" && 
+       !location.startsWith("/reset-password") && (
         <button
           onClick={scrollToTop}
           className="fixed bottom-28 right-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"
