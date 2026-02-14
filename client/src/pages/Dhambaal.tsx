@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -23,7 +23,9 @@ import {
   RotateCw,
   Users,
   Award,
-  Trophy
+  Trophy,
+  SkipBack,
+  SkipForward
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,6 +85,7 @@ export default function Dhambaal() {
   };
   const audioRef = useRef<HTMLAudioElement>(null);
   const imagesRef = useRef<HTMLDivElement>(null);
+  const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
   const isAdmin = parent?.isAdmin;
@@ -138,6 +141,30 @@ export default function Dhambaal() {
         setShowThankYouModal(true);
       }
     }
+    // Auto-play next lesson after a short delay
+    // Clear any existing timeout first
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+    }
+    autoPlayTimeoutRef.current = setTimeout(() => {
+      goToNextLesson();
+    }, 2000); // 2 second delay before auto-playing next
+  };
+
+  // Navigate to previous lesson
+  const goToPreviousLesson = () => {
+    if (!allMessages || allMessages.length === 0 || currentMessageIndex <= 0) return;
+    setSelectedMessage(allMessages[currentMessageIndex - 1]);
+    setCurrentImageIndex(0);
+  };
+
+  // Navigate to next lesson
+  const goToNextLesson = () => {
+    if (!allMessages || allMessages.length === 0 || currentMessageIndex < 0) return;
+    if (currentMessageIndex < allMessages.length - 1) {
+      setSelectedMessage(allMessages[currentMessageIndex + 1]);
+      setCurrentImageIndex(0);
+    }
   };
 
   const seekBackward = () => {
@@ -171,6 +198,13 @@ export default function Dhambaal() {
     setAudioProgress(0);
     setAudioCurrentTime(0);
     setAudioDuration(0);
+    // Clear any pending auto-play timeout when message changes
+    return () => {
+      if (autoPlayTimeoutRef.current) {
+        clearTimeout(autoPlayTimeoutRef.current);
+        autoPlayTimeoutRef.current = null;
+      }
+    };
   }, [selectedMessage?.id]);
 
   const { data: todayMessage, isLoading: loadingToday } = useQuery<ParentMessage>({
@@ -191,6 +225,12 @@ export default function Dhambaal() {
     enabled: !!parent,
   });
   const readIds = new Set(dhambaalProgress.map(p => p.contentId));
+
+  // Memoize current message index to avoid redundant array searches
+  const currentMessageIndex = useMemo(() => {
+    if (!allMessages || !selectedMessage) return -1;
+    return allMessages.findIndex(m => m.id === selectedMessage.id);
+  }, [allMessages, selectedMessage?.id]);
 
   const markReadMutation = useMutation({
     mutationFn: async (contentId: string) => {
@@ -642,6 +682,39 @@ export default function Dhambaal() {
                 {/* Audio Player - right below images */}
                 {selectedMessage.audioUrl && !isEditing && (
                   <div className="bg-gradient-to-r from-teal-600/30 to-emerald-600/30 rounded-xl p-5 border border-teal-500/30 mb-4">
+                    {/* Playlist position indicator */}
+                    {allMessages && allMessages.length > 1 && (
+                      <div className="flex items-center justify-between mb-3 pb-3 border-b border-teal-500/20">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-teal-300" />
+                          <span className="text-sm text-teal-200 font-medium">
+                            Casharka {currentMessageIndex + 1} / {allMessages.length}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={goToPreviousLesson}
+                            disabled={currentMessageIndex === 0}
+                            size="sm"
+                            className="h-8 px-3 bg-teal-700/50 hover:bg-teal-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                            data-testid="button-previous-lesson"
+                          >
+                            <SkipBack className="w-4 h-4 text-white mr-1" />
+                            <span className="text-xs text-white">Hore</span>
+                          </Button>
+                          <Button
+                            onClick={goToNextLesson}
+                            disabled={currentMessageIndex === allMessages.length - 1}
+                            size="sm"
+                            className="h-8 px-3 bg-teal-700/50 hover:bg-teal-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                            data-testid="button-next-lesson"
+                          >
+                            <span className="text-xs text-white">Xiga</span>
+                            <SkipForward className="w-4 h-4 text-white ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Button
                         onClick={seekBackward}
