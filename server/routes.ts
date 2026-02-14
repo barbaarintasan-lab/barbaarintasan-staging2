@@ -4121,7 +4121,7 @@ Ka jawaab qaabkan JSON ah:
         });
       }
 
-      // Video watch requirement removed - parents can now proceed to next lesson without completing 80%
+      // Video watch requirement removed - parents can now proceed to next lesson without watching 80% of the video
 
       const progress = await storage.markLessonComplete(
         req.session.parentId,

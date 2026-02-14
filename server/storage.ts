@@ -1439,7 +1439,7 @@ export class DatabaseStorage implements IStorage {
       return { error: 'Casharkan lama helin' };
     }
     
-    // Video watch requirement removed - parents can now complete lessons without 80% completion
+    // Video watch requirement removed - parents can now complete lessons without viewing 80% of the video
     
     const existing = await this.getLessonProgress(parentId, lessonId);
     
