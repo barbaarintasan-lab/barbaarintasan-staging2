@@ -1,9 +1,9 @@
 // API utility functions for admin operations
 
-export async function apiRequest<T = any>(
+export async function apiRequest<T>(
   method: string,
   url: string,
-  data?: any
+  data?: unknown
 ): Promise<T> {
   const options: RequestInit = {
     method,
@@ -22,18 +22,18 @@ export async function apiRequest<T = any>(
   return res.json();
 }
 
-export async function apiGet<T = any>(url: string): Promise<T> {
+export async function apiGet<T>(url: string): Promise<T> {
   return apiRequest<T>("GET", url);
 }
 
-export async function apiPost<T = any>(url: string, data?: any): Promise<T> {
+export async function apiPost<T>(url: string, data?: unknown): Promise<T> {
   return apiRequest<T>("POST", url, data);
 }
 
-export async function apiPatch<T = any>(url: string, data: any): Promise<T> {
+export async function apiPatch<T>(url: string, data: unknown): Promise<T> {
   return apiRequest<T>("PATCH", url, data);
 }
 
-export async function apiDelete<T = any>(url: string): Promise<T> {
+export async function apiDelete<T>(url: string): Promise<T> {
   return apiRequest<T>("DELETE", url);
 }

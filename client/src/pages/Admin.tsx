@@ -282,7 +282,7 @@ function FlashcardManager() {
     },
     onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/flashcard-categories"] });
-      // Fix: Use a ref or check if component is still mounted before updating state
+      // Clear selected category if it was deleted
       if (selectedCategoryId === deletedId) {
         setSelectedCategoryId(null);
       }
@@ -357,22 +357,22 @@ function FlashcardManager() {
     }
   };
 
-  const handleCreateCategory = useCallback(() => {
+  const handleCreateCategory = () => {
     if (!categoryForm.name.trim()) return;
     createCategoryMutation.mutate(categoryForm);
-  }, [categoryForm, createCategoryMutation]);
+  };
 
-  const handleEditCategory = useCallback((cat: FlashcardCategory) => {
+  const handleEditCategory = (cat: FlashcardCategory) => {
     setEditingCategory(cat.id);
     setCategoryForm({ name: cat.name, nameEnglish: cat.nameEnglish || "", iconEmoji: cat.iconEmoji || "", description: cat.description || "" });
-  }, []);
+  };
 
-  const handleSaveCategory = useCallback(() => {
+  const handleSaveCategory = () => {
     if (!editingCategory || !categoryForm.name.trim()) return;
     updateCategoryMutation.mutate({ id: editingCategory, data: categoryForm });
-  }, [editingCategory, categoryForm, updateCategoryMutation]);
+  };
 
-  const handleCreateFlashcard = useCallback(() => {
+  const handleCreateFlashcard = () => {
     if (!selectedCategoryId || !flashcardForm.nameSomali.trim() || !flashcardForm.imageUrl.trim()) return;
     createFlashcardMutation.mutate({
       categoryId: selectedCategoryId,
@@ -380,17 +380,17 @@ function FlashcardManager() {
       nameEnglish: flashcardForm.nameEnglish || undefined,
       imageUrl: flashcardForm.imageUrl,
     });
-  }, [selectedCategoryId, flashcardForm, createFlashcardMutation]);
+  };
 
-  const handleEditFlashcard = useCallback((card: Flashcard) => {
+  const handleEditFlashcard = (card: Flashcard) => {
     setEditingFlashcard(card.id);
     setFlashcardForm({ nameSomali: card.nameSomali, nameEnglish: card.nameEnglish || "", imageUrl: card.imageUrl });
-  }, []);
+  };
 
-  const handleSaveFlashcard = useCallback(() => {
+  const handleSaveFlashcard = () => {
     if (!editingFlashcard || !flashcardForm.nameSomali.trim()) return;
     updateFlashcardMutation.mutate({ id: editingFlashcard, data: flashcardForm });
-  }, [editingFlashcard, flashcardForm, updateFlashcardMutation]);
+  };
 
   return (
     <div className="space-y-6">
