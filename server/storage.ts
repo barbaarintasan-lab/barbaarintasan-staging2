@@ -1439,13 +1439,7 @@ export class DatabaseStorage implements IStorage {
       return { error: 'Casharkan lama helin' };
     }
     
-    if (lesson.videoWatchRequired && lesson.lessonType === 'video') {
-      const existing = await this.getLessonProgress(parentId, lessonId);
-      const watchedPercent = existing?.videoWatchedPercent || 0;
-      if (watchedPercent < 80) {
-        return { error: 'Waa inaad daawadasho ugu yaraan 80% video-ga' };
-      }
-    }
+    // Video watch requirement removed - parents can now complete lessons without 80% completion
     
     const existing = await this.getLessonProgress(parentId, lessonId);
     
