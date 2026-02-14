@@ -1,6 +1,6 @@
 // Google Drive Integration for Maktabada (Library)
 // Supports: Replit connector (dev), OAuth refresh token, and Service Account (Fly.io production)
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
 
 const MAKTABADA_FOLDER_NAME = "Barbaarintasan Maktabada";
 
@@ -255,7 +255,7 @@ export async function listMaktabadaFiles(): Promise<DriveFile[]> {
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} files in Maktabada`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',
@@ -336,7 +336,7 @@ export async function listFilesInFolder(folderUrl: string): Promise<DriveFile[]>
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} audio files in folder`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',
@@ -534,7 +534,7 @@ export async function listMaktabadaSubfolderFiles(subfolderName: string): Promis
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} files in subfolder '${subfolderName}'`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',

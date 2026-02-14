@@ -477,7 +477,7 @@ export default function CourseCompleteCelebration({
     playAirplaneSound();
 
     function animate(now: number) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !canvas || !ctx) return;
       const elapsed = (now - startTimeRef.current) / 1000;
       const w = canvas.width;
       const h = canvas.height;
