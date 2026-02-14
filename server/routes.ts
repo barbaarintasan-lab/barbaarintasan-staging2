@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, type Parent } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -888,7 +888,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         // Generate Dhambaal if doesn't exist
         if (!existingMsgDates.has(dateString)) {
           try {
-            await generateAndSaveParentMessage(dateString);
+            await generateAndSaveParentMessage();
             dhambaalCount++;
             console.log(`[SEED] Generated Dhambaal for ${dateString}`);
           } catch (err: any) {
@@ -902,7 +902,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         // Generate Sheeko if doesn't exist
         if (!existingStoryDates.has(dateString)) {
           try {
-            await generateDailyBedtimeStory(dateString);
+            await generateDailyBedtimeStory();
             sheekoCount++;
             console.log(`[SEED] Generated Sheeko for ${dateString}`);
           } catch (err: any) {
@@ -968,8 +968,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
           images: msg.images,
           messageDate: msg.messageDate,
           isPublished: msg.isPublished,
-          authorName: msg.authorName,
-          audioFileId: msg.audioFileId
+          authorName: msg.authorName
         })),
         bedtimeStories: bedtimeStories.map(story => ({
           title: story.title,
@@ -981,8 +980,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
           ageRange: story.ageRange,
           images: story.images,
           storyDate: story.storyDate,
-          isPublished: story.isPublished,
-          audioFileId: story.audioFileId
+          isPublished: story.isPublished
         }))
       };
       
@@ -1051,8 +1049,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
               images: msg.images || [],
               messageDate: msg.messageDate,
               isPublished: msg.isPublished !== false,
-              authorName: msg.authorName || "Muuse Siciid Aw-Muuse",
-              audioFileId: msg.audioFileId || null
+              authorName: msg.authorName || "Muuse Siciid Aw-Muuse"
             });
             dhambaalCount++;
           } catch (err) {
@@ -1079,8 +1076,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
               ageRange: story.ageRange || "3-8",
               images: story.images || [],
               storyDate: story.storyDate,
-              isPublished: story.isPublished !== false,
-              audioFileId: story.audioFileId || null
+              isPublished: story.isPublished !== false
             });
             sheekoCount++;
           } catch (err) {
@@ -1845,7 +1841,7 @@ Ka jawaab qaabkan JSON ah:
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      let parent;
+      let parent: Parent | undefined;
       
       if (existingParent) {
         // If parent exists but has no password (Google account), allow setting password
@@ -1879,9 +1875,11 @@ Ka jawaab qaabkan JSON ah:
         }
 
         // Sync new user to WordPress (non-blocking)
-        syncUserToWordPress(parent.email, parent.name, phone || '', hashedPassword).catch(err => {
-          console.error(`[WP-SYNC] Background sync failed for ${parent.email}:`, err);
-        });
+        if (parent) {
+          syncUserToWordPress(parent.email, parent.name, phone || '', hashedPassword).catch(err => {
+            console.error(`[WP-SYNC] Background sync failed for ${parent.email}:`, err);
+          });
+        }
       }
 
       // Generate unique session token for single-session enforcement
@@ -2965,7 +2963,7 @@ Ka jawaab qaabkan JSON ah:
         try {
           const sender = await storage.getParentById(req.session.parentId);
           const senderName = sender?.name?.split(' ')[0] || "Qof";
-          const subscriptions = await storage.getPushSubscriptionsByParentId(recipientId);
+          const subscriptions = await storage.getPushSubscriptionsByParent(recipientId);
           
           if (subscriptions.length > 0) {
             const notificationPayload = JSON.stringify({
@@ -2975,7 +2973,7 @@ Ka jawaab qaabkan JSON ah:
             });
 
             await Promise.allSettled(
-              subscriptions.map(async (sub) => {
+              subscriptions.map(async (sub: any) => {
                 try {
                   await webpush.sendNotification(
                     {
@@ -3473,14 +3471,13 @@ Ka jawaab qaabkan JSON ah:
           await storage.createAiModerationReport({
             contentType: "social_post",
             contentId: "draft",
-            parentId: req.session.parentId!,
-            flaggedContent: combinedContent.substring(0, 500),
+            userId: req.session.parentId!,
+            originalContent: combinedContent.substring(0, 500),
             violationType: moderationResult.violationType || "unknown",
-            confidenceScore: moderationResult.confidenceScore.toString(),
+            confidenceScore: moderationResult.confidenceScore,
             aiExplanation: moderationResult.explanation || null,
-            moderatorAction: null,
-            reviewedAt: null,
-            reviewedBy: null,
+            actionTaken: "hidden",
+            status: "pending"
           });
         } catch (e) {
           console.error("Error saving moderation report:", e);
@@ -3891,14 +3888,13 @@ Ka jawaab qaabkan JSON ah:
           await storage.createAiModerationReport({
             contentType: "post_comment",
             contentId: draftCommentId,
-            parentId: req.session.parentId!,
-            flaggedContent: body.substring(0, 500),
+            userId: req.session.parentId!,
+            originalContent: body.substring(0, 500),
             violationType: moderationResult.violationType || "unknown",
-            confidenceScore: moderationResult.confidenceScore.toString(),
+            confidenceScore: moderationResult.confidenceScore,
             aiExplanation: moderationResult.explanation || null,
-            moderatorAction: null,
-            reviewedAt: null,
-            reviewedBy: null,
+            actionTaken: "hidden",
+            status: "pending"
           });
         } catch (e) {
           console.error("Error saving moderation report:", e);
