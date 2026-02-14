@@ -14830,6 +14830,61 @@ function MeetEventsAdmin() {
           </DialogHeader>
           {accessibilityReport && (
             <div className="space-y-6">
+              {/* Export Button */}
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    try {
+                      // Prepare CSV data with summary
+                      const csvData = [];
+                      
+                      // Add summary rows
+                      csvData.push({
+                        "Koorsada/Course": "GUUD AHAAN (SUMMARY)",
+                        "ID": "",
+                        "Status": "",
+                        "Wadarta Casharada/Total Lessons": accessibilityReport.summary.totalLessonsAcrossAll,
+                        "Casharada Bilaash/Free Lessons": accessibilityReport.summary.freeLessonsAcrossAll,
+                        "Casharada Lacag/Paid Lessons": accessibilityReport.summary.totalLessonsAcrossAll - accessibilityReport.summary.freeLessonsAcrossAll,
+                        "% Bilaash": Math.round((accessibilityReport.summary.freeLessonsAcrossAll / accessibilityReport.summary.totalLessonsAcrossAll) * 100)
+                      });
+                      csvData.push({}); // Empty row
+                      
+                      // Add course data
+                      accessibilityReport.courses.forEach((course: any) => {
+                        csvData.push({
+                          "Koorsada/Course": course.courseTitle,
+                          "ID": course.courseCourseId,
+                          "Status": course.isCourseFreee ? "Bilaash" : "Lacag",
+                          "Wadarta Casharada/Total Lessons": course.totalLessons,
+                          "Casharada Bilaash/Free Lessons": course.freeLessons,
+                          "Casharada Lacag/Paid Lessons": course.paidLessons,
+                          "% Bilaash": course.accessibilityPercentage
+                        });
+                      });
+                      
+                      // Generate CSV
+                      const csv = Papa.unparse(csvData);
+                      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const link = document.createElement("a");
+                      link.href = URL.createObjectURL(blob);
+                      const date = new Date().toISOString().split('T')[0];
+                      link.download = `warbixinta-casharada_${date}.csv`;
+                      link.click();
+                      toast.success("Warbixinta waa la soo saaray! (Report exported successfully!)");
+                    } catch (error) {
+                      console.error("Export error:", error);
+                      toast.error("Lama soo saari karin warbixinta casharada");
+                    }
+                  }}
+                  variant="default"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Soo Saar CSV (Export CSV)
+                </Button>
+              </div>
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card className="border-none shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50">
