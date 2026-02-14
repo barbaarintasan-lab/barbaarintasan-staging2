@@ -3,6 +3,24 @@ import App from "./App";
 import "./index.css";
 import "./i18n";
 
+// Lock screen orientation to portrait
+const lockOrientation = async () => {
+  try {
+    if ('screen' in window && 'orientation' in window.screen) {
+      const orientation = window.screen.orientation;
+      if ('lock' in orientation && typeof orientation.lock === 'function') {
+        await orientation.lock('portrait');
+        console.log('[Orientation] Locked to portrait mode');
+      }
+    }
+  } catch (error) {
+    console.log('[Orientation] Lock not supported or already locked:', error);
+  }
+};
+
+// Attempt to lock orientation when app loads
+lockOrientation();
+
 // Detect if we're in Sheeko standalone mode
 const isSheekoPWA = () => {
   const isSheekoPath = window.location.pathname.startsWith('/sheeko');
