@@ -80,13 +80,18 @@ async function warmupPool() {
   } catch (err: unknown) {
     const isHeliumError = checkForHeliumError(err, 'Warmup');
     if (isHeliumError) {
-      throw new Error('Database connection failed: DATABASE_URL is malformed (defaulting to "helium" hostname)');
+      console.error('[DB Pool] WARNING: Database connection failed - DATABASE_URL is malformed (defaulting to "helium" hostname)');
+      console.error('[DB Pool] Application will start but database operations will fail');
+    } else {
+      console.error('[DB Pool] WARNING: Warmup failed:', err);
+      console.error('[DB Pool] Application will start but database may be unavailable');
     }
-    console.error('[DB Pool] Warmup failed:', err);
-    throw err; // Re-throw to prevent app from starting with bad DB config
   }
 }
-warmupPool();
+
+// Start warmup in background - don't block server startup
+// Errors are already logged inside warmupPool(), so we just need to consume the promise
+warmupPool().catch(() => {});
 
 // Keep connection alive with periodic pings (every 30 seconds)
 setInterval(async () => {
