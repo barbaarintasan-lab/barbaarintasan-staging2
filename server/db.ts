@@ -90,7 +90,8 @@ async function warmupPool() {
 }
 
 // Start warmup in background - don't block server startup
-warmupPool();
+// Errors are already logged inside warmupPool(), so we just need to consume the promise
+warmupPool().catch(() => {});
 
 // Keep connection alive with periodic pings (every 30 seconds)
 setInterval(async () => {
