@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import type { InsertBedtimeStory } from "@shared/schema";
 import { generateBedtimeStoryAudio } from "./tts";
-import { saveMaaweelToGoogleDrive } from "./googleDrive";
+import { saveMaaweelToGoogleDrive, searchMaaweelByCharacter } from "./googleDrive";
 import OpenAI from "openai";
 
 // Use Replit AI Integration on Replit, fallback to direct OpenAI on Fly.io
@@ -761,6 +761,93 @@ export function registerBedtimeStoryRoutes(app: Express): void {
     } catch (error) {
       console.error("Error deleting bedtime story:", error);
       res.status(500).json({ error: "Failed to delete bedtime story" });
+    }
+  });
+
+  // Search for stories by character name in Google Drive backups (admin only)
+  app.get("/api/admin/bedtime-stories/search/:characterName", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.parentId) {
+        return res.status(401).json({ error: "Fadlan soo gal" });
+      }
+      const parent = await storage.getParent(req.session.parentId);
+      if (!parent?.isAdmin) {
+        return res.status(403).json({ error: "Admin kaliya ayaa baadhitaan kara" });
+      }
+      
+      const { characterName } = req.params;
+      console.log(`[Bedtime Stories] Searching Google Drive backups for character: ${characterName}`);
+      
+      const stories = await searchMaaweelByCharacter(characterName);
+      res.json({ 
+        success: true, 
+        count: stories.length,
+        stories 
+      });
+    } catch (error) {
+      console.error("Error searching stories from Google Drive:", error);
+      res.status(500).json({ error: "Failed to search stories" });
+    }
+  });
+
+  // Restore a story from Google Drive backup to database (admin only)
+  app.post("/api/admin/bedtime-stories/restore", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.parentId) {
+        return res.status(401).json({ error: "Fadlan soo gal" });
+      }
+      const parent = await storage.getParent(req.session.parentId);
+      if (!parent?.isAdmin) {
+        return res.status(403).json({ error: "Admin kaliya ayaa soo celin kara" });
+      }
+      
+      const { title, titleSomali, content, characterName, moralLesson, storyDate } = req.body;
+      
+      if (!title || !titleSomali || !content || !characterName || !storyDate) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      // Check if story already exists for this date
+      const existingStory = await storage.getBedtimeStoryByDate(storyDate);
+      if (existingStory) {
+        return res.status(409).json({ 
+          error: "Story already exists for this date",
+          existingStory 
+        });
+      }
+      
+      // Find character type from SAHABI_CHARACTERS or TABIYIN_CHARACTERS
+      const allCharacters = [...SAHABI_CHARACTERS, ...TABIYIN_CHARACTERS];
+      const character = allCharacters.find(c => c.nameSomali === characterName);
+      const characterType = character?.type || "sahabi";
+      
+      const storyData: InsertBedtimeStory = {
+        title,
+        titleSomali,
+        content,
+        characterName,
+        characterType,
+        moralLesson: moralLesson || "Waxbarasho muhiim ah",
+        ageRange: "3-8",
+        images: [],
+        storyDate,
+        isPublished: false, // Start as unpublished for review
+      };
+      
+      const newStory = await storage.createBedtimeStory(storyData);
+      console.log(`[Bedtime Stories] Restored story from Google Drive: ${titleSomali}`);
+      
+      res.json({ 
+        success: true, 
+        message: "Sheekada waa la soo celiyay",
+        story: newStory 
+      });
+    } catch (error: any) {
+      console.error("Error restoring story from Google Drive:", error);
+      if (error?.code === '23505' || error?.message?.includes('unique')) {
+        return res.status(409).json({ error: "Story already exists for this date" });
+      }
+      res.status(500).json({ error: "Failed to restore story" });
     }
   });
 }
