@@ -192,19 +192,42 @@ export default function Dhambaal() {
     return () => clearInterval(interval);
   }, [isPlaying, selectedMessage]);
 
-  // Reset audio when message changes
+  // Reset audio when message changes and autoplay
   useEffect(() => {
     setIsPlaying(false);
     setAudioProgress(0);
     setAudioCurrentTime(0);
     setAudioDuration(0);
+    
     // Clear any pending auto-play timeout when message changes
-    return () => {
-      if (autoPlayTimeoutRef.current) {
-        clearTimeout(autoPlayTimeoutRef.current);
-        autoPlayTimeoutRef.current = null;
-      }
-    };
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+    
+    // Autoplay when a message is selected
+    if (selectedMessage?.audioUrl) {
+      // Small delay to ensure audio element is ready
+      const playTimeout = setTimeout(() => {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.play().then(() => {
+            setIsPlaying(true);
+            // Scroll to images when starting to play
+            if (imagesRef.current) {
+              imagesRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }).catch(err => {
+            // Autoplay might be blocked by browser, silently fail
+            console.log("Autoplay prevented by browser:", err);
+          });
+        }
+      }, 300); // Small delay to ensure audio is loaded
+      
+      return () => {
+        clearTimeout(playTimeout);
+      };
+    }
   }, [selectedMessage?.id]);
 
   const { data: todayMessage, isLoading: loadingToday } = useQuery<ParentMessage>({
