@@ -10,13 +10,19 @@ export function useLanguage() {
   // Get current language from i18n
   const currentLang = i18n.language || 'so';
   
-  // Map to API format (so -> somali, en -> english)
-  const apiLang = currentLang === 'so' ? 'so' : 'en';
+  // Map to API format - only support Somali and English
+  let apiLang: 'so' | 'en' = 'so';
+  if (currentLang === 'en' || currentLang === 'english') {
+    apiLang = 'en';
+  } else if (currentLang === 'so' || currentLang === 'somali') {
+    apiLang = 'so';
+  }
+  // Default to Somali for any unsupported language
   
   return {
     currentLanguage: currentLang,
     apiLanguage: apiLang,
-    isSomali: currentLang === 'so',
-    isEnglish: currentLang === 'en',
+    isSomali: apiLang === 'so',
+    isEnglish: apiLang === 'en',
   };
 }
