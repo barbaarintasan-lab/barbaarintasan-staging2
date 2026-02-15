@@ -43,11 +43,15 @@ function validateDatabaseUrl(url: string): void {
 }
 
 // Helper to detect and report "helium" hostname errors
-function checkForHeliumError(err: any, context: string): void {
-  if (err.message && err.message.includes('helium')) {
-    console.error(`[DB ${context}] CRITICAL: Attempting to connect to hostname "helium" - your DATABASE_URL is malformed!`);
-    console.error(`[DB ${context}] Please verify your DATABASE_URL environment variable is a valid PostgreSQL connection string.`);
+function checkForHeliumError(err: unknown, context: string): boolean {
+  if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+    if (err.message.includes('helium')) {
+      console.error(`[DB ${context}] CRITICAL: Attempting to connect to hostname "helium" - your DATABASE_URL is malformed!`);
+      console.error(`[DB ${context}] Please verify your DATABASE_URL environment variable is a valid PostgreSQL connection string.`);
+      return true;
+    }
   }
+  return false;
 }
 
 validateDatabaseUrl(process.env.DATABASE_URL);
@@ -73,9 +77,9 @@ async function warmupPool() {
     await client.query('SELECT 1');
     client.release();
     console.log('[DB Pool] Connection warmed up successfully');
-  } catch (err: any) {
-    checkForHeliumError(err, 'Warmup');
-    if (err.message && err.message.includes('helium')) {
+  } catch (err: unknown) {
+    const isHeliumError = checkForHeliumError(err, 'Warmup');
+    if (isHeliumError) {
       throw new Error('Database connection failed: DATABASE_URL is malformed (defaulting to "helium" hostname)');
     }
     console.error('[DB Pool] Warmup failed:', err);
