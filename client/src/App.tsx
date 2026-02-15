@@ -189,7 +189,7 @@ function Router() {
     "/dhambaal",
     "/waalid/feed",
     "/baraha",
-    "/reset-password",
+    "/reset-password", // Matches /reset-password and /reset-password/* routes
   ];
   
   // Exact path matches for authentication pages
