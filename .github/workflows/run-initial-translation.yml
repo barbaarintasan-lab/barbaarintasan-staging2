@@ -1,0 +1,43 @@
+name: Run Initial Translation
+
+on:
+  workflow_dispatch:
+    inputs:
+      database_url:
+        description: 'Database URL (postgres://username:password@host:5432/barbaarintasan)'
+        required: false
+        type: string
+      openai_api_key:
+        description: 'OpenAI API Key (sk-...)'
+        required: false
+        type: string
+
+jobs:
+  translate:
+    name: Run initial translation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run initial translation
+        run: |
+          # Set environment variables
+          export DATABASE_URL="${{ inputs.database_url || secrets.DATABASE_URL }}"
+          export OPENAI_API_KEY="${{ inputs.openai_api_key || secrets.OPENAI_API_KEY }}"
+
+          # Run initial translation
+          npm run translate:initial
+        env:
+          DATABASE_URL: ${{ inputs.database_url || secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ inputs.openai_api_key || secrets.OPENAI_API_KEY }}
