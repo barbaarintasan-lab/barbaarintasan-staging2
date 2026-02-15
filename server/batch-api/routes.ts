@@ -296,8 +296,8 @@ export function registerBatchApiRoutes(app: Express) {
         return res.status(401).json({ error: 'Unauthorized - Admin access required' });
       }
 
-      const format = req.query.format as string || 'json';
-      const language = req.query.lang as 'somali' | 'english' || 'english';
+      const format = req.query.format === 'text' ? 'text' : 'json';
+      const language = req.query.lang === 'somali' ? 'somali' : 'english';
 
       const report = await generateTranslationCoverageReport();
 

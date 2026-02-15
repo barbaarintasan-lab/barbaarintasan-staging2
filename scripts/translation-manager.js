@@ -48,7 +48,12 @@ function makeRequest(method, path, data = null) {
           const json = JSON.parse(body);
           resolve({ status: res.statusCode, data: json });
         } catch (e) {
-          resolve({ status: res.statusCode, data: body });
+          // If JSON parsing fails, return raw body (might be text response)
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ status: res.statusCode, data: body });
+          } else {
+            resolve({ status: res.statusCode, data: body, error: 'Failed to parse JSON response' });
+          }
         }
       });
     });
