@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useIsAuthPage } from '@/hooks/useIsAuthPage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -14,6 +15,9 @@ export function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [installed, setInstalled] = useState(false);
+
+  // Don't show on auth pages
+  const isAuthPage = useIsAuthPage();
 
   useEffect(() => {
     const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
@@ -81,7 +85,7 @@ export function PWAInstallPrompt() {
     }
   };
 
-  if (isStandalone || installed) return null;
+  if (isStandalone || installed || isAuthPage) return null;
 
   return (
     <>

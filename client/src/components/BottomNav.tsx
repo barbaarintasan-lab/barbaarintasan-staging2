@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { useIsAuthPage } from "@/hooks/useIsAuthPage";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -29,6 +30,9 @@ export default function BottomNav() {
   const queryClient = useQueryClient();
   const { parent } = useParentAuth();
   const [showSocialSection, setShowSocialSection] = useState(false);
+
+  // Check if current page is an authentication page
+  const isAuthPage = useIsAuthPage();
 
   // Focus mode check from URL hash - reactive to hash changes
   const [isFocusMode, setIsFocusMode] = useState(
@@ -286,7 +290,8 @@ export default function BottomNav() {
             location !== "/sheeko" &&
             location !== "/ai-caawiye" &&
             location !== "/homework-helper" &&
-            location !== "/tarbiya-helper"
+            location !== "/tarbiya-helper" &&
+            !isAuthPage
             ? "max-h-20 opacity-100"
             : "max-h-0 opacity-0 py-0 border-t-0",
         )}
@@ -431,7 +436,7 @@ export default function BottomNav() {
       </nav>
 
       {/* Floating Scroll to Top Button */}
-      {showScrollTop && (
+      {showScrollTop && !isAuthPage && (
         <button
           onClick={scrollToTop}
           className="fixed bottom-28 right-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"
