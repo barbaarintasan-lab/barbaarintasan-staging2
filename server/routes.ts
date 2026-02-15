@@ -7734,7 +7734,7 @@ Return a JSON object with:
   // Admin: Get all courses
   app.get("/api/admin/courses", requireAuth, async (req, res) => {
     try {
-      const allCourses = await storage.getCourses();
+      const allCourses = await storage.getAllCourses();
       res.json(allCourses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -7917,7 +7917,7 @@ Return a JSON object with:
         return res.status(500).json({ error: "R2 storage not configured" });
       }
       
-      const courses = await storage.getCourses();
+      const courses = await storage.getAllCourses();
       const results: { courseId: string; title: string; oldUrl: string; newUrl: string }[] = [];
       const errors: { courseId: string; error: string }[] = [];
       
