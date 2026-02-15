@@ -9006,6 +9006,7 @@ Return a JSON object with:
       // Use Veo API key for video generation
       const veoApiKey = process.env.GOOGLE_VEO_API_KEY;
       if (!veoApiKey) {
+        console.error("[AI-VIDEO] GOOGLE_VEO_API_KEY not configured in environment variables");
         return res.status(500).json({ error: "Veo API key not configured" });
       }
 
@@ -9055,6 +9056,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
             parameters: {
               aspectRatio: "16:9",
               durationSeconds: 8,
+              resolution: "1080p",
             },
           }),
         }
@@ -9062,7 +9064,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
       console.log("[AI-VIDEO] Response status:", response.status, response.statusText);
       const responseText = await response.text();
-      console.log("[AI-VIDEO] Response body:", responseText.substring(0, 500));
+      console.log("[AI-VIDEO] Response body:", responseText.substring(0, 1000));
 
       if (!response.ok) {
         console.error("[AI-VIDEO] Gemini Veo error:", response.status, responseText);
@@ -9070,8 +9072,12 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         try {
           const parsed = JSON.parse(responseText);
           errorMsg = parsed?.error?.message || errorMsg;
+          // Log detailed error for debugging
+          if (parsed?.error) {
+            console.error("[AI-VIDEO] Detailed error:", JSON.stringify(parsed.error, null, 2));
+          }
         } catch { 
-          errorMsg = responseText || errorMsg;
+          errorMsg = responseText.substring(0, 200) || errorMsg;
         }
         return res.status(500).json({ error: errorMsg });
       }
