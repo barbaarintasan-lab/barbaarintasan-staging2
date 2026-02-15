@@ -21,6 +21,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+test-db-validation.js
 
 # Archive / backup files
 *.tar.gz
