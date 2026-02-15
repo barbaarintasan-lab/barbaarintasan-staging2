@@ -178,7 +178,7 @@ function Router() {
   const [location] = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   
-  const showBottomNav = !location.includes("/lesson/") && !location.includes("/admin") && !location.includes("/assessment") && !location.includes("/share-info") && !location.includes("/maaweelo") && !location.includes("/dhambaal") && !location.includes("/waalid/feed") && !location.includes("/baraha");
+  const showBottomNav = !location.includes("/lesson/") && !location.includes("/admin") && !location.includes("/assessment") && !location.includes("/share-info") && !location.includes("/maaweelo") && !location.includes("/dhambaal") && !location.includes("/waalid/feed") && !location.includes("/baraha") && location !== "/register" && location !== "/login" && location !== "/forgot-password" && !location.startsWith("/reset-password");
 
   return (
     <div className="bg-gradient-to-b from-blue-100 via-blue-50 to-blue-100 min-h-screen flex flex-col lg:items-center font-semibold">
