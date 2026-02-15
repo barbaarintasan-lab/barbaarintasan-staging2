@@ -62,6 +62,9 @@ interface ParentMessage {
   authorName: string | null;
 }
 
+// Delay before attempting to autoplay audio (allows audio element to be ready)
+const AUTOPLAY_DELAY_MS = 300;
+
 export default function Dhambaal() {
   const [, setLocation] = useLocation();
   const [selectedMessage, setSelectedMessage] = useState<ParentMessage | null>(null);
@@ -202,13 +205,41 @@ export default function Dhambaal() {
     return () => clearInterval(interval);
   }, [isPlaying, selectedMessage]);
 
-  // Reset audio when message changes
+  // Reset audio when message changes and autoplay
   useEffect(() => {
     setIsPlaying(false);
     setAudioProgress(0);
     setAudioCurrentTime(0);
     setAudioDuration(0);
+    
     // Clear any pending auto-play timeout when message changes
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+    
+    // Autoplay when a message is selected
+    if (selectedMessage?.audioUrl) {
+      // Small delay to ensure audio element is ready
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.play().then(() => {
+            setIsPlaying(true);
+            // Scroll to images when starting to play
+            if (imagesRef.current) {
+              imagesRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }).catch(err => {
+            // Autoplay might be blocked by browser, silently fail
+            console.log("Autoplay prevented by browser:", err);
+          });
+        }
+        autoPlayTimeoutRef.current = null;
+      }, AUTOPLAY_DELAY_MS);
+    }
+    
+    // Cleanup function that always runs on unmount or when selectedMessage changes
     return () => {
       if (autoPlayTimeoutRef.current) {
         clearTimeout(autoPlayTimeoutRef.current);
