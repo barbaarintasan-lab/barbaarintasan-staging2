@@ -75,19 +75,42 @@ You can set these in a `.env` file or export them in your shell.
 
 ## Running the Script
 
-### Option 1: Using npm script (Recommended)
+### Option 1: Using GitHub Actions Workflow (Recommended for Production)
+
+The easiest way to run the initial translation is through GitHub Actions:
+
+1. Go to your GitHub repository: https://github.com/barbaarintasan-ship-it/barbaarintasan-staging2
+2. Click on the **Actions** tab
+3. Select **"Run Initial Translation"** from the left sidebar
+4. Click **"Run workflow"** button
+5. Optionally adjust the batch_size (default: 50)
+6. Click the green **"Run workflow"** button
+
+**Requirements:**
+- `DATABASE_URL` secret must be set in GitHub repository settings
+- `OPENAI_API_KEY` secret must be set in GitHub repository settings
+
+**Benefits:**
+- ✅ No local environment setup needed
+- ✅ Runs in a clean, isolated environment
+- ✅ Automatic logging and monitoring via GitHub Actions
+- ✅ Can be triggered remotely from anywhere
+
+See [docs/GITHUB_ACTIONS_TRANSLATION_GUIDE.md](docs/GITHUB_ACTIONS_TRANSLATION_GUIDE.md) for detailed instructions.
+
+### Option 2: Using npm script (Recommended for Local Development)
 
 ```bash
 npm run translate:initial
 ```
 
-### Option 2: Using tsx directly
+### Option 3: Using tsx directly
 
 ```bash
 tsx scripts/run-initial-translation.ts
 ```
 
-### Option 3: Make it executable and run
+### Option 4: Make it executable and run
 
 ```bash
 chmod +x scripts/run-initial-translation.ts
