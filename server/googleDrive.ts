@@ -539,6 +539,7 @@ export async function searchMaaweelByCharacter(characterName: string): Promise<{
   name: string;
   createdTime: string;
   title: string;
+  titleSomali: string;
   content: string;
   characterName: string;
   moralLesson: string;
@@ -546,7 +547,17 @@ export async function searchMaaweelByCharacter(characterName: string): Promise<{
 }[]> {
   try {
     const files = await listMaaweelFiles();
-    const results: any[] = [];
+    const results: {
+      id: string;
+      name: string;
+      createdTime: string;
+      title: string;
+      titleSomali: string;
+      content: string;
+      characterName: string;
+      moralLesson: string;
+      date: string;
+    }[] = [];
     
     for (const file of files) {
       const content = await getFileContent(file.id);
@@ -561,8 +572,12 @@ export async function searchMaaweelByCharacter(characterName: string): Promise<{
           id: file.id,
           name: file.name,
           createdTime: file.createdTime,
-          ...parsed,
+          title: parsed.title, // The backup saves titleSomali as title
+          titleSomali: parsed.title, // The backup saves titleSomali as title
           content: parsed.body,
+          characterName: parsed.characterName,
+          moralLesson: parsed.moralLesson,
+          date: parsed.date,
         });
       }
     }

@@ -801,10 +801,17 @@ export function registerBedtimeStoryRoutes(app: Express): void {
         return res.status(403).json({ error: "Admin kaliya ayaa soo celin kara" });
       }
       
-      const { title, titleSomali, content, characterName, moralLesson, storyDate } = req.body;
+      let { title, titleSomali, content, characterName, moralLesson, storyDate } = req.body;
       
-      if (!title || !titleSomali || !content || !characterName || !storyDate) {
-        return res.status(400).json({ error: "Missing required fields" });
+      // titleSomali is required, but title (English) can be derived from titleSomali if not provided
+      if (!titleSomali || !content || !characterName || !storyDate) {
+        return res.status(400).json({ error: "Missing required fields: titleSomali, content, characterName, storyDate" });
+      }
+      
+      // If English title is not provided, use the Somali title
+      // (Google Drive backups only contain the Somali title)
+      if (!title) {
+        title = titleSomali;
       }
       
       // Check if story already exists for this date
