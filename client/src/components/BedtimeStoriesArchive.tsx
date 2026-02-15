@@ -142,6 +142,12 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
     if (isFirstStory || currentStoryIndex < 0) return;
     const previousStory = stories[currentStoryIndex - 1];
     if (previousStory) {
+      // Stop currently playing audio before navigating
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+      }
       setSelectedStory(previousStory);
       setCurrentImageIndex(0);
     }
@@ -151,6 +157,12 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
     if (isLastStory || currentStoryIndex < 0) return;
     const nextStory = stories[currentStoryIndex + 1];
     if (nextStory) {
+      // Stop currently playing audio before navigating
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+      }
       setSelectedStory(nextStory);
       setCurrentImageIndex(0);
     }

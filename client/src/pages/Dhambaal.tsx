@@ -154,6 +154,12 @@ export default function Dhambaal() {
   // Navigate to previous lesson
   const goToPreviousLesson = () => {
     if (!allMessages || allMessages.length === 0 || currentMessageIndex <= 0) return;
+    // Stop currently playing audio before navigating
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+    }
     setSelectedMessage(allMessages[currentMessageIndex - 1]);
     setCurrentImageIndex(0);
   };
@@ -162,6 +168,12 @@ export default function Dhambaal() {
   const goToNextLesson = () => {
     if (!allMessages || allMessages.length === 0 || currentMessageIndex < 0) return;
     if (currentMessageIndex < allMessages.length - 1) {
+      // Stop currently playing audio before navigating
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+      }
       setSelectedMessage(allMessages[currentMessageIndex + 1]);
       setCurrentImageIndex(0);
     }
