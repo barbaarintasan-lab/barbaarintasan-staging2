@@ -5,7 +5,17 @@
 
 import OpenAI from 'openai';
 import { db } from '../db';
-import { batchJobs, batchJobItems, lessons, quizQuestions, translations } from '@shared/schema';
+import { 
+  batchJobs, 
+  batchJobItems, 
+  lessons, 
+  quizQuestions, 
+  translations,
+  courses,
+  modules,
+  parentMessages,
+  bedtimeStories
+} from '@shared/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import type { 
   BatchJobType, 
@@ -100,6 +110,38 @@ Provide suggestions as JSON:
 }
 
 /**
+ * Get entity data by type and ID
+ */
+async function getEntityData(entityId: string): Promise<any> {
+  // Try to find the entity in different tables
+  // Check lessons first
+  const [lesson] = await db.select().from(lessons).where(eq(lessons.id, entityId));
+  if (lesson) return { entity: lesson, type: 'lesson' };
+  
+  // Check courses
+  const [course] = await db.select().from(courses).where(eq(courses.id, entityId));
+  if (course) return { entity: course, type: 'course' };
+  
+  // Check modules
+  const [module] = await db.select().from(modules).where(eq(modules.id, entityId));
+  if (module) return { entity: module, type: 'module' };
+  
+  // Check quiz questions
+  const [quizQuestion] = await db.select().from(quizQuestions).where(eq(quizQuestions.id, entityId));
+  if (quizQuestion) return { entity: quizQuestion, type: 'quiz_question' };
+  
+  // Check parent messages
+  const [parentMessage] = await db.select().from(parentMessages).where(eq(parentMessages.id, entityId));
+  if (parentMessage) return { entity: parentMessage, type: 'parent_message' };
+  
+  // Check bedtime stories
+  const [bedtimeStory] = await db.select().from(bedtimeStories).where(eq(bedtimeStories.id, entityId));
+  if (bedtimeStory) return { entity: bedtimeStory, type: 'bedtime_story' };
+  
+  return null;
+}
+
+/**
  * Create JSONL batch input file for translation jobs
  */
 export async function createTranslationBatchInput(
@@ -108,18 +150,35 @@ export async function createTranslationBatchInput(
   const batchItems: BatchRequestItem[] = [];
 
   for (const request of requests) {
-    // Get lesson data
-    const [lesson] = await db.select().from(lessons).where(eq(lessons.id, request.lessonId));
-    if (!lesson) continue;
+    // Get entity data
+    const entityData = await getEntityData(request.lessonId); // lessonId is used generically for all entities
+    if (!entityData) continue;
+    
+    const { entity, type: entityType } = entityData;
 
     // Create translation requests for each field and target language
     for (const field of Object.keys(request.fields) as Array<keyof typeof request.fields>) {
-      const sourceText = lesson[field];
+      // Get source text from entity, handling field name variations
+      let sourceText: string | null = null;
+      
+      if (field === 'title' && entityType === 'bedtime_story') {
+        // For bedtime stories, use titleSomali instead of title
+        sourceText = entity['titleSomali'];
+      } else if (field === 'comingSoonMessage' && entityType === 'course') {
+        sourceText = entity['comingSoonMessage'];
+      } else if (field === 'keyPoints' && entityType === 'parent_message') {
+        sourceText = entity['keyPoints'];
+      } else if (field === 'moralLesson' && entityType === 'bedtime_story') {
+        sourceText = entity['moralLesson'];
+      } else {
+        sourceText = entity[field];
+      }
+      
       if (!sourceText) continue;
 
       for (const targetLang of request.targetLanguages) {
         batchItems.push({
-          custom_id: `translation-${request.lessonId}-${field}-${targetLang}`,
+          custom_id: `translation-${entityType}-${request.lessonId}-${field}-${targetLang}`,
           method: 'POST',
           url: '/v1/chat/completions',
           body: {
@@ -428,13 +487,14 @@ async function applyResultToDatabase(
   const parts = customId.split('-');
   
   if (jobType === 'translation') {
-    const [, lessonId, field, targetLang] = parts;
+    // Format: translation-{entityType}-{entityId}-{field}-{targetLang}
+    const [, entityType, entityId, field, targetLang] = parts;
     
     // Store translation in translations table
     try {
       await db.insert(translations).values({
-        entityType: 'lesson',
-        entityId: lessonId,
+        entityType: entityType,
+        entityId: entityId,
         fieldName: field,
         sourceLanguage: 'somali',
         targetLanguage: targetLang,
@@ -447,7 +507,7 @@ async function applyResultToDatabase(
         }
       });
       
-      console.log(`[Batch API] Stored ${targetLang} translation for lesson ${lessonId}.${field}`);
+      console.log(`[Batch API] Stored ${targetLang} translation for ${entityType} ${entityId}.${field}`);
     } catch (err) {
       console.error(`[Batch API] Failed to store translation:`, err);
     }
