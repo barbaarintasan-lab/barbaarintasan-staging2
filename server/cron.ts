@@ -933,10 +933,11 @@ export function startCronJobs() {
     await checkAppointmentReminders();
   });
 
-  // Generate AI parenting tip daily at 6:00 AM
-  cron.schedule("0 6 * * *", async () => {
+  // Generate AI parenting tip every 3 hours from 6:00 AM to 9:00 PM East Africa Time
+  // Runs at: 6:00 AM, 9:00 AM, 12:00 PM, 3:00 PM, 6:00 PM, 9:00 PM EAT
+  cron.schedule("0 6,9,12,15,18,21 * * *", async () => {
     await generateAiParentingTip();
-  });
+  }, { timezone: "Africa/Nairobi" });
 
   // Generate AI flashcard images daily at 7:00 AM
   cron.schedule("0 7 * * *", async () => {
@@ -978,7 +979,7 @@ export function startCronJobs() {
   });
 
   console.log(
-    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips 6AM, flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h)",
+    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips every 3h (6AM-9PM EAT), flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h)",
   );
 
   setTimeout(async () => {
