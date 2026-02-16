@@ -13,10 +13,21 @@ import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
 const useReplitIntegration = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
 console.log(`[Bedtime Stories] OpenAI config: ${useReplitIntegration ? 'Replit Integration' : 'Direct OpenAI API'}`);
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-  ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
-});
+// Lazy-load OpenAI client to allow server to start even without API keys
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY environment variable.');
+    }
+    openai = new OpenAI({
+      apiKey,
+      ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
+    });
+  }
+  return openai;
+}
 
 const SAHABI_CHARACTERS = [
   { name: "Bilaal ibn Rabaah", nameSomali: "Bilaal bin Rabaah", type: "sahabi" },
@@ -124,7 +135,7 @@ Ka jawaab qaabkan JSON ah:
 
   console.log("[Bedtime Stories] Generating text with GPT-4o...");
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -294,7 +305,7 @@ async function generateStoryImage(scene: string, characterName: string): Promise
 
   console.log("[Bedtime Stories] Generating image with gpt-image-1...");
 
-  const response = await openai.images.generate({
+  const response = await getOpenAI().images.generate({
     model: "gpt-image-1",
     prompt: prompt,
     n: 1,

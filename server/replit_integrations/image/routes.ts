@@ -1,9 +1,19 @@
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-load OpenAI client to allow server to start even without API keys
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+    }
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 export function registerImageRoutes(app: Express): void {
   app.post("/api/generate-image", async (req: Request, res: Response) => {
@@ -20,7 +30,7 @@ export function registerImageRoutes(app: Express): void {
 
       console.log("[DALL-E] Generating image with prompt:", prompt.slice(0, 100) + "...");
 
-      const response = await openai.images.generate({
+      const response = await getOpenAI().images.generate({
         model: "dall-e-3",
         prompt: prompt,
         n: 1,

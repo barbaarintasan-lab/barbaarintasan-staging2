@@ -5,12 +5,6 @@ import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
-
 // Validate DATABASE_URL format to prevent cryptic "helium" DNS errors
 function validateDatabaseUrl(url: string): void {
   try {
@@ -54,10 +48,20 @@ function checkForHeliumError(err: unknown, context: string): boolean {
   return false;
 }
 
-validateDatabaseUrl(process.env.DATABASE_URL);
+// Check if DATABASE_URL is set, but don't crash if it's not
+// This allows the server to start and serve health checks even without a database
+if (!process.env.DATABASE_URL) {
+  console.warn('[DB] WARNING: DATABASE_URL is not set. Database operations will fail.');
+  console.warn('[DB] Server will start but database-dependent features will not work.');
+} else {
+  validateDatabaseUrl(process.env.DATABASE_URL);
+}
+
+// Use a dummy connection string if DATABASE_URL is not set to prevent crashes
+const connectionString = process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy';
 
 export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   max: 20,
   min: 2,
   idleTimeoutMillis: 60000,
@@ -70,8 +74,13 @@ pool.on('error', (err) => {
   console.error('[DB Pool] Unexpected error on idle client:', err.message);
 });
 
-// Pre-warm the database connection pool on startup
+// Pre-warm the database connection pool on startup (non-blocking)
 async function warmupPool() {
+  if (!process.env.DATABASE_URL) {
+    console.log('[DB Pool] Skipping warmup - DATABASE_URL not set');
+    return;
+  }
+  
   try {
     const client = await pool.connect();
     await client.query('SELECT 1');
@@ -80,13 +89,18 @@ async function warmupPool() {
   } catch (err: unknown) {
     const isHeliumError = checkForHeliumError(err, 'Warmup');
     if (isHeliumError) {
-      throw new Error('Database connection failed: DATABASE_URL is malformed (defaulting to "helium" hostname)');
+      console.error('[DB Pool] Database connection failed: DATABASE_URL is malformed (defaulting to "helium" hostname)');
+    } else {
+      console.error('[DB Pool] Warmup failed:', err);
     }
-    console.error('[DB Pool] Warmup failed:', err);
-    throw err; // Re-throw to prevent app from starting with bad DB config
+    // Don't throw - allow server to start even if database is unavailable
+    // Database-dependent operations will fail gracefully
   }
 }
-warmupPool();
+// Call warmup but don't await it - let it run in the background
+warmupPool().catch(err => {
+  console.error('[DB Pool] Warmup error:', err);
+});
 
 // Keep connection alive with periodic pings (every 30 seconds)
 setInterval(async () => {

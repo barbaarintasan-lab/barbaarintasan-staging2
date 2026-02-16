@@ -13,10 +13,21 @@ import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
 const useReplitIntegration = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
 console.log(`[Parent Messages] OpenAI config: ${useReplitIntegration ? 'Replit Integration' : 'Direct OpenAI API'}`);
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-  ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
-});
+// Lazy-load OpenAI client to allow server to start even without API keys
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY environment variable.');
+    }
+    openai = new OpenAI({
+      apiKey,
+      ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
+    });
+  }
+  return openai;
+}
 
 const PARENTING_TOPICS = [
   { topic: "Dulqaadka iyo Samirka", description: "Patience and perseverance in parenting" },
@@ -91,7 +102,7 @@ Ka jawaab JSON sax ah:
 
   console.log("[Parent Messages] Generating text with GPT-4o...");
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -261,7 +272,7 @@ async function generateMessageImage(topic: string, sceneDescription: string): Pr
 
   console.log("[Parent Messages] Generating image with gpt-image-1...");
 
-  const response = await openai.images.generate({
+  const response = await getOpenAI().images.generate({
     model: "gpt-image-1",
     prompt: prompt,
     n: 1,

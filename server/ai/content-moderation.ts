@@ -2,7 +2,18 @@ import OpenAI from "openai";
 
 // Use Replit AI integration key if available, fallback to standard OPENAI_API_KEY
 const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-const openai = new OpenAI({ apiKey: apiKey || "" });
+
+// Lazy-load OpenAI client
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+    openai = new OpenAI({ apiKey });
+  }
+  return openai;
+}
 
 export interface ModerationResult {
   isFlagged: boolean;
@@ -23,7 +34,7 @@ export async function moderateContent(content: string): Promise<ModerationResult
   }
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {

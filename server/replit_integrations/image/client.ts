@@ -2,9 +2,27 @@ import fs from "node:fs";
 import OpenAI, { toFile } from "openai";
 import { Buffer } from "node:buffer";
 
-export const openai = process.env.AI_INTEGRATIONS_OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY, baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL })
-  : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy-load OpenAI client to allow server to start even without API keys
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY environment variable.');
+    }
+    openaiClient = process.env.AI_INTEGRATIONS_OPENAI_API_KEY
+      ? new OpenAI({ apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY, baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL })
+      : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
+
+// Export for backwards compatibility
+export const openai = {
+  get images() {
+    return getOpenAI().images;
+  }
+};
 
 /**
  * Generate an image and return as Buffer.
@@ -15,7 +33,7 @@ export async function generateImageBuffer(
   prompt: string,
   size: "1024x1024" | "1024x1536" | "1536x1024" | "auto" = "1024x1024"
 ): Promise<Buffer> {
-  const response = await openai.images.generate({
+  const response = await getOpenAI().images.generate({
     model: "gpt-image-1",
     prompt,
     size,
@@ -41,7 +59,7 @@ export async function editImages(
     )
   );
 
-  const response = await openai.images.edit({
+  const response = await getOpenAI().images.edit({
     model: "gpt-image-1",
     image: images,
     prompt,
