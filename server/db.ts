@@ -5,6 +5,10 @@ import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
+// Fallback connection string for when DATABASE_URL is not set
+// This allows the server to start without crashing, but database operations will fail
+export const FALLBACK_DATABASE_URL = 'postgresql://dummy:dummy@localhost:5432/dummy';
+
 // Validate DATABASE_URL format to prevent cryptic "helium" DNS errors
 function validateDatabaseUrl(url: string): void {
   try {
@@ -58,7 +62,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Use a dummy connection string if DATABASE_URL is not set to prevent crashes
-const connectionString = process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy';
+const connectionString = process.env.DATABASE_URL || FALLBACK_DATABASE_URL;
 
 export const pool = new Pool({ 
   connectionString,

@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import { createServer, type Server } from "http";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { storage } from "./storage";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -11,7 +12,7 @@ import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
 import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, type Parent, type PushSubscription } from "@shared/schema";
-import { db } from "./db";
+import { db, FALLBACK_DATABASE_URL } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { registerObjectStorageRoutes, ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage";
@@ -423,16 +424,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // In production, SESSION_SECRET should be set for security
   const sessionSecret = process.env.SESSION_SECRET;
   if (isProduction && !sessionSecret) {
-    console.warn('[SESSION] WARNING: SESSION_SECRET not set in production. Using fallback (sessions will not persist across restarts)');
+    console.warn('[SESSION] WARNING: SESSION_SECRET not set in production. Using cryptographically secure fallback.');
+    console.warn('[SESSION] Sessions will not persist across server restarts. Set SESSION_SECRET for production use.');
   }
   
-  // Use a generated session secret as fallback (not secure for production but allows server to start)
-  const effectiveSecret = sessionSecret || 'fallback-secret-' + Date.now();
+  // Use a cryptographically secure random session secret as fallback
+  const effectiveSecret = sessionSecret || crypto.randomBytes(32).toString('hex');
   
   app.use(
     session({
       store: new PgSession({
-        conString: process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy',
+        conString: process.env.DATABASE_URL || FALLBACK_DATABASE_URL,
         tableName: "session",
         createTableIfMissing: true,
       }),

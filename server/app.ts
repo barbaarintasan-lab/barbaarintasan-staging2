@@ -1,5 +1,6 @@
 import { type Server } from "node:http";
 import path from "node:path";
+import crypto from "node:crypto";
 
 import express, { type Express, type Request, Response, NextFunction } from "express";
 import { registerRoutes, registerHealthCheck } from "./routes";
