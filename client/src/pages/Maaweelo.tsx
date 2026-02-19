@@ -57,6 +57,7 @@ interface BedtimeStory {
   moralLesson: string | null;
   ageRange: string | null;
   images: string[];
+  thumbnailUrl?: string | null;
   audioUrl: string | null;
   storyDate: string;
   generatedAt: string;

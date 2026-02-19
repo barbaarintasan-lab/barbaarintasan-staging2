@@ -440,13 +440,13 @@ async function applyTranslationsToStories<T extends Record<string, any> & { id: 
 
   return stories.map(story => {
     const storyTranslations = translationsByStory.get(story.id) || [];
-    const translated = { ...story };
+    const translated: Record<string, any> = { ...story };
     for (const t of storyTranslations) {
       if (['title', 'content', 'moralLesson'].includes(t.fieldName)) {
         translated[t.fieldName] = t.translatedText;
       }
     }
-    return translated;
+    return translated as typeof story;
   });
 }
 

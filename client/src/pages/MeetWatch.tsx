@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Video, Volume2, Calendar, Clock, Loader2, Play, RefreshCw } from "lucide-react";
-import tarbiyaddaLogo from "@assets/logo_1770622897660.png";
+import tarbiyaddaLogo from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 
 export default function MeetWatch() {
   const { id } = useParams<{ id: string }>();

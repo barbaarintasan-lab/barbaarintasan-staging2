@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, paymentSubmissions, courses, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -224,14 +224,14 @@ async function applyTranslations<T extends Record<string, any>>(
     );
 
   // Apply translations to the entity
-  const translatedEntity = { ...entity };
+  const translatedEntity: Record<string, any> = { ...entity };
   for (const translation of entityTranslations) {
     if (fields.includes(translation.fieldName)) {
       translatedEntity[translation.fieldName] = translation.translatedText;
     }
   }
 
-  return translatedEntity;
+  return translatedEntity as T;
 }
 
 /**
@@ -277,7 +277,7 @@ async function applyTranslationsToArray<T extends Record<string, any> & { id: st
   // Apply translations to each entity
   return entities.map(entity => {
     const entityTranslations = translationsByEntity.get(entity.id) || [];
-    const translatedEntity = { ...entity };
+    const translatedEntity: Record<string, any> = { ...entity };
     
     for (const translation of entityTranslations) {
       if (fields.includes(translation.fieldName)) {
@@ -285,7 +285,7 @@ async function applyTranslationsToArray<T extends Record<string, any> & { id: st
       }
     }
     
-    return translatedEntity;
+    return translatedEntity as typeof entity;
   });
 }
 
@@ -2073,8 +2073,9 @@ Ka jawaab qaabkan JSON ah:
 
         // Sync new user to WordPress (non-blocking)
         if (parent) {
-          syncUserToWordPress(parent.email, parent.name, phone || '', hashedPassword).catch(err => {
-            console.error(`[WP-SYNC] Background sync failed for ${parent.email}:`, err);
+          const parentRef = parent;
+          syncUserToWordPress(parentRef.email, parentRef.name, phone || '', hashedPassword).catch(err => {
+            console.error(`[WP-SYNC] Background sync failed for ${parentRef.email}:`, err);
           });
         }
       }
@@ -4169,7 +4170,8 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Sawir ma la soo dirin" });
       }
 
-      const imageUrl = await uploadToGoogleDrive(req.file.buffer, req.file.originalname, req.file.mimetype);
+      const driveResult = await uploadToGoogleDrive(req.file.buffer, req.file.originalname, req.file.mimetype);
+      const imageUrl = driveResult.webContentLink;
       
       await storage.addCommentImage({
         commentId,
@@ -4608,7 +4610,7 @@ Ka jawaab qaabkan JSON ah:
       }
 
       if (completed === true) {
-        await storage.markLessonComplete(req.session.parentId, lesson);
+        await storage.markLessonComplete(req.session.parentId, lesson.id, lesson.courseId);
       }
 
       res.json({ success: true, synced: true });
@@ -5380,9 +5382,9 @@ Ka jawaab qaabkan JSON ah:
         },
         course: {
           id: course?.id,
-          name: course?.name,
+          name: course?.title,
           description: course?.description,
-          thumbnailUrl: course?.thumbnailUrl
+          thumbnailUrl: course?.imageUrl
         },
         assets: [] as string[]
       };
@@ -7057,7 +7059,7 @@ Return JSON:
       
       // Send email notification to admin
       const course = await storage.getCourse(submission.courseId);
-      const paymentMethod = await storage.getPaymentMethod(submission.paymentMethodId);
+      const paymentMethod = submission.paymentMethodId ? await storage.getPaymentMethod(submission.paymentMethodId) : undefined;
       const planLabels: Record<string, string> = { onetime: "Hal Mar ($70)", monthly: "Bille ($15)", yearly: "Sanad ($114)" };
       
       const adminEmail = process.env.SMTP_EMAIL;
@@ -7298,7 +7300,7 @@ Return JSON:
         if (updated.customerEmail) {
           const course = await storage.getCourse(updated.courseId);
           const courseName = course?.title || "Koorsada";
-          const courseSlug = course?.slug || undefined;
+          const courseSlug = course?.courseId || undefined;
           const emailSent = await sendPurchaseConfirmationEmail(
             updated.customerEmail,
             updated.customerName,
@@ -8387,7 +8389,7 @@ Return a JSON object with:
       res.json({
         success: true,
         uploaded: results.length,
-        errors: errors.length,
+        errorCount: errors.length,
         results,
         errors: errors
       });
@@ -8819,7 +8821,7 @@ Return a JSON object with:
   app.get("/api/testimonial-reactions", async (req, res) => {
     try {
       const parentId = req.session?.parentId || null;
-      const reactions = await storage.getAllTestimonialReactions(parentId);
+      const reactions = await storage.getAllTestimonialReactions(parentId || undefined);
       res.json(reactions);
     } catch (error) {
       console.error("Error fetching testimonial reactions:", error);
@@ -10468,7 +10470,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           await storage.createParentMessage({
             title: parsed.title,
             content: parsed.body,
-            generatedAt: new Date(parsed.date + 'T08:00:00Z'),
+            messageDate: parsed.date,
             audioUrl: null,
             images: [],
             topic: 'general'
@@ -10499,11 +10501,13 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           
           // Create new bedtime story
           await storage.createBedtimeStory({
+            title: parsed.title,
             titleSomali: parsed.title,
-            storySomali: parsed.body,
+            content: parsed.body,
             characterName: parsed.characterName || 'Qof aan la aqoon',
+            characterType: 'human',
             moralLesson: parsed.moralLesson || '',
-            generatedAt: new Date(parsed.date + 'T08:00:00Z'),
+            storyDate: parsed.date,
             audioUrl: null,
             images: []
           });
@@ -15590,7 +15594,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       const parent = await storage.getParentById(parentId);
       const progress = await storage.getProgressByParentId(parentId);
       const enrollments = await storage.getEnrollmentsByParentId(parentId);
-      const notifications = await storage.getNotificationsByParentId(parentId);
+      const notifications = await storage.getParentNotifications(parentId);
       const consent = await storage.getUserConsent(parentId);
 
       const exportData = {
@@ -15604,8 +15608,8 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         learningProgress: progress,
         enrollments: enrollments.map(e => ({
           courseId: e.courseId,
-          enrolledAt: e.enrolledAt,
-          subscriptionType: e.subscriptionType,
+          enrolledAt: e.accessStart,
+          subscriptionType: e.planType,
         })),
         notificationCount: notifications.length,
         consentRecord: consent,
@@ -15669,7 +15673,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       for (const parent of allParents) {
         const parentEnrollments = [];
         for (const course of allCourses) {
-          const enrollment = await storage.getEnrollment(parent.id, course.id);
+          const enrollment = await storage.getEnrollmentByParentAndCourse(parent.id, course.id);
           if (enrollment && enrollment.status === 'active') {
             parentEnrollments.push({
               courseId: course.courseId,
@@ -16106,7 +16110,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
               courseId: course.id,
               planType: normalizedPlan,
               status: 'active',
-              accessStart: new Date(),
               accessEnd: enrollAccessEnd,
             });
             console.log(`[WORDPRESS API] Enrolled ${email} in ${course.title} (${normalizedPlan})`);
@@ -16144,7 +16147,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
             courseId: targetCourseId,
             planType: plan_type,
             status: 'active',
-            accessStart: new Date(),
             accessEnd: accessEnd,
           });
         }
@@ -16223,7 +16225,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         return res.json({ verified: false, error: "User not found" });
       }
 
-      const isValid = await bcrypt.compare(password, parent.password);
+      const isValid = parent.password ? await bcrypt.compare(password, parent.password) : false;
       console.log(`[WP-VERIFY] Password verification for ${normalizedEmail}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
 
       res.json({ verified: isValid });
@@ -16322,21 +16324,14 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
               );
               
               if (existingSubscription) {
-                await storage.updateEnrollment(existingSubscription.id, {
-                  status: 'active',
-                  planType: planType,
-                  accessEnd: accessEnd,
-                });
+                await storage.renewEnrollment(existingSubscription.id, planType, accessEnd);
               } else {
                 const enrollment = await storage.createEnrollment({
                   parentId: parent.id,
                   courseId: allAccessCourseId,
                   planType: planType,
                 });
-                await storage.updateEnrollment(enrollment.id, {
-                  status: 'active',
-                  accessEnd: accessEnd,
-                });
+                await storage.renewEnrollment(enrollment.id, planType, accessEnd);
               }
               
               console.log(`[WORDPRESS WEBHOOK] Subscription activated for ${phone}: ${planType}`);
@@ -16866,7 +16861,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
 
       await db.insert(ssoTokens).values({
         token,
-        userId: parent.id,
+        userId: 0,
         email: parent.email,
         name: parent.name,
         expiresAt,

@@ -57,6 +57,7 @@ interface ParentMessage {
   topic: string;
   keyPoints: string | null;
   images: string[];
+  thumbnailUrl?: string | null;
   audioUrl: string | null;
   messageDate: string;
   generatedAt: string;

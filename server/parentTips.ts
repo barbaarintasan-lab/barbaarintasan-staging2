@@ -371,7 +371,7 @@ export function registerParentTipsRoutes(app: Express): void {
         `tip-${tip.id}-${timestamp}`,
         "tts-audio/talooyinka",
         { azureVoice: voiceName },
-        'talo'
+        'dhambaal'
       );
 
       await storage.updateParentTip(tip.id, { audioUrl });

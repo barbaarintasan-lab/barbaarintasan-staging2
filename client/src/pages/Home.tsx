@@ -17,7 +17,7 @@ import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 import barahaWaalidiintaImg from "@assets/generated_images/somali_parents_community_gathering.png";
 import bsaAppIcon from "@assets/generated_images/bsa_app_icon_orange_gradient.png";
 import sheekoAppIcon from "@assets/generated_images/sheeko_app_icon_purple_gradient.png";
-import tarbiyaddaLogo from "@assets/logo_1770622897660.png";
+import tarbiyaddaLogo from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 // Furud (Fruits) - 10 items
 import bananaImg from "@assets/generated_images/banana_white_background.png";
 import mangoImg from "@assets/generated_images/mango_white_background.png";

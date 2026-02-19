@@ -506,7 +506,7 @@ The image should:
           size: "1024x1024",
         });
 
-        const imageBase64 = response.data[0]?.b64_json;
+        const imageBase64 = response.data?.[0]?.b64_json;
         if (!imageBase64) {
           console.log(`[CRON] No image generated for ${word.somali}`);
           continue;

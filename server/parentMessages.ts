@@ -326,9 +326,8 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
 }
 
 export async function generateAndSaveParentMessage(): Promise<void> {
+  const today = getSomaliaToday();
   try {
-    const today = getSomaliaToday();
-    
     const existingMessage = await storage.getParentMessageByDate(today);
     if (existingMessage) {
       console.log(`[Parent Messages] Message already exists for ${today}`);
@@ -457,13 +456,13 @@ async function applyTranslationsToMessages<T extends Record<string, any> & { id:
 
   return messages.map(message => {
     const messageTranslations = translationsByMessage.get(message.id) || [];
-    const translated = { ...message };
+    const translated: Record<string, any> = { ...message };
     for (const t of messageTranslations) {
       if (['title', 'content', 'keyPoints'].includes(t.fieldName)) {
         translated[t.fieldName] = t.translatedText;
       }
     }
-    return translated;
+    return translated as typeof message;
   });
 }
 

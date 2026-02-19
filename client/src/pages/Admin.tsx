@@ -803,7 +803,7 @@ export default function Admin() {
   const [enrollmentPlanType, setEnrollmentPlanType] = useState("lifetime");
   const [parentToDelete, setParentToDelete] = useState<Parent | null>(null);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
-  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number } | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number; parentName?: string; courseName?: string; courseId?: string; planType?: string; status?: string } | null>(null);
   const [adminToggleConfirm, setAdminToggleConfirm] = useState<{parent: Parent, makeAdmin: boolean} | null>(null);
   const [hostToggleConfirm, setHostToggleConfirm] = useState<{parent: Parent, makeHost: boolean} | null>(null);
 

@@ -87,4 +87,5 @@ export interface BatchJobMetadata {
   totalItems: number;
   description: string;
   createdBy?: string;
+  entityType?: string;
 }

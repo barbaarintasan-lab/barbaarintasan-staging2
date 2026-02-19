@@ -268,10 +268,46 @@ export function useUpload(options: UseUploadOptions = {}) {
     []
   );
 
+  /**
+   * Upload a file to Google Drive via the server API.
+   * Returns the web content link URL or null on failure.
+   */
+  const uploadToGoogleDrive = useCallback(
+    async (file: File): Promise<string | null> => {
+      setIsUploading(true);
+      setError(null);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/uploads/google-drive", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Google Drive upload failed");
+        }
+        const data = await response.json();
+        return data.url || data.webContentLink || null;
+      } catch (err) {
+        const uploadError = err instanceof Error ? err : new Error("Upload failed");
+        setError(uploadError);
+        options.onError?.(uploadError);
+        return null;
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [options]
+  );
+
   return {
     uploadFile,
     getUploadParameters,
+    uploadToGoogleDrive,
     isUploading,
+    uploading: isUploading,
     error,
     progress,
   };

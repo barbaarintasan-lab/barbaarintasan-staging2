@@ -147,12 +147,12 @@ async function getRecentJobSummaries(limit: number = 10): Promise<JobSummary[]> 
 
   return jobs.map(job => ({
     id: job.id,
-    type: job.jobType,
+    type: job.type,
     status: job.status,
-    description: job.description || '',
-    requestCount: job.requestCount,
-    completedCount: job.completedCount || 0,
-    failedCount: job.failedCount || 0,
+    description: (job.metadata ? (JSON.parse(job.metadata) as any)?.description : null) || '',
+    requestCount: job.totalRequests,
+    completedCount: job.completedRequests || 0,
+    failedCount: job.failedRequests || 0,
     createdAt: job.createdAt.toISOString(),
     completedAt: job.completedAt?.toISOString()
   }));
@@ -172,13 +172,13 @@ async function getFailedTranslations(limit: number = 20): Promise<FailedTranslat
   const failures: FailedTranslation[] = [];
 
   for (const job of failedJobs) {
-    if (job.errorMessage) {
-      const metadata = job.metadata as any;
+    if (job.error) {
+      const metadata = job.metadata ? (JSON.parse(job.metadata) as any) : null;
       failures.push({
         entityType: metadata?.entityType || 'unknown',
         entityId: job.id,
         fieldName: 'multiple',
-        error: job.errorMessage,
+        error: job.error,
         attemptedAt: job.createdAt.toISOString()
       });
     }
