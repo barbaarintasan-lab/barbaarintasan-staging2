@@ -232,6 +232,7 @@ function bsa_payment_settings_page() {
         update_option('bsa_api_key', sanitize_text_field($_POST['bsa_api_key'] ?? ''));
         update_option('bsa_stripe_publishable_key', sanitize_text_field($_POST['bsa_stripe_publishable_key'] ?? ''));
         update_option('bsa_stripe_secret_key', sanitize_text_field($_POST['bsa_stripe_secret_key'] ?? ''));
+        update_option('bsa_stripe_webhook_secret', sanitize_text_field($_POST['bsa_stripe_webhook_secret'] ?? ''));
         update_option('bsa_mobile_money_number', sanitize_text_field($_POST['bsa_mobile_money_number'] ?? ''));
         update_option('bsa_mobile_money_name', sanitize_text_field($_POST['bsa_mobile_money_name'] ?? ''));
         update_option('bsa_openai_api_key', sanitize_text_field($_POST['bsa_openai_api_key'] ?? ''));
@@ -264,6 +265,11 @@ function bsa_payment_settings_page() {
                 <tr>
                     <th>Stripe Secret Key</th>
                     <td><input type="password" name="bsa_stripe_secret_key" value="<?php echo esc_attr(get_option('bsa_stripe_secret_key', '')); ?>" class="regular-text" placeholder="sk_live_..." /></td>
+                </tr>
+                <tr>
+                    <th>Stripe Webhook Secret</th>
+                    <td><input type="password" name="bsa_stripe_webhook_secret" value="<?php echo esc_attr(get_option('bsa_stripe_webhook_secret', '')); ?>" class="regular-text" placeholder="whsec_..." />
+                    <p class="description">Stripe Dashboard &rarr; Webhooks ka hel signing secret-ka. Webhook URL: <code><?php echo esc_url(rest_url('bsa/v1/stripe-webhook')); ?></code></p></td>
                 </tr>
                 <tr><td colspan="2"><hr style="border-top: 2px solid #e5e7eb;"></td></tr>
                 <tr>
@@ -455,6 +461,127 @@ function bsa_handle_stripe_verify() {
     $clean_url = remove_query_arg(array('session_id', 'bsa_payment'));
     wp_safe_redirect(add_query_arg('bsa_payment', 'success', $clean_url));
     exit;
+}
+
+// Register Stripe webhook REST endpoint
+add_action('rest_api_init', function () {
+    register_rest_route('bsa/v1', '/stripe-webhook', array(
+        'methods'             => 'POST',
+        'callback'            => 'bsa_handle_stripe_webhook',
+        'permission_callback' => '__return_true',
+    ));
+});
+
+function bsa_handle_stripe_webhook(WP_REST_Request $request) {
+    $webhook_secret = get_option('bsa_stripe_webhook_secret', '');
+    if (empty($webhook_secret)) {
+        return new WP_REST_Response(array('error' => 'Webhook secret not configured'), 500);
+    }
+
+    $payload    = $request->get_body();
+    $sig_header = $request->get_header('stripe-signature');
+
+    if (empty($sig_header)) {
+        return new WP_REST_Response(array('error' => 'Missing Stripe-Signature header'), 400);
+    }
+
+    // Verify the webhook signature
+    $event = bsa_stripe_verify_webhook_signature($payload, $sig_header, $webhook_secret);
+    if (is_wp_error($event)) {
+        error_log('BSA Stripe Webhook: signature verification failed - ' . $event->get_error_message());
+        return new WP_REST_Response(array('error' => 'Invalid signature'), 400);
+    }
+
+    $event_type = $event['type'] ?? '';
+    error_log('BSA Stripe Webhook: received event ' . $event_type);
+
+    if ($event_type === 'checkout.session.completed') {
+        $session    = $event['data']['object'] ?? array();
+        $session_id = $session['id'] ?? '';
+
+        // Idempotency: skip if already processed
+        if (!empty($session_id) && get_transient('bsa_stripe_processed_' . $session_id)) {
+            return new WP_REST_Response(array('received' => true), 200);
+        }
+
+        if (($session['payment_status'] ?? '') !== 'paid' && ($session['status'] ?? '') !== 'complete') {
+            return new WP_REST_Response(array('received' => true), 200);
+        }
+
+        $email       = $session['metadata']['email'] ?? ($session['customer_email'] ?? '');
+        $name        = $session['metadata']['name'] ?? '';
+        $course_id   = $session['metadata']['course_id'] ?? 'all-access';
+        $plan_type   = $session['metadata']['plan_type'] ?? 'yearly';
+        $amount_total = ($session['amount_total'] ?? 0) / 100;
+
+        if (empty($email)) {
+            return new WP_REST_Response(array('received' => true), 200);
+        }
+
+        if (!empty($session_id)) {
+            set_transient('bsa_stripe_processed_' . $session_id, true, 86400);
+        }
+
+        $result = bsa_record_purchase_in_app($email, $course_id, $plan_type, $amount_total, 'stripe', $session_id, $name);
+
+        $payment_id = wp_insert_post(array(
+            'post_title'  => 'Stripe Webhook: ' . sanitize_text_field($email) . ' - ' . sanitize_text_field($plan_type),
+            'post_type'   => 'bsa_payment',
+            'post_status' => 'publish',
+        ));
+        if ($payment_id) {
+            update_post_meta($payment_id, 'bsa_email', $email);
+            update_post_meta($payment_id, 'bsa_course_id', $course_id);
+            update_post_meta($payment_id, 'bsa_plan_type', $plan_type);
+            update_post_meta($payment_id, 'bsa_amount', $amount_total);
+            update_post_meta($payment_id, 'bsa_payment_status', 'approved');
+            update_post_meta($payment_id, 'bsa_payment_method', 'stripe');
+            update_post_meta($payment_id, 'bsa_stripe_session_id', $session_id);
+            update_post_meta($payment_id, 'bsa_approved_at', current_time('mysql'));
+            update_post_meta($payment_id, 'bsa_app_sync_result', wp_json_encode($result));
+        }
+    }
+
+    return new WP_REST_Response(array('received' => true), 200);
+}
+
+function bsa_stripe_verify_webhook_signature($payload, $sig_header, $secret) {
+    // Parse the Stripe-Signature header: t=timestamp,v1=signature,...
+    $parts     = array();
+    $timestamp = null;
+    $signatures = array();
+
+    foreach (explode(',', $sig_header) as $part) {
+        $pair = explode('=', $part, 2);
+        if (count($pair) !== 2) {
+            continue;
+        }
+        if ($pair[0] === 't') {
+            $timestamp = (int) $pair[1];
+        } elseif ($pair[0] === 'v1') {
+            $signatures[] = $pair[1];
+        }
+    }
+
+    if (empty($timestamp) || empty($signatures)) {
+        return new WP_Error('invalid_signature', 'Missing timestamp or signatures in Stripe-Signature header');
+    }
+
+    // Reject events with timestamp older than 5 minutes (replay attack prevention)
+    if (abs(time() - $timestamp) > 300) {
+        return new WP_Error('invalid_timestamp', 'Stripe webhook timestamp is too old');
+    }
+
+    $signed_payload    = $timestamp . '.' . $payload;
+    $expected_signature = hash_hmac('sha256', $signed_payload, $secret);
+
+    foreach ($signatures as $sig) {
+        if (hash_equals($expected_signature, $sig)) {
+            return json_decode($payload, true);
+        }
+    }
+
+    return new WP_Error('invalid_signature', 'Stripe webhook signature mismatch');
 }
 
 function bsa_enroll_user_in_app($enroll_body, $payment_id) {
