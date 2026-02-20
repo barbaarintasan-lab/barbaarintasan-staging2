@@ -31,7 +31,61 @@ add_action('rest_api_init', function () {
         'callback' => 'bsa_sync_user_from_app',
         'permission_callback' => '__return_true',
     ));
+
+    register_rest_route('bsa/v1', '/list-users', array(
+        'methods'  => 'GET',
+        'callback' => 'bsa_list_all_users',
+        'permission_callback' => '__return_true',
+    ));
 });
+
+function bsa_list_all_users(WP_REST_Request $request) {
+    $api_key = $request->get_header('X-API-Key');
+    $saved_key = get_option('bsa_api_key', '');
+
+    if (empty($saved_key) || $api_key !== $saved_key) {
+        return new WP_REST_Response(array('success' => false, 'error' => 'Unauthorized'), 403);
+    }
+
+    $page = max(1, intval($request->get_param('page') ?: 1));
+    $per_page = min(100, max(10, intval($request->get_param('per_page') ?: 100)));
+
+    $args = array(
+        'number'  => $per_page,
+        'paged'   => $page,
+        'orderby' => 'ID',
+        'order'   => 'ASC',
+        'fields'  => array('ID', 'user_login', 'user_email', 'display_name', 'user_registered'),
+    );
+
+    $user_query = new WP_User_Query($args);
+    $users = $user_query->get_results();
+    $total = $user_query->get_total();
+
+    $user_list = array();
+    foreach ($users as $user) {
+        $phone = get_user_meta($user->ID, 'bsa_phone', true);
+        if (empty($phone)) {
+            $phone = get_user_meta($user->ID, 'billing_phone', true);
+        }
+        $user_list[] = array(
+            'wp_id'      => $user->ID,
+            'email'      => $user->user_email,
+            'name'       => $user->display_name,
+            'username'   => $user->user_login,
+            'phone'      => $phone ?: '',
+            'registered' => $user->user_registered,
+        );
+    }
+
+    return new WP_REST_Response(array(
+        'success' => true,
+        'users'   => $user_list,
+        'total'   => $total,
+        'page'    => $page,
+        'pages'   => ceil($total / $per_page),
+    ), 200);
+}
 
 function bsa_sync_user_from_app(WP_REST_Request $request) {
     $api_key = $request->get_header('X-API-Key');
