@@ -501,6 +501,39 @@ add_action('rest_api_init', function () {
     ));
 });
 
+// Reads the Stripe-Signature header using every available PHP/server mechanism.
+// Nginx + PHP-FPM, Apache, LiteSpeed and Cloudflare all expose headers differently;
+// trying all sources ensures the header is found regardless of server config.
+function bsa_get_stripe_signature() {
+    // Method 1: standard FastCGI superglobal (works on most setups)
+    if (!empty($_SERVER['HTTP_STRIPE_SIGNATURE'])) {
+        return wp_unslash($_SERVER['HTTP_STRIPE_SIGNATURE']);
+    }
+
+    // Method 2: getallheaders() — works on Apache and PHP built-in server;
+    // also available on Nginx when the FPM pool has fastcgi_pass_header configured
+    if (function_exists('getallheaders')) {
+        foreach (getallheaders() as $name => $value) {
+            if (strtolower($name) === 'stripe-signature') {
+                return wp_unslash($value);
+            }
+        }
+    }
+
+    // Method 3: case-insensitive scan of HTTP_* keys only (catches non-standard casing)
+    $http_server = array_filter(
+        $_SERVER,
+        function ($k) { return strpos($k, 'HTTP_') === 0; },
+        ARRAY_FILTER_USE_KEY
+    );
+    $http_lower  = array_change_key_case($http_server, CASE_LOWER);
+    if (!empty($http_lower['http_stripe_signature'])) {
+        return wp_unslash($http_lower['http_stripe_signature']);
+    }
+
+    return '';
+}
+
 function bsa_handle_stripe_webhook(WP_REST_Request $request) {
     $webhook_secret = get_option('bsa_stripe_webhook_secret', '');
     if (empty($webhook_secret)) {
@@ -508,7 +541,8 @@ function bsa_handle_stripe_webhook(WP_REST_Request $request) {
     }
 
     $payload    = $request->get_body();
-    $sig_header = $request->get_header('stripe-signature');
+    // Try WordPress REST header parser first, then fall back to the multi-source helper
+    $sig_header = $request->get_header('stripe-signature') ?: bsa_get_stripe_signature();
 
     if (empty($sig_header)) {
         return new WP_REST_Response(array('error' => 'Missing Stripe-Signature header'), 400);
@@ -633,7 +667,7 @@ function bsa_handle_stripe_webhook_ajax() {
     }
 
     $payload    = file_get_contents('php://input');
-    $sig_header = isset($_SERVER['HTTP_STRIPE_SIGNATURE']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_STRIPE_SIGNATURE'])) : '';
+    $sig_header = bsa_get_stripe_signature();
 
     if (empty($sig_header)) {
         status_header(400);
