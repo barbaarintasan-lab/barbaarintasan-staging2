@@ -3,7 +3,7 @@
  * Plugin Name: Barbaarintasan Payment
  * Plugin URI: https://barbaarintasan.com
  * Description: Barbaarintasan Academy - Lacag bixin Mobile Money & Stripe. Shortcodes: [bsa_payment] [bsa_register]
- * Version: 2.5.0
+ * Version: 2.5.1
  * Author: Barbaarintasan Academy
  * Author URI: https://barbaarintasan.com
  * Text Domain: bsa-payment
@@ -15,6 +15,12 @@ if (!defined('ABSPATH')) {
 }
 
 define('BSA_APP_API_URL', 'https://appbarbaarintasan.com');
+
+// Flush rewrite rules on activation so the REST webhook route is immediately available
+register_activation_hook(__FILE__, 'bsa_activate_plugin');
+function bsa_activate_plugin() {
+    flush_rewrite_rules();
+}
 
 // AJAX registration handler for inline register form
 add_action('wp_ajax_nopriv_bsa_ajax_register', 'bsa_ajax_register');
@@ -281,9 +287,16 @@ function bsa_payment_settings_page() {
                         <?php endif; ?>
                         <ol class="description" style="margin:6px 0 0 1.2em;padding:0;">
                             <li>Stripe Dashboard &rarr; Developers &rarr; Webhooks &rarr; <strong>Add endpoint</strong></li>
-                            <li>Webhook URL-kan ku geli: <code style="background:#f3f4f6;padding:2px 6px;"><?php echo esc_url(rest_url('bsa/v1/stripe-webhook')); ?></code></li>
+                            <li>
+                                Webhook URL (REST &mdash; <em>try this first</em>):<br>
+                                <code style="background:#f3f4f6;padding:2px 6px;user-select:all;"><?php echo esc_url(rest_url('bsa/v1/stripe-webhook')); ?></code>
+                            </li>
+                            <li>
+                                Webhook URL (fallback &mdash; use this if REST gives a 404):<br>
+                                <code style="background:#fff3cd;padding:2px 6px;user-select:all;"><?php echo esc_url(admin_url('admin-ajax.php') . '?action=bsa_stripe_webhook'); ?></code>
+                            </li>
                             <li>Event: <code>checkout.session.completed</code> dooro</li>
-                            <li>&ldquo;Signing secret&rdquo; ka hel (<code>whsec_...</code>) oo halkan ku geli</li>
+                            <li>&ldquo;Signing secret&rdquo; ka hel (<code>whsec_...</code>) oo halkan ku geli &rarr; <strong>Save Settings</strong></li>
                         </ol>
                     </td>
                 </tr>
@@ -508,57 +521,64 @@ function bsa_handle_stripe_webhook(WP_REST_Request $request) {
         return new WP_REST_Response(array('error' => 'Invalid signature'), 400);
     }
 
+    bsa_process_stripe_webhook_event($event);
+
+    return new WP_REST_Response(array('received' => true), 200);
+}
+
+// Shared event processor used by both the REST endpoint and the admin-ajax fallback
+function bsa_process_stripe_webhook_event($event) {
     $event_type = $event['type'] ?? '';
     error_log('BSA Stripe Webhook: received event ' . $event_type);
 
-    if ($event_type === 'checkout.session.completed') {
-        $session    = $event['data']['object'] ?? array();
-        $session_id = $session['id'] ?? '';
-
-        // Idempotency: skip if already processed
-        if (!empty($session_id) && get_transient('bsa_stripe_processed_' . $session_id)) {
-            return new WP_REST_Response(array('received' => true), 200);
-        }
-
-        if (($session['payment_status'] ?? '') !== 'paid' && ($session['status'] ?? '') !== 'complete') {
-            return new WP_REST_Response(array('received' => true), 200);
-        }
-
-        $email       = $session['metadata']['email'] ?? ($session['customer_email'] ?? '');
-        $name        = $session['metadata']['name'] ?? '';
-        $course_id   = $session['metadata']['course_id'] ?? 'all-access';
-        $plan_type   = $session['metadata']['plan_type'] ?? 'yearly';
-        $amount_total = ($session['amount_total'] ?? 0) / 100;
-
-        if (empty($email)) {
-            return new WP_REST_Response(array('received' => true), 200);
-        }
-
-        if (!empty($session_id)) {
-            set_transient('bsa_stripe_processed_' . $session_id, true, 86400);
-        }
-
-        $result = bsa_record_purchase_in_app($email, $course_id, $plan_type, $amount_total, 'stripe', $session_id, $name);
-
-        $payment_id = wp_insert_post(array(
-            'post_title'  => 'Stripe Webhook: ' . sanitize_text_field($email) . ' - ' . sanitize_text_field($plan_type),
-            'post_type'   => 'bsa_payment',
-            'post_status' => 'publish',
-        ));
-        if ($payment_id) {
-            update_post_meta($payment_id, 'bsa_email', $email);
-            update_post_meta($payment_id, 'bsa_course_id', $course_id);
-            update_post_meta($payment_id, 'bsa_plan_type', $plan_type);
-            update_post_meta($payment_id, 'bsa_amount', $amount_total);
-            update_post_meta($payment_id, 'bsa_payment_status', 'approved');
-            update_post_meta($payment_id, 'bsa_payment_method', 'stripe');
-            update_post_meta($payment_id, 'bsa_stripe_session_id', $session_id);
-            update_post_meta($payment_id, 'bsa_approved_at', current_time('mysql'));
-            update_post_meta($payment_id, 'bsa_app_sync_result', wp_json_encode($result));
-        }
+    if ($event_type !== 'checkout.session.completed') {
+        return;
     }
 
-    return new WP_REST_Response(array('received' => true), 200);
+    $session    = $event['data']['object'] ?? array();
+    $session_id = $session['id'] ?? '';
+
+    // Idempotency: skip if already processed
+    if (!empty($session_id) && get_transient('bsa_stripe_processed_' . $session_id)) {
+        return;
+    }
+
+    if (($session['payment_status'] ?? '') !== 'paid' && ($session['status'] ?? '') !== 'complete') {
+        return;
+    }
+
+    $email        = $session['metadata']['email'] ?? ($session['customer_email'] ?? '');
+    $name         = $session['metadata']['name'] ?? '';
+    $course_id    = $session['metadata']['course_id'] ?? 'all-access';
+    $plan_type    = $session['metadata']['plan_type'] ?? 'yearly';
+    $amount_total = ($session['amount_total'] ?? 0) / 100;
+
+    if (empty($email)) {
+        return;
+    }
+
+    if (!empty($session_id)) {
+        set_transient('bsa_stripe_processed_' . $session_id, true, 86400);
+    }
+
+    $result = bsa_record_purchase_in_app($email, $course_id, $plan_type, $amount_total, 'stripe', $session_id, $name);
+
+    $payment_id = wp_insert_post(array(
+        'post_title'  => 'Stripe Webhook: ' . sanitize_text_field($email) . ' - ' . sanitize_text_field($plan_type),
+        'post_type'   => 'bsa_payment',
+        'post_status' => 'publish',
+    ));
+    if ($payment_id) {
+        update_post_meta($payment_id, 'bsa_email', $email);
+        update_post_meta($payment_id, 'bsa_course_id', $course_id);
+        update_post_meta($payment_id, 'bsa_plan_type', $plan_type);
+        update_post_meta($payment_id, 'bsa_amount', $amount_total);
+        update_post_meta($payment_id, 'bsa_payment_status', 'approved');
+        update_post_meta($payment_id, 'bsa_payment_method', 'stripe');
+        update_post_meta($payment_id, 'bsa_stripe_session_id', $session_id);
+        update_post_meta($payment_id, 'bsa_approved_at', current_time('mysql'));
+        update_post_meta($payment_id, 'bsa_app_sync_result', wp_json_encode($result));
+    }
 }
 
 function bsa_stripe_verify_webhook_signature($payload, $sig_header, $secret) {
@@ -598,6 +618,37 @@ function bsa_stripe_verify_webhook_signature($payload, $sig_header, $secret) {
     }
 
     return new WP_Error('invalid_signature', 'Stripe webhook signature mismatch');
+}
+
+// Admin-ajax fallback: works even when REST API permalink structure is misconfigured.
+// Stripe webhook URL (fallback): /wp-admin/admin-ajax.php?action=bsa_stripe_webhook
+add_action('wp_ajax_nopriv_bsa_stripe_webhook', 'bsa_handle_stripe_webhook_ajax');
+add_action('wp_ajax_bsa_stripe_webhook', 'bsa_handle_stripe_webhook_ajax');
+
+function bsa_handle_stripe_webhook_ajax() {
+    $webhook_secret = get_option('bsa_stripe_webhook_secret', '');
+    if (empty($webhook_secret)) {
+        status_header(500);
+        wp_send_json(array('error' => 'Webhook secret not configured'));
+    }
+
+    $payload    = file_get_contents('php://input');
+    $sig_header = isset($_SERVER['HTTP_STRIPE_SIGNATURE']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_STRIPE_SIGNATURE'])) : '';
+
+    if (empty($sig_header)) {
+        status_header(400);
+        wp_send_json(array('error' => 'Missing Stripe-Signature header'));
+    }
+
+    $event = bsa_stripe_verify_webhook_signature($payload, $sig_header, $webhook_secret);
+    if (is_wp_error($event)) {
+        error_log('BSA Stripe Webhook (ajax): signature verification failed - ' . $event->get_error_message());
+        status_header(400);
+        wp_send_json(array('error' => 'Invalid signature'));
+    }
+
+    bsa_process_stripe_webhook_event($event);
+    wp_send_json(array('received' => true));
 }
 
 function bsa_enroll_user_in_app($enroll_body, $payment_id) {
