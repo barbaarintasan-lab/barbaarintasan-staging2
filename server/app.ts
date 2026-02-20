@@ -6,7 +6,7 @@ import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { startCronJobs } from "./cron";
 import { runMigrations } from 'stripe-replit-sync';
-import { getStripeSync } from './stripeClient';
+import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 
 // Memory usage monitoring - logs every 60 seconds
@@ -69,29 +69,41 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    console.log('[STRIPE] Setting up managed webhook...');
+    console.log('[STRIPE] Setting up webhook endpoint...');
     // Use custom domain for production, fallback to Replit domain for development
     const customDomain = 'appbarbaarintasan.com';
     const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
     const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
     const webhookBaseUrl = isProduction ? `https://${customDomain}` : `https://${replitDomain}`;
-    
+    const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
+
     try {
-      const result = await stripeSync.findOrCreateManagedWebhook(
-        `${webhookBaseUrl}/api/stripe/webhook`
-      );
-      if (result?.webhook?.url) {
-        console.log(`[STRIPE] Webhook configured: ${result.webhook.url}`);
+      // List existing webhook endpoints and find one matching our URL.
+      // This avoids looking up a stored endpoint ID that may have been deleted
+      // from Stripe (which would produce resource_missing health alerts).
+      const stripe = await getUncachableStripeClient();
+      let existing = null;
+      for await (const endpoint of stripe.webhookEndpoints.list()) {
+        if (endpoint.url === webhookUrl && endpoint.status === 'enabled') {
+          existing = endpoint;
+          break;
+        }
+      }
+
+      if (existing) {
+        console.log(`[STRIPE] Webhook already configured: ${existing.url} (${existing.id})`);
       } else {
-        console.log('[STRIPE] Webhook setup skipped (no URL returned)');
-        console.log('[STRIPE] NOTE: Configure webhook manually in Stripe Dashboard:');
-        console.log(`[STRIPE]   URL: https://${customDomain}/api/stripe/webhook`);
-        console.log('[STRIPE]   Events: checkout.session.completed');
+        const created = await stripe.webhookEndpoints.create({
+          url: webhookUrl,
+          enabled_events: ['checkout.session.completed'],
+        });
+        console.log(`[STRIPE] Webhook endpoint created: ${created.url} (${created.id})`);
       }
     } catch (webhookError) {
       console.log('[STRIPE] Webhook setup skipped:', webhookError);
       console.log('[STRIPE] NOTE: Configure webhook manually in Stripe Dashboard:');
-      console.log(`[STRIPE]   URL: https://${customDomain}/api/stripe/webhook`);
+      console.log(`[STRIPE]   URL: ${webhookUrl}`);
+      console.log('[STRIPE]   Events: checkout.session.completed');
     }
 
     console.log('[STRIPE] Syncing Stripe data...');
