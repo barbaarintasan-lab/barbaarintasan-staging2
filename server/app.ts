@@ -69,10 +69,30 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    // Stripe webhook endpoints are configured manually in Stripe Dashboard
-    // pointing to /api/stripe/webhook. The app does not auto-register or manage
-    // webhook endpoints — that responsibility belongs to the WordPress payment
-    // plugin (barbaarintasan.com), which is where course payments are processed.
+    console.log('[STRIPE] Setting up managed webhook...');
+    // Use custom domain for production, fallback to Replit domain for development
+    const customDomain = 'appbarbaarintasan.com';
+    const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+    const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+    const webhookBaseUrl = isProduction ? `https://${customDomain}` : `https://${replitDomain}`;
+    
+    try {
+      const result = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`
+      );
+      if (result?.webhook?.url) {
+        console.log(`[STRIPE] Webhook configured: ${result.webhook.url}`);
+      } else {
+        console.log('[STRIPE] Webhook setup skipped (no URL returned)');
+        console.log('[STRIPE] NOTE: Configure webhook manually in Stripe Dashboard:');
+        console.log(`[STRIPE]   URL: https://${customDomain}/api/stripe/webhook`);
+        console.log('[STRIPE]   Events: checkout.session.completed');
+      }
+    } catch (webhookError) {
+      console.log('[STRIPE] Webhook setup skipped:', webhookError);
+      console.log('[STRIPE] NOTE: Configure webhook manually in Stripe Dashboard:');
+      console.log(`[STRIPE]   URL: https://${customDomain}/api/stripe/webhook`);
+    }
 
     console.log('[STRIPE] Syncing Stripe data...');
     stripeSync.syncBackfill()
