@@ -6,7 +6,7 @@ import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { startCronJobs } from "./cron";
 import { runMigrations } from 'stripe-replit-sync';
-import { getStripeSync, getUncachableStripeClient } from './stripeClient';
+import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 
 // Memory usage monitoring - logs every 60 seconds
@@ -69,42 +69,10 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    console.log('[STRIPE] Setting up webhook endpoint...');
-    // Use custom domain for production, fallback to Replit domain for development
-    const customDomain = 'appbarbaarintasan.com';
-    const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
-    const webhookBaseUrl = isProduction ? `https://${customDomain}` : `https://${replitDomain}`;
-    const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
-
-    try {
-      // List existing webhook endpoints and find one matching our URL.
-      // This avoids looking up a stored endpoint ID that may have been deleted
-      // from Stripe (which would produce resource_missing health alerts).
-      const stripe = await getUncachableStripeClient();
-      let existing = null;
-      for await (const endpoint of stripe.webhookEndpoints.list()) {
-        if (endpoint.url === webhookUrl && endpoint.status === 'enabled') {
-          existing = endpoint;
-          break;
-        }
-      }
-
-      if (existing) {
-        console.log(`[STRIPE] Webhook already configured: ${existing.url} (${existing.id})`);
-      } else {
-        const created = await stripe.webhookEndpoints.create({
-          url: webhookUrl,
-          enabled_events: ['checkout.session.completed'],
-        });
-        console.log(`[STRIPE] Webhook endpoint created: ${created.url} (${created.id})`);
-      }
-    } catch (webhookError) {
-      console.log('[STRIPE] Webhook setup skipped:', webhookError);
-      console.log('[STRIPE] NOTE: Configure webhook manually in Stripe Dashboard:');
-      console.log(`[STRIPE]   URL: ${webhookUrl}`);
-      console.log('[STRIPE]   Events: checkout.session.completed');
-    }
+    // Stripe webhook endpoints are configured manually in Stripe Dashboard
+    // pointing to /api/stripe/webhook. The app does not auto-register or manage
+    // webhook endpoints — that responsibility belongs to the WordPress payment
+    // plugin (barbaarintasan.com), which is where course payments are processed.
 
     console.log('[STRIPE] Syncing Stripe data...');
     stripeSync.syncBackfill()
