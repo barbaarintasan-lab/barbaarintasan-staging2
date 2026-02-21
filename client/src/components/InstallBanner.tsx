@@ -89,7 +89,7 @@ export function InstallBanner() {
             <Button
               onClick={handleInstall}
               size="sm"
-              className="bg-white text-orange-600 hover:bg-white/90 font-bold text-xs px-3 h-8"
+              className="bg-white text-orange-800 hover:bg-white/90 font-bold text-xs px-3 h-8"
               data-testid="button-install-banner"
             >
               <Download className="w-3 h-3 mr-1" />
@@ -99,7 +99,7 @@ export function InstallBanner() {
             <Link href="/install">
               <Button
                 size="sm"
-                className="bg-white text-orange-600 hover:bg-white/90 font-bold text-xs px-3 h-8"
+                className="bg-white text-orange-800 hover:bg-white/90 font-bold text-xs px-3 h-8"
                 data-testid="button-install-guide"
               >
                 <Download className="w-3 h-3 mr-1" />

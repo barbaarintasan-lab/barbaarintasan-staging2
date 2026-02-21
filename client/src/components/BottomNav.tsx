@@ -317,6 +317,7 @@ export default function BottomNav() {
                 href={social.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={social.name}
                 className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center text-white transition-all active:scale-95",
                   social.color,
@@ -444,6 +445,7 @@ export default function BottomNav() {
           onClick={scrollToTop}
           className="fixed bottom-28 right-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"
           data-testid="button-scroll-top"
+          aria-label="Xagga sare u laabo"
         >
           <ArrowUp className="w-6 h-6" />
         </button>
@@ -463,6 +465,7 @@ export default function BottomNav() {
               <button
                 onClick={() => setShowPWAModal(false)}
                 className="absolute top-2 right-2 text-white/80 hover:text-white p-1"
+                aria-label="Xir"
               >
                 <X className="w-5 h-5" />
               </button>

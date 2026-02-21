@@ -173,7 +173,7 @@ function AnimatedCounter({ value }: { value: number }) {
   const finalDisplay = hasAnimatedRef.current ? displayCount : (value > 0 ? value : displayCount);
 
   return (
-    <span ref={ref} className="text-3xl font-bold text-orange-500 tabular-nums">
+    <span ref={ref} className="text-3xl font-bold text-orange-700 tabular-nums">
       {finalDisplay}
     </span>
   );
@@ -567,6 +567,7 @@ function DhambaalSection() {
                 src={todayMessage.thumbnailUrl || todayMessage.images[0]} 
                 alt={todayMessage.title}
                 className="w-full h-full object-cover opacity-60"
+                loading="lazy"
               />
             </div>
           )}
@@ -624,6 +625,7 @@ function MaaweeloSection() {
                 src={todayStory.thumbnailUrl || todayStory.images[0]} 
                 alt={todayStory.titleSomali}
                 className="w-full h-full object-cover opacity-60"
+                loading="lazy"
               />
             </div>
           )}
@@ -684,6 +686,7 @@ function ParentFeedSection() {
               src={barahaWaalidiintaImg} 
               alt="Baraha Waalidiinta"
               className="w-full h-full object-cover opacity-60"
+              loading="lazy"
             />
           </div>
         </div>
@@ -703,7 +706,7 @@ function CourseCard({ course, onComingSoonClick }: { course: Course; onComingSoo
     >
       <div className="h-20 bg-gradient-to-br from-sky-200 via-blue-100 to-cyan-100 relative overflow-hidden">
         {course.imageUrl ? (
-          <img src={course.imageUrl} alt={course.title} className={`w-full h-full object-cover ${!isAvailable ? 'opacity-70' : ''}`} />
+          <img src={course.imageUrl} alt={course.title} className={`w-full h-full object-cover ${!isAvailable ? 'opacity-70' : ''}`} loading="lazy" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
@@ -876,7 +879,7 @@ function MeetEventsSection({ parent }: { parent: any }) {
                   Duubis
                 </div>
                 <div className="flex items-start gap-3">
-                  <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" loading="lazy" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-sm text-gray-900 mb-1">{recordingTitle}</h3>
                     {event.mediaTitle && event.title !== event.mediaTitle && (
@@ -934,7 +937,7 @@ function MeetEventsSection({ parent }: { parent: any }) {
                 );
               })()}
               <div className="flex items-start gap-3">
-                <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" loading="lazy" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-sm text-gray-900 mb-1">{event.title}</h3>
                   {event.description && (
@@ -1173,6 +1176,7 @@ function AiTipCard() {
             src="/images/founder-musse.jpg"
             alt="Founder"
             className="w-14 h-14 rounded-full object-cover border-2 border-purple-300 shadow-sm"
+            loading="lazy"
           />
           <span className="absolute -bottom-1 -right-1 bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
             AI
@@ -1969,6 +1973,7 @@ function FlashcardModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               src={card.image} 
               alt={card.word} 
               className="w-full h-48 object-contain rounded-xl mb-4"
+              loading="lazy"
             />
             <h2 className="text-4xl font-black text-center text-gray-800 tracking-wide">{card.word}</h2>
           </div>
@@ -2307,14 +2312,14 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-white pb-24 lg:pb-8">
+    <main className="min-h-screen bg-white pb-24 lg:pb-8">
       <InstallBanner />
       <header className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 safe-top prevent-flicker">
         <div className="px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Link href="/" className="flex flex-col items-center" data-testid="link-bsa-app">
-                <img src={bsaAppIcon} alt="BSA" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
+                <img src={bsaAppIcon} alt="" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
                 <span className="text-white text-[10px] font-bold mt-0.5">BSA</span>
               </Link>
             </div>
@@ -2362,7 +2367,7 @@ export default function Home() {
               <img src={logoImage} alt="Logo" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" data-testid="button-language-switcher">
+                  <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" data-testid="button-language-switcher" aria-label="Luuqadda beddel">
                     <Globe className="w-4 h-4 text-white" />
                   </button>
                 </DropdownMenuTrigger>
@@ -2387,7 +2392,7 @@ export default function Home() {
               </DropdownMenu>
               {(parent?.email === "barbaarintasan@gmail.com" || parent?.isAdmin) && (
                 <Link href="/admin">
-                  <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" data-testid="button-admin-header">
+                  <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" data-testid="button-admin-header" aria-label="Maamulka">
                     <Settings className="w-4 h-4 text-white" />
                   </button>
                 </Link>
@@ -2396,7 +2401,7 @@ export default function Home() {
             
             <div className="flex items-center gap-2">
               <Link href="/sheeko" className="flex flex-col items-center" data-testid="link-sheeko-app">
-                <img src={sheekoAppIcon} alt="Sheeko" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
+                <img src={sheekoAppIcon} alt="" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
                 <span className="text-white text-[10px] font-bold mt-0.5">Sheeko</span>
               </Link>
             </div>
@@ -2412,7 +2417,7 @@ export default function Home() {
         </div>
         {parent ? (
           <div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">{parent.name}</h1>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">{parent.name}</h2>
             {hasEnrollments ? (
               <>
                 <p className="text-gray-600 text-base mb-5">{t("home.knowledgeBasedParenting")}</p>
@@ -2471,22 +2476,22 @@ export default function Home() {
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
             <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
+            <p className="text-xs text-gray-500 mt-1">{t("home.stats.available")}</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.lessons")}</p>
             <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 70} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
+            <p className="text-xs text-gray-500 mt-1">{t("home.stats.available")}</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.parents")}</p>
             <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
+            <p className="text-xs text-gray-500 mt-1">{t("home.stats.inApp")}</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">Telegram</p>
             <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.followUs")}</p>
+            <p className="text-xs text-gray-500 mt-1">{t("home.stats.followUs")}</p>
           </div>
         </div>
       </div>
@@ -2935,7 +2940,7 @@ export default function Home() {
               <li>{t("footer.help4")}</li>
             </ul>
           </section>
-          <p className="text-xs text-gray-400 mt-4">
+          <p className="text-xs text-gray-500 mt-4">
             {t("footer.copyright")}
           </p>
           
@@ -2966,7 +2971,7 @@ export default function Home() {
           </div>
 
           <p className="text-sm font-semibold text-gray-600 mt-8">{t("footer.ownerName")}</p>
-          <img src="/signature.png" alt={t("footer.signatureAlt")} className="h-8 mx-auto mt-1" />
+          <img src="/signature.png" alt={t("footer.signatureAlt")} className="h-8 mx-auto mt-1" loading="lazy" />
         </article>
       </footer>
 
@@ -3023,6 +3028,6 @@ export default function Home() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

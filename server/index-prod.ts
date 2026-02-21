@@ -16,6 +16,31 @@ export async function serveStatic(app: Express, server: Server) {
     );
   }
 
+  // Security headers for all responses
+  app.use((_req, res, next) => {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        // unsafe-inline required for Vite-built SPA inline scripts; unsafe-eval required by framer-motion/livekit
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        // https: wildcard needed for dynamic user content images from various CDNs
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' https://api.stripe.com https://api.openai.com wss://*.livekit.cloud wss:",
+        "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://drive.google.com",
+        "media-src 'self' blob: https:",
+        "worker-src 'self' blob:",
+      ].join("; "),
+    );
+    next();
+  });
+
   app.use("/assets", express.static(path.join(distPath, "assets"), {
     maxAge: "1y",
     immutable: true,
