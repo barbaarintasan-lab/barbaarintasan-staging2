@@ -5129,6 +5129,7 @@ Ka jawaab qaabkan JSON ah:
         }
         return c;
       });
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -9064,6 +9065,7 @@ Return a JSON object with:
         }
         return s;
       });
+      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
       res.json(sections);
     } catch (error) {
       console.error("Error fetching homepage sections:", error);
@@ -10108,6 +10110,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         const count = await storage.getParentCount();
         return { count };
       });
+      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
       res.json(data);
     } catch (error) {
       res.json({ count: 0 });
@@ -10121,6 +10124,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         const count = await getTelegramGroupMemberCount();
         return { count: count || 9905 };
       });
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
       res.json(data);
     } catch (error) {
       console.error("Error fetching Telegram member count:", error);

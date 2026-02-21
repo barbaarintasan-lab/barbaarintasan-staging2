@@ -2319,7 +2319,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Link href="/" className="flex flex-col items-center" data-testid="link-bsa-app">
-                <img src={bsaAppIcon} alt="" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
+                <img src={bsaAppIcon} alt="" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" fetchPriority="high" />
                 <span className="text-white text-[10px] font-bold mt-0.5">BSA</span>
               </Link>
             </div>
@@ -2364,7 +2364,7 @@ export default function Home() {
                   </button>
                 </Link>
               )}
-              <img src={logoImage} alt="Logo" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" />
+              <img src={logoImage} alt="Logo" className="w-10 h-10 rounded-xl shadow-lg border-2 border-white/30" fetchPriority="high" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all" data-testid="button-language-switcher" aria-label="Luuqadda beddel">
