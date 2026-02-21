@@ -89,6 +89,21 @@ function translateDuration(duration: string | null, t: (key: string) => string):
     .replace(/(\d+)\s*cashar/gi, `$1 ${t("courses.lessons")}`);
 }
 
+const localCourseImages: Record<string, string> = {
+  "0-6":          "/course-images/0-6-bilood.png",
+  "6-12":         "/course-images/6-12-bilood.png",
+  "1-2":          "/course-images/1-2-sano.png",
+  "2-4":          "/course-images/2-4-sano.png",
+  "4-7":          "/course-images/4-7-sano.png",
+  "intellect":    "/course-images/caqli-sare.png",
+  "independence": "/course-images/ilmo-is-dabira.png",
+  "father":       "/course-images/aabe-baraarugay.png",
+  "autism":       "/course-images/hadalka-daaho.png",
+  "family":       "/course-images/badqabka-qoyska.png",
+  "free-trial":   "/course-images/0-6-bilood.png",
+  "free-general": "/course-images/4-7-sano.png",
+};
+
 interface Course {
   id: number;
   courseId: string;
@@ -706,7 +721,18 @@ function CourseCard({ course, onComingSoonClick }: { course: Course; onComingSoo
     >
       <div className="h-20 bg-gradient-to-br from-sky-200 via-blue-100 to-cyan-100 relative overflow-hidden">
         {course.imageUrl ? (
-          <img src={course.imageUrl} alt={course.title} className={`w-full h-full object-cover ${!isAvailable ? 'opacity-70' : ''}`} loading="lazy" />
+          <img
+            src={course.imageUrl}
+            alt={course.title}
+            className={`w-full h-full object-cover ${!isAvailable ? 'opacity-70' : ''}`}
+            loading="lazy"
+            onError={(e) => {
+              const fallback = localCourseImages[course.courseId];
+              if (fallback && (e.currentTarget as HTMLImageElement).src !== new URL(fallback, window.location.origin).href) {
+                (e.currentTarget as HTMLImageElement).src = fallback;
+              }
+            }}
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
