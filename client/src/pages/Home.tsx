@@ -2429,7 +2429,7 @@ export default function Home() {
                 <Link href="/learning-hub">
                   <button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-browse-courses">
                     <Sparkles className="w-5 h-5" />
-                    {t("home.browseCourses")}
+                    {t("home.browseCourses", "Arag Koorsooyinka")}
                   </button>
                 </Link>
               </>
