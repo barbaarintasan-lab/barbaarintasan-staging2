@@ -307,7 +307,7 @@ export default function BottomNav() {
           </button>
 
           {/* Social Media Icons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {socialLinks.map((social) => (
               <a
                 key={social.name}
@@ -315,11 +315,11 @@ export default function BottomNav() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center text-white transition-all active:scale-95",
+                  "w-5 h-5 rounded-full flex items-center justify-center text-white transition-all active:scale-95",
                   social.color,
                 )}
               >
-                <span className="w-3 h-3 flex items-center justify-center">
+                <span className="w-2.5 h-2.5 flex items-center justify-center">
                   {social.icon}
                 </span>
               </a>
@@ -439,10 +439,10 @@ export default function BottomNav() {
       {showScrollTop && !isAuthPage && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-28 right-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"
+          className="fixed bottom-32 right-4 w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"
           data-testid="button-scroll-top"
         >
-          <ArrowUp className="w-6 h-6" />
+          <ArrowUp className="w-5 h-5" />
         </button>
       )}
 
