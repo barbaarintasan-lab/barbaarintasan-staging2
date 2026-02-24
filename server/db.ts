@@ -49,6 +49,10 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
+pool.on('connect', (client) => {
+  client.query('SET search_path TO public');
+});
+
 pool.on('error', (err) => {
   console.error('[DB Pool] Unexpected error on idle client:', err.message);
 });
