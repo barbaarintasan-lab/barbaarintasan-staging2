@@ -2,8 +2,16 @@ import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import type { InsertBedtimeStory } from "@shared/schema";
 import { generateBedtimeStoryAudio } from "./tts";
-import { saveMaaweelToGoogleDrive } from "./googleDrive";
+import { saveMaaweelToGoogleDrive, searchMaaweelByCharacter } from "./googleDrive";
 import OpenAI from "openai";
+import { db } from "./db";
+import { translations } from "@shared/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
+
+function getSomaliaToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
+}
 
 // Use Replit AI Integration on Replit, fallback to direct OpenAI on Fly.io
 const useReplitIntegration = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
@@ -306,7 +314,7 @@ async function generateStoryImage(scene: string, characterName: string): Promise
 }
 
 export async function generateDailyBedtimeStory(): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getSomaliaToday();
   
   const existingStory = await storage.getBedtimeStoryByDate(today);
   if (existingStory) {
@@ -364,14 +372,21 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 
     try {
       console.log(`[Bedtime Stories] Generating audio (Ubax voice)...`);
-      const audioUrl = await generateBedtimeStoryAudio(newStory.content, newStory.moralLesson, newStory.id);
+      const { generateAndUploadAudio } = await import("./tts");
+      const audioUrl = await generateAndUploadAudio(
+        newStory.content,
+        `maaweelo-${newStory.id}`,
+        "tts-audio/maaweelada",
+        { azureVoice: "so-SO-UbaxNeural" },
+        'maaweelo'
+      );
       await storage.updateBedtimeStory(newStory.id, { audioUrl });
-      console.log(`[Bedtime Stories] Audio generated and saved`);
+      console.log(`[Bedtime Stories] Audio generated and saved to R2: ${audioUrl}`);
     } catch (audioError) {
       console.error(`[Bedtime Stories] Audio generation failed (story saved without audio):`, audioError);
     }
     
-    // Backup to Google Drive
+    /* Google Drive backup disabled as per user request
     try {
       await saveMaaweelToGoogleDrive(
         storyText.titleSomali,
@@ -384,6 +399,7 @@ export async function generateDailyBedtimeStory(): Promise<void> {
     } catch (driveError) {
       console.error(`[Bedtime Stories] Google Drive backup failed:`, driveError);
     }
+    */
   } catch (error: any) {
     if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('duplicate')) {
       console.log(`[Bedtime Stories] Story already exists for ${today} (caught duplicate insert)`);
@@ -396,18 +412,60 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 
 // Cache for admin bedtime stories (module-level for clearing)
 let bedtimeStoriesCache: { data: any[]; timestamp: number } | null = null;
-const STORIES_CACHE_TTL = 30000; // 30 seconds
+const STORIES_CACHE_TTL = 30000;
+const todayStoryCache = new Map<string, { data: any; expiry: number }>();
 
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
-  console.log("[Bedtime Stories] Cache cleared");
+  todayStoryCache.clear();
+}
+
+async function applyTranslationsToStories<T extends Record<string, any> & { id: string }>(
+  stories: T[],
+  language: string
+): Promise<T[]> {
+  if (isSomaliLanguage(language) || stories.length === 0) {
+    return stories;
+  }
+
+  const storyIds = stories.map(s => s.id);
+  const allTranslations = await db.select()
+    .from(translations)
+    .where(
+      and(
+        eq(translations.entityType, 'bedtime_story'),
+        inArray(translations.entityId, storyIds),
+        eq(translations.targetLanguage, normalizeLanguageCode(language))
+      )
+    );
+
+  const translationsByStory = new Map<string, typeof allTranslations>();
+  for (const translation of allTranslations) {
+    if (!translationsByStory.has(translation.entityId)) {
+      translationsByStory.set(translation.entityId, []);
+    }
+    translationsByStory.get(translation.entityId)!.push(translation);
+  }
+
+  return stories.map(story => {
+    const storyTranslations = translationsByStory.get(story.id) || [];
+    const translated = { ...story };
+    for (const t of storyTranslations) {
+      if (['title', 'content', 'moralLesson'].includes(t.fieldName)) {
+        translated[t.fieldName] = t.translatedText;
+      }
+    }
+    return translated;
+  });
 }
 
 export function registerBedtimeStoryRoutes(app: Express): void {
   app.get("/api/bedtime-stories", async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 30;
-      const stories = await storage.getBedtimeStories(limit);
+      const lang = req.query.lang as string;
+      let stories = await storage.getBedtimeStories(limit);
+      stories = await applyTranslationsToStories(stories, lang);
       res.json(stories);
     } catch (error) {
       console.error("Error fetching bedtime stories:", error);
@@ -433,11 +491,20 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories/today", async (req: Request, res: Response) => {
     try {
-      const story = await storage.getTodayBedtimeStory();
+      const lang = req.query.lang as string;
+      const cacheKey = `bs-today-${lang || 'so'}`;
+      const cached = todayStoryCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiry) {
+        return res.json(cached.data);
+      }
+      let story = await storage.getTodayBedtimeStory();
       if (!story) {
         return res.status(404).json({ error: "No story available for today" });
       }
-      res.json(story);
+      const translated = await applyTranslationsToStories([story], lang);
+      const result = translated[0];
+      todayStoryCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching today's story:", error);
       res.status(500).json({ error: "Failed to fetch story" });
@@ -446,11 +513,13 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories/:id", async (req: Request, res: Response) => {
     try {
-      const story = await storage.getBedtimeStory(req.params.id);
+      const lang = req.query.lang as string;
+      let story = await storage.getBedtimeStory(req.params.id);
       if (!story) {
         return res.status(404).json({ error: "Story not found" });
       }
-      res.json(story);
+      const translated = await applyTranslationsToStories([story], lang);
+      res.json(translated[0]);
     } catch (error) {
       console.error("Error fetching story:", error);
       res.status(500).json({ error: "Failed to fetch story" });
@@ -761,6 +830,100 @@ export function registerBedtimeStoryRoutes(app: Express): void {
     } catch (error) {
       console.error("Error deleting bedtime story:", error);
       res.status(500).json({ error: "Failed to delete bedtime story" });
+    }
+  });
+
+  // Search for stories by character name in Google Drive backups (admin only)
+  app.get("/api/admin/bedtime-stories/search/:characterName", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.parentId) {
+        return res.status(401).json({ error: "Fadlan soo gal" });
+      }
+      const parent = await storage.getParent(req.session.parentId);
+      if (!parent?.isAdmin) {
+        return res.status(403).json({ error: "Admin kaliya ayaa baadhitaan kara" });
+      }
+      
+      const { characterName } = req.params;
+      console.log(`[Bedtime Stories] Searching Google Drive backups for character: ${characterName}`);
+      
+      const stories = await searchMaaweelByCharacter(characterName);
+      res.json({ 
+        success: true, 
+        count: stories.length,
+        stories 
+      });
+    } catch (error) {
+      console.error("Error searching stories from Google Drive:", error);
+      res.status(500).json({ error: "Failed to search stories" });
+    }
+  });
+
+  // Restore a story from Google Drive backup to database (admin only)
+  app.post("/api/admin/bedtime-stories/restore", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.parentId) {
+        return res.status(401).json({ error: "Fadlan soo gal" });
+      }
+      const parent = await storage.getParent(req.session.parentId);
+      if (!parent?.isAdmin) {
+        return res.status(403).json({ error: "Admin kaliya ayaa soo celin kara" });
+      }
+      
+      let { title, titleSomali, content, characterName, moralLesson, storyDate } = req.body;
+      
+      // titleSomali is required, but title (English) can be derived from titleSomali if not provided
+      if (!titleSomali || !content || !characterName || !storyDate) {
+        return res.status(400).json({ error: "Missing required fields: titleSomali, content, characterName, storyDate" });
+      }
+      
+      // If English title is not provided, use the Somali title
+      // (Google Drive backups only contain the Somali title)
+      if (!title) {
+        title = titleSomali;
+      }
+      
+      // Check if story already exists for this date
+      const existingStory = await storage.getBedtimeStoryByDate(storyDate);
+      if (existingStory) {
+        return res.status(409).json({ 
+          error: "Story already exists for this date",
+          existingStory 
+        });
+      }
+      
+      // Find character type from SAHABI_CHARACTERS or TABIYIN_CHARACTERS
+      const allCharacters = [...SAHABI_CHARACTERS, ...TABIYIN_CHARACTERS];
+      const character = allCharacters.find(c => c.nameSomali === characterName);
+      const characterType = character?.type || "sahabi";
+      
+      const storyData: InsertBedtimeStory = {
+        title,
+        titleSomali,
+        content,
+        characterName,
+        characterType,
+        moralLesson: moralLesson || "Waxbarasho muhiim ah",
+        ageRange: "3-8",
+        images: [],
+        storyDate,
+        isPublished: false, // Start as unpublished for review
+      };
+      
+      const newStory = await storage.createBedtimeStory(storyData);
+      console.log(`[Bedtime Stories] Restored story from Google Drive: ${titleSomali}`);
+      
+      res.json({ 
+        success: true, 
+        message: "Sheekada waa la soo celiyay",
+        story: newStory 
+      });
+    } catch (error: any) {
+      console.error("Error restoring story from Google Drive:", error);
+      if (error?.code === '23505' || error?.message?.includes('unique')) {
+        return res.status(409).json({ error: "Story already exists for this date" });
+      }
+      res.status(500).json({ error: "Failed to restore story" });
     }
   });
 }
