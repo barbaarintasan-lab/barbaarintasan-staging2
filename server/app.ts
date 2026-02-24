@@ -31,6 +31,17 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+registerHealthCheck(app);
+
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
 const staticCacheOptions = { maxAge: '7d', immutable: false };
 const hashedAssetCache = { maxAge: '1y', immutable: true };
 
@@ -44,18 +55,6 @@ app.use('/course-images', express.static(courseImagesPath, staticCacheOptions));
 if (process.env.NODE_ENV === 'production') {
   app.use('/assets', express.static(path.join(process.cwd(), 'dist', 'public', 'assets'), hashedAssetCache));
 }
-
-// Register health check endpoint first (before any middleware that might slow it down)
-registerHealthCheck(app);
-
-app.use(compression({
-  level: 6,
-  threshold: 1024,
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) return false;
-    return compression.filter(req, res);
-  }
-}));
 
 // Initialize Stripe schema and sync data
 async function initStripe() {
