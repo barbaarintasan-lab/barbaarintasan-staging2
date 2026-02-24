@@ -7031,7 +7031,7 @@ Return JSON:
                     <p><strong>Reference:</strong> ${submission.referenceCode || 'Ma jirto'}</p>
                   </div>
                   <p style="text-align: center; margin-top: 20px;">
-                    <a href="https://barbaarintasan-academy.replit.app/admin" style="display: inline-block; background: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                    <a href="https://appbarbaarintasan.com/admin" style="display: inline-block; background: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
                       Gal Admin Panel
                     </a>
                   </p>
