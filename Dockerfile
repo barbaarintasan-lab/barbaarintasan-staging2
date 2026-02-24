@@ -29,13 +29,14 @@ RUN npm ci --omit=dev && npm ls stripe 2>/dev/null || npm install stripe
 # dist/ contains: index.js (bundled server) and public/ (client build)
 COPY --from=builder /app/dist ./dist
 
-# Ensure course-images are in the correct location for static serving
-# (Vite should copy them, but this ensures they're present)
+# Ensure course-images directory exists for static serving
 RUN mkdir -p /app/dist/public/course-images
-COPY --from=builder /app/client/public/course-images ./dist/public/course-images
 
-# Copy static assets needed at runtime
+# Copy attached_assets if they exist (logo, icons etc)
 COPY --from=builder /app/attached_assets ./attached_assets
+
+# Copy scripts directory for CLI tools (e.g., translation-manager.js)
+COPY --from=builder /app/scripts ./scripts
 
 # Create TTS audio temp directory
 RUN mkdir -p /app/tts-audio
@@ -47,8 +48,7 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
 # Start the application

@@ -10,15 +10,16 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, type Parent, type PushSubscription } from "@shared/schema";
+import { db, pool } from "./db";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { registerObjectStorageRoutes, ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage";
 import { generateImageBuffer } from "./replit_integrations/image/client";
 import { registerImageRoutes } from "./replit_integrations/image";
 import { registerBedtimeStoryRoutes, generateDailyBedtimeStory, clearBedtimeStoriesCache } from "./bedtimeStories";
 import { registerParentMessageRoutes, generateAndSaveParentMessage, clearParentMessagesCache } from "./parentMessages";
+import { registerParentTipsRoutes, generateAndSaveParentTip } from "./parentTips";
 import { createGoogleMeetLink } from "./google-calendar";
 import { listMaktabadaFiles, getFileDownloadUrl, deleteDriveFile, listFilesInFolder, getDirectDownloadUrl, listMaktabadaSubfolderFiles } from "./google-drive";
 import { uploadToGoogleDrive, getOrCreateSheekoFolder, downloadFromGoogleDrive, listDhambaalFiles, listMaaweelFiles, getFileContent, parseDhambaalContent, parseMaaweelContent } from "./googleDrive";
@@ -26,13 +27,14 @@ import { sendEmail, sendPurchaseConfirmationEmail, sendWelcomeEmail, sendPasswor
 import { registerLearningGroupRoutes } from "./learningGroups";
 import { registerLessonGroupRoutes } from "./lessonGroups";
 import { registerDhambaalDiscussionRoutes } from "./dhambaalDiscussion";
+import { registerBatchApiRoutes } from "./batch-api/routes";
+import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { getParentingHelp, checkRateLimit } from "./ai/parenting-help";
 import { checkAiAccess, checkOrStartTrial, activateGold, MEMBERSHIP_ADVICE_SOMALI } from "./ai/access-guard";
 import { uploadToR2, isR2Configured, listR2Files } from "./r2Storage";
 import { moderateContent } from "./ai/content-moderation";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, verifyPaypalOrder } from "./paypal";
 import { AccessToken } from "livekit-server-sdk";
 import { videoProxyRouter } from "./videoProxy";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -89,6 +91,18 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 const PgSession = connectPgSimple(session);
+
+const apiCache = new Map<string, { data: any; expiry: number }>();
+function getCached(key: string, ttlMs: number, fetcher: () => Promise<any>): Promise<any> {
+  const cached = apiCache.get(key);
+  if (cached && Date.now() < cached.expiry) {
+    return Promise.resolve(cached.data);
+  }
+  return fetcher().then(data => {
+    apiCache.set(key, { data, expiry: Date.now() + ttlMs });
+    return data;
+  });
+}
 
 // Health check endpoint for deployment readiness checks
 export function registerHealthCheck(app: Express) {
@@ -180,6 +194,99 @@ declare module 'express-session' {
     sessionToken: string; // For single-session enforcement
     oauthReturnUrl?: string; // For WordPress redirect after OAuth
   }
+}
+
+/**
+ * Helper function to apply translations to any entity
+ * Fetches translations from the database and applies them to the entity
+ */
+async function applyTranslations<T extends Record<string, any>>(
+  entity: T,
+  entityType: string,
+  entityId: string,
+  language: string,
+  fields: string[]
+): Promise<T> {
+  // If language is Somali or not specified, return original entity
+  if (isSomaliLanguage(language)) {
+    return entity;
+  }
+
+  // Fetch translations for this entity
+  const entityTranslations = await db.select()
+    .from(translations)
+    .where(
+      and(
+        eq(translations.entityType, entityType),
+        eq(translations.entityId, entityId),
+        eq(translations.targetLanguage, normalizeLanguageCode(language))
+      )
+    );
+
+  // Apply translations to the entity
+  const translatedEntity = { ...entity };
+  for (const translation of entityTranslations) {
+    if (fields.includes(translation.fieldName)) {
+      translatedEntity[translation.fieldName] = translation.translatedText;
+    }
+  }
+
+  return translatedEntity;
+}
+
+/**
+ * Helper function to apply translations to an array of entities
+ */
+async function applyTranslationsToArray<T extends Record<string, any> & { id: string }>(
+  entities: T[],
+  entityType: string,
+  language: string,
+  fields: string[]
+): Promise<T[]> {
+  // If language is Somali or not specified, return original entities
+  if (isSomaliLanguage(language)) {
+    return entities;
+  }
+
+  // Return early if no entities
+  if (entities.length === 0) {
+    return entities;
+  }
+
+  // Fetch all translations for these entities in one query
+  const entityIds = entities.map(e => e.id);
+  const allTranslations = await db.select()
+    .from(translations)
+    .where(
+      and(
+        eq(translations.entityType, entityType),
+        inArray(translations.entityId, entityIds),
+        eq(translations.targetLanguage, normalizeLanguageCode(language))
+      )
+    );
+
+  // Group translations by entity ID
+  const translationsByEntity = new Map<string, typeof allTranslations>();
+  for (const translation of allTranslations) {
+    if (!translationsByEntity.has(translation.entityId)) {
+      translationsByEntity.set(translation.entityId, []);
+    }
+    translationsByEntity.get(translation.entityId)!.push(translation);
+  }
+
+  // Apply translations to each entity
+  return entities.map(entity => {
+    const entityTranslations = translationsByEntity.get(entity.id) || [];
+    const translatedEntity = { ...entity };
+    
+    for (const translation of entityTranslations) {
+      if (fields.includes(translation.fieldName)) {
+        translatedEntity[translation.fieldName] = translation.translatedText;
+      }
+    }
+    
+    return translatedEntity;
+  });
 }
 
 // Authentication middleware - checks both old admin system and parent admin
@@ -284,6 +391,17 @@ async function checkCourseAccess(parentId: string, courseId: string): Promise<{ 
       (!e.accessEnd || new Date(e.accessEnd) > new Date())
     );
     
+    // Auto-expire any all-access enrollment that's past its end date
+    const expiredAllAccess = allEnrollments.find(e =>
+      e.courseId === allAccessCourse.id &&
+      e.status === "active" &&
+      e.accessEnd && new Date(e.accessEnd) < new Date()
+    );
+    if (expiredAllAccess) {
+      console.log(`[ACCESS] Auto-expiring all-access enrollment ${expiredAllAccess.id} (accessEnd: ${expiredAllAccess.accessEnd})`);
+      await storage.updateEnrollmentStatus(expiredAllAccess.id, "expired");
+    }
+    
     // If user has active All-Access subscription and course is live, grant access
     if (allAccessEnrollment && course.isLive) {
       return { hasAccess: true };
@@ -309,6 +427,10 @@ async function checkCourseAccess(parentId: string, courseId: string): Promise<{ 
   }
   
   if (new Date(enrollment.accessEnd) < new Date()) {
+    if (enrollment.status === "active") {
+      console.log(`[ACCESS] Auto-expiring enrollment ${enrollment.id} (accessEnd: ${enrollment.accessEnd})`);
+      await storage.updateEnrollmentStatus(enrollment.id, "expired");
+    }
     return { hasAccess: false, reason: "Diiwaangelintaadii way dhammaatay. Fadlan cusboonaysii si aad u sii waddato" };
   }
   
@@ -323,6 +445,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure (always enabled for Replit)
   app.set("trust proxy", 1);
 
+  app.get('/download/app-release.aab', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'app-release.aab');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'app-release.aab');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
+  app.get('/download/app-release.zip', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'app-release.zip');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'app-release.zip');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
+  app.get('/download/wordpress-plugin.zip', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'wordpress-plugin.zip');
+    if (fs.existsSync(filePath)) {
+      res.download(filePath, 'wordpress-plugin.zip');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
+  app.get('/download/barbaarintasan-theme.zip', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'download', 'barbaarintasan-theme.zip');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.download(filePath, 'barbaarintasan-theme.zip');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
+  app.get('/download/barbaarintasan-theme-v3.zip', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'download', 'barbaarintasan-theme-v3.zip');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.download(filePath, 'barbaarintasan-theme-v3.zip');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
+  app.get('/download/barbaarintasan-theme-v4.zip', (req: Request, res: Response) => {
+    const filePath = path.join(process.cwd(), 'download', 'barbaarintasan-theme-v4.zip');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.download(filePath, 'barbaarintasan-theme-v4.zip');
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
   // Session configuration with PostgreSQL store for persistence
   const isProduction = process.env.NODE_ENV === "production";
   
@@ -335,9 +520,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(
     session({
       store: new PgSession({
-        conString: process.env.DATABASE_URL,
+        pool: pool as any,
         tableName: "session",
         createTableIfMissing: true,
+        pruneSessionInterval: 600,
       }),
       secret: sessionSecret || "barbaarintasan-academy-dev-secret-key",
       resave: false,
@@ -546,7 +732,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
   // Covers all major route prefixes where parentId is used
   const parentAuthPaths = ["/api/parent", "/api/lessons", "/api/milestones", "/api/badges", 
                           "/api/resources", "/api/conversations", "/api/assessment", 
-                          "/api/paypal", "/api/livekit", "/api/quran-reciters", "/api/hadiths",
+                          "/api/livekit", "/api/quran-reciters", "/api/hadiths",
                           "/api/support", "/api/voice-rooms", "/api/sheeko"];
   
   parentAuthPaths.forEach(path => {
@@ -765,6 +951,17 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         console.error("[DAILY-CONTENT] Maaweelada Caruurta - FAILED:", error);
       }
 
+      // Generate Talooyinka Waalidka (Parent Tips by dev stage)
+      try {
+        console.log("[DAILY-CONTENT] Generating Talooyinka Waalidka...");
+        await generateAndSaveParentTip();
+        (results as any).parentTips = { success: true, message: "Waa la sameeyay" };
+        console.log("[DAILY-CONTENT] Talooyinka Waalidka - SUCCESS");
+      } catch (error: any) {
+        (results as any).parentTips = { success: false, message: error.message || "Waa guuldareystay" };
+        console.error("[DAILY-CONTENT] Talooyinka Waalidka - FAILED:", error);
+      }
+
       const allSuccess = results.dhambaal.success && results.maaweelada.success;
       res.json({
         success: allSuccess,
@@ -888,7 +1085,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         // Generate Dhambaal if doesn't exist
         if (!existingMsgDates.has(dateString)) {
           try {
-            await generateAndSaveParentMessage(dateString);
+            await generateAndSaveParentMessage();
             dhambaalCount++;
             console.log(`[SEED] Generated Dhambaal for ${dateString}`);
           } catch (err: any) {
@@ -902,7 +1099,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         // Generate Sheeko if doesn't exist
         if (!existingStoryDates.has(dateString)) {
           try {
-            await generateDailyBedtimeStory(dateString);
+            await generateDailyBedtimeStory();
             sheekoCount++;
             console.log(`[SEED] Generated Sheeko for ${dateString}`);
           } catch (err: any) {
@@ -968,8 +1165,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
           images: msg.images,
           messageDate: msg.messageDate,
           isPublished: msg.isPublished,
-          authorName: msg.authorName,
-          audioFileId: msg.audioFileId
+          authorName: msg.authorName
         })),
         bedtimeStories: bedtimeStories.map(story => ({
           title: story.title,
@@ -981,8 +1177,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
           ageRange: story.ageRange,
           images: story.images,
           storyDate: story.storyDate,
-          isPublished: story.isPublished,
-          audioFileId: story.audioFileId
+          isPublished: story.isPublished
         }))
       };
       
@@ -1051,8 +1246,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
               images: msg.images || [],
               messageDate: msg.messageDate,
               isPublished: msg.isPublished !== false,
-              authorName: msg.authorName || "Muuse Siciid Aw-Muuse",
-              audioFileId: msg.audioFileId || null
+              authorName: msg.authorName || "Muuse Siciid Aw-Muuse"
             });
             dhambaalCount++;
           } catch (err) {
@@ -1079,8 +1273,7 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
               ageRange: story.ageRange || "3-8",
               images: story.images || [],
               storyDate: story.storyDate,
-              isPublished: story.isPublished !== false,
-              audioFileId: story.audioFileId || null
+              isPublished: story.isPublished !== false
             });
             sheekoCount++;
           } catch (err) {
@@ -1845,7 +2038,7 @@ Ka jawaab qaabkan JSON ah:
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      let parent;
+      let parent: Parent | undefined;
       
       if (existingParent) {
         // If parent exists but has no password (Google account), allow setting password
@@ -1878,10 +2071,6 @@ Ka jawaab qaabkan JSON ah:
           console.error(`[REGISTRATION] Failed to send welcome email to ${parent.email}:`, emailError);
         }
 
-        // Sync new user to WordPress (non-blocking)
-        syncUserToWordPress(parent.email, parent.name, phone || '', hashedPassword).catch(err => {
-          console.error(`[WP-SYNC] Background sync failed for ${parent.email}:`, err);
-        });
       }
 
       // Generate unique session token for single-session enforcement
@@ -1932,37 +2121,8 @@ Ka jawaab qaabkan JSON ah:
     }
   });
 
-  // Helper: Verify login credentials against WordPress
   async function verifyWithWordPress(email: string, password: string): Promise<{ verified: boolean; user?: { name: string; phone: string; email: string } }> {
-    const apiKey = process.env.WORDPRESS_API_KEY;
-    if (!apiKey) {
-      console.log('[WP-LOGIN] WORDPRESS_API_KEY not set - skipping WordPress verification');
-      return { verified: false };
-    }
-    
-    try {
-      const response = await fetch('https://barbaarintasan.com/wp-json/bsa/v1/verify-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      const result = await response.json() as any;
-      
-      if (result.verified) {
-        console.log(`[WP-LOGIN] WordPress verified user: ${email}`);
-        return { verified: true, user: result.user };
-      }
-      
-      console.log(`[WP-LOGIN] WordPress verification failed for: ${email} - ${result.error || 'unknown'}`);
-      return { verified: false };
-    } catch (error) {
-      console.error(`[WP-LOGIN] Error verifying with WordPress: ${email}`, error);
-      return { verified: false };
-    }
+    return { verified: false };
   }
 
   // Parent email/password login
@@ -1978,24 +2138,7 @@ Ka jawaab qaabkan JSON ah:
       let parent = await storage.getParentByEmail(normalizedEmail);
       
       if (!parent) {
-        // User not in app database - try WordPress verification
-        const wpVerified = await verifyWithWordPress(normalizedEmail, password);
-        if (!wpVerified.verified) {
-          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
-        }
-        
-        // WordPress verified! Auto-create account in app
-        const hashedPassword = await bcrypt.hash(password, 10);
-        parent = await storage.createParent({
-          email: normalizedEmail,
-          password: hashedPassword,
-          name: wpVerified.user?.name || normalizedEmail.split('@')[0],
-          phone: wpVerified.user?.phone || null,
-          country: null,
-          city: null,
-          inParentingGroup: false,
-        });
-        console.log(`[WP-LOGIN] Auto-created app account for WordPress user: ${normalizedEmail}, id: ${parent.id}`);
+        return res.status(401).json({ error: "Akoonkan lama helin. Fadlan app-ka ka iska diiwaangeli." });
       } else {
         if (!parent.password) {
           return res.status(401).json({ error: "Akoonkaan wuxuu ku sameeyay Google. Fadlan Google-ga ku gal." });
@@ -2003,16 +2146,7 @@ Ka jawaab qaabkan JSON ah:
 
         const isValid = await bcrypt.compare(password, parent.password);
         if (!isValid) {
-          // Also try WordPress as fallback (user may have changed password on WordPress)
-          const wpVerified = await verifyWithWordPress(normalizedEmail, password);
-          if (wpVerified.verified) {
-            // Update app password to match WordPress
-            const hashedPassword = await bcrypt.hash(password, 10);
-            await storage.updateParentPassword(parent.id, hashedPassword);
-            console.log(`[WP-LOGIN] Updated app password from WordPress for: ${normalizedEmail}`);
-          } else {
-            return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
-          }
+          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
         }
       }
 
@@ -2427,14 +2561,29 @@ Ka jawaab qaabkan JSON ah:
       let isExpiredMonthly = false;
       
       // First check active enrollment for upgrade eligibility
+      const yearlyPrice = course?.priceYearly || 114;
+      let monthlyPaidAmount = 0;
+      
       if (enrollment && 
           enrollment.planType === "monthly" && 
           enrollment.status === "active" && 
           enrollment.accessEnd && 
           new Date(enrollment.accessEnd) > new Date()) {
         eligibleForUpgrade = true;
-        // Upgrade price: $114 (yearly) - $30 (already paid monthly) + $1 (adjustment) = $85
-        upgradePrice = 85;
+        
+        // Get the actual monthly amount this user paid from their payment submission
+        if (enrollment.paymentSubmissionId) {
+          const paymentSub = await storage.getPaymentSubmission(enrollment.paymentSubmissionId);
+          if (paymentSub) {
+            monthlyPaidAmount = paymentSub.amount;
+          }
+        }
+        if (!monthlyPaidAmount) {
+          monthlyPaidAmount = course?.priceMonthly || 15;
+        }
+        
+        // Dynamic upgrade price: yearly - monthly already paid + $1 adjustment (minimum $1)
+        upgradePrice = Math.max(1, yearlyPrice - monthlyPaidAmount + 1);
         
         // Calculate remaining days in current subscription
         const now = new Date();
@@ -2463,7 +2612,20 @@ Ka jawaab qaabkan JSON ah:
           // Expired monthly subscription - still eligible for upgrade
           eligibleForUpgrade = true;
           isExpiredMonthly = true;
-          upgradePrice = 85;
+          
+          // Get actual monthly amount paid
+          if (latestEnrollment.paymentSubmissionId) {
+            const paymentSub = await storage.getPaymentSubmission(latestEnrollment.paymentSubmissionId);
+            if (paymentSub) {
+              monthlyPaidAmount = paymentSub.amount;
+            }
+          }
+          if (!monthlyPaidAmount) {
+            monthlyPaidAmount = course?.priceMonthly || 15;
+          }
+          
+          // Dynamic upgrade price: yearly - monthly already paid + $1 adjustment (minimum $1)
+          upgradePrice = Math.max(1, yearlyPrice - monthlyPaidAmount + 1);
           upgradeMonthsRemaining = 0; // No remaining time
         }
       }
@@ -2490,10 +2652,12 @@ Ka jawaab qaabkan JSON ah:
           eligible: true,
           isExpiredMonthly,
           upgradePrice: upgradePrice,
+          monthlyPaidAmount: monthlyPaidAmount,
           monthsRemaining: upgradeMonthsRemaining,
-          yearlyPrice: 114,
-          monthlyPrice: 30,
-          savings: (30 * 12) - upgradePrice, // $360 - $85 = $275 savings
+          yearlyPrice: yearlyPrice,
+          monthlyPrice: course?.priceMonthly || 15,
+          totalCost: monthlyPaidAmount + upgradePrice,
+          savings: ((course?.priceMonthly || 15) * 12) - (monthlyPaidAmount + upgradePrice),
           bannerVisible: upgradeBannerVisible,
           bannerExpiresAt: upgradeBannerExpiresAt,
         } : null,
@@ -2582,10 +2746,10 @@ Ka jawaab qaabkan JSON ah:
           daysRemaining,
           accessEnd: enrollment.accessEnd,
           // Upgrade pricing
-          upgradePrice: 85, // $114 - $30 + $1
+          upgradePrice: 70, // $114 - $15
           yearlyPrice: 114,
-          monthlyPrice: 30,
-          savings: (30 * 12) - 85, // $360 - $85 = $275 savings
+          monthlyPrice: 15,
+          savings: (15 * 12) - 85, // $360 - $85 = $275 savings
         });
       }
       
@@ -2965,7 +3129,7 @@ Ka jawaab qaabkan JSON ah:
         try {
           const sender = await storage.getParentById(req.session.parentId);
           const senderName = sender?.name?.split(' ')[0] || "Qof";
-          const subscriptions = await storage.getPushSubscriptionsByParentId(recipientId);
+          const subscriptions = await storage.getPushSubscriptionsByParent(recipientId);
           
           if (subscriptions.length > 0) {
             const notificationPayload = JSON.stringify({
@@ -2975,7 +3139,7 @@ Ka jawaab qaabkan JSON ah:
             });
 
             await Promise.allSettled(
-              subscriptions.map(async (sub) => {
+              subscriptions.map(async (sub: PushSubscription) => {
                 try {
                   await webpush.sendNotification(
                     {
@@ -3473,14 +3637,13 @@ Ka jawaab qaabkan JSON ah:
           await storage.createAiModerationReport({
             contentType: "social_post",
             contentId: "draft",
-            parentId: req.session.parentId!,
-            flaggedContent: combinedContent.substring(0, 500),
+            userId: req.session.parentId!,
+            originalContent: combinedContent.substring(0, 500),
             violationType: moderationResult.violationType || "unknown",
-            confidenceScore: moderationResult.confidenceScore.toString(),
+            confidenceScore: moderationResult.confidenceScore,
             aiExplanation: moderationResult.explanation || null,
-            moderatorAction: null,
-            reviewedAt: null,
-            reviewedBy: null,
+            actionTaken: "hidden",
+            status: "pending"
           });
         } catch (e) {
           console.error("Error saving moderation report:", e);
@@ -3577,25 +3740,27 @@ Ka jawaab qaabkan JSON ah:
   app.get("/api/social-posts/latest", async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 5, 10);
-      const posts = await storage.listLatestParentPosts(limit);
-      
-      const postsWithDetails = await Promise.all(
-        posts.map(async (post) => {
-          const [parent, images] = await Promise.all([
-            storage.getParent(post.parentId),
-            storage.getPostImages(post.id),
-          ]);
-          return {
-            ...post,
-            author: {
-              id: parent?.id,
-              name: parent?.name,
-              picture: parent?.picture,
-            },
-            images,
-          };
-        })
-      );
+      const cacheKey = `social-posts-latest-${limit}`;
+      const postsWithDetails = await getCached(cacheKey, 120000, async () => {
+        const posts = await storage.listLatestParentPosts(limit);
+        return Promise.all(
+          posts.map(async (post) => {
+            const [parent, images] = await Promise.all([
+              storage.getParent(post.parentId),
+              storage.getPostImages(post.id),
+            ]);
+            return {
+              ...post,
+              author: {
+                id: parent?.id,
+                name: parent?.name,
+                picture: parent?.picture,
+              },
+              images,
+            };
+          })
+        );
+      });
 
       res.json(postsWithDetails);
     } catch (error) {
@@ -3891,14 +4056,13 @@ Ka jawaab qaabkan JSON ah:
           await storage.createAiModerationReport({
             contentType: "post_comment",
             contentId: draftCommentId,
-            parentId: req.session.parentId!,
-            flaggedContent: body.substring(0, 500),
+            userId: req.session.parentId!,
+            originalContent: body.substring(0, 500),
             violationType: moderationResult.violationType || "unknown",
-            confidenceScore: moderationResult.confidenceScore.toString(),
+            confidenceScore: moderationResult.confidenceScore,
             aiExplanation: moderationResult.explanation || null,
-            moderatorAction: null,
-            reviewedAt: null,
-            reviewedBy: null,
+            actionTaken: "hidden",
+            status: "pending"
           });
         } catch (e) {
           console.error("Error saving moderation report:", e);
@@ -4126,17 +4290,7 @@ Ka jawaab qaabkan JSON ah:
         });
       }
 
-      // Check if video watch is required and not met
-      if (lesson.videoWatchRequired && lesson.videoUrl && lesson.videoUrl.trim() !== '') {
-        const currentProgress = await storage.getLessonProgress(req.session.parentId, lessonId);
-        const videoWatched = currentProgress?.videoWatchedPercent && currentProgress.videoWatchedPercent >= 80;
-        if (!videoWatched) {
-          return res.status(403).json({ 
-            error: "Video not watched", 
-            message: "Fadlan daawo video-ga ugu yaraan 80% intaadan u gudbin casharka xiga" 
-          });
-        }
-      }
+      // Video watch requirement removed - parents can now proceed to next lesson without watching 80% of the video
 
       const progress = await storage.markLessonComplete(
         req.session.parentId,
@@ -4560,7 +4714,7 @@ Ka jawaab qaabkan JSON ah:
         targetParentIds = parentIds.map(p => p.id);
       }
 
-      const uniqueIds = [...new Set(targetParentIds)];
+      const uniqueIds = Array.from(new Set(targetParentIds));
       console.log(`[PUSH BROADCAST] Starting broadcast to ${uniqueIds.length} parents (${audience})`);
 
       let sentCount = 0;
@@ -4718,7 +4872,7 @@ Ka jawaab qaabkan JSON ah:
     try {
       const subscriptions = await storage.getAllPushSubscriptions();
       // Get unique parent IDs and fetch their info
-      const parentIds = [...new Set(subscriptions.map(s => s.parentId))];
+      const parentIds = Array.from(new Set(subscriptions.map(s => s.parentId)));
       const subscribersWithInfo = await Promise.all(
         parentIds.map(async (parentId) => {
           const parent = await storage.getParent(parentId);
@@ -4764,7 +4918,7 @@ Ka jawaab qaabkan JSON ah:
       }
       
       // Get unique parent IDs to save notifications
-      const uniqueParentIds = [...new Set(subscriptions.map(sub => sub.parentId))];
+      const uniqueParentIds = Array.from(new Set(subscriptions.map(sub => sub.parentId)));
       
       // Save notifications to inbox for each parent
       for (const parentId of uniqueParentIds) {
@@ -4905,7 +5059,15 @@ Ka jawaab qaabkan JSON ah:
   // Course routes
   app.get("/api/courses", async (req, res) => {
     try {
-      const courses = await storage.getAllCourses();
+      const lang = req.query.lang as string;
+      const cacheKey = `courses-${lang || 'default'}`;
+      const courses = await getCached(cacheKey, 60000, async () => {
+        let c = await storage.getAllCourses();
+        if (lang) {
+          c = await applyTranslationsToArray(c, 'course', lang, ['title', 'description', 'comingSoonMessage']);
+        }
+        return c;
+      });
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -4915,10 +5077,24 @@ Ka jawaab qaabkan JSON ah:
 
   app.get("/api/courses/:id", async (req, res) => {
     try {
-      const course = await storage.getCourseByCourseId(req.params.id);
+      const lang = req.query.lang as string;
+      let course = await storage.getCourseByCourseId(req.params.id);
+      
       if (!course) {
         return res.status(404).json({ error: "Course not found" });
       }
+      
+      // Apply translations if language is specified
+      if (lang) {
+        course = await applyTranslations(
+          course,
+          'course',
+          course.id,
+          lang,
+          ['title', 'description', 'comingSoonMessage']
+        );
+      }
+      
       res.json(course);
     } catch (error) {
       console.error("Error fetching course:", error);
@@ -4966,7 +5142,19 @@ Ka jawaab qaabkan JSON ah:
   // Module routes
   app.get("/api/modules", async (req, res) => {
     try {
-      const modulesList = await storage.getAllModules();
+      const lang = req.query.lang as string;
+      let modulesList = await storage.getAllModules();
+      
+      // Apply translations if language is specified
+      if (lang) {
+        modulesList = await applyTranslationsToArray(
+          modulesList,
+          'module',
+          lang,
+          ['title']
+        );
+      }
+      
       res.json(modulesList);
     } catch (error) {
       console.error("Error fetching all modules:", error);
@@ -4976,7 +5164,19 @@ Ka jawaab qaabkan JSON ah:
 
   app.get("/api/courses/:courseId/modules", async (req, res) => {
     try {
-      const modulesList = await storage.getModulesByCourseId(req.params.courseId);
+      const lang = req.query.lang as string;
+      let modulesList = await storage.getModulesByCourseId(req.params.courseId);
+      
+      // Apply translations if language is specified
+      if (lang) {
+        modulesList = await applyTranslationsToArray(
+          modulesList,
+          'module',
+          lang,
+          ['title']
+        );
+      }
+      
       res.json(modulesList);
     } catch (error) {
       console.error("Error fetching modules:", error);
@@ -5021,12 +5221,34 @@ Ka jawaab qaabkan JSON ah:
   // Lesson routes
   app.get("/api/lessons", async (req, res) => {
     try {
-      const { courseId } = req.query;
+      const { courseId, lang } = req.query;
       if (courseId && typeof courseId === "string") {
-        const lessons = await storage.getLessonsByCourseId(courseId);
+        let lessons = await storage.getLessonsByCourseId(courseId);
+        
+        // Apply translations if language is specified
+        if (lang && typeof lang === "string") {
+          lessons = await applyTranslationsToArray(
+            lessons,
+            'lesson',
+            lang,
+            ['title', 'description', 'textContent']
+          );
+        }
+        
         return res.json(lessons);
       }
-      const lessons = await storage.getAllLessons();
+      let lessons = await storage.getAllLessons();
+      
+      // Apply translations if language is specified
+      if (lang && typeof lang === "string") {
+        lessons = await applyTranslationsToArray(
+          lessons,
+          'lesson',
+          lang,
+          ['title', 'description', 'textContent']
+        );
+      }
+      
       res.json(lessons);
     } catch (error) {
       console.error("Error fetching lessons:", error);
@@ -5120,13 +5342,25 @@ Ka jawaab qaabkan JSON ah:
 
   app.get("/api/lessons/:id", async (req, res) => {
     try {
-      const lesson = await storage.getLesson(req.params.id);
+      const lang = req.query.lang as string;
+      let lesson = await storage.getLesson(req.params.id);
       if (!lesson) {
         return res.status(404).json({ error: "Lesson not found" });
       }
       
       // Free lessons are accessible to everyone (including guests)
-      if (lesson.isFree) {
+      // Also allow first 5 lessons (by order) for free trial access
+      const isFirstFiveLessons = typeof lesson.order === 'number' && lesson.order < 5;
+      if (lesson.isFree || isFirstFiveLessons) {
+        if (lang) {
+          lesson = await applyTranslations(
+            lesson,
+            'lesson',
+            lesson.id,
+            lang,
+            ['title', 'description', 'textContent']
+          );
+        }
         return res.json(lesson);
       }
       
@@ -5141,10 +5375,9 @@ Ka jawaab qaabkan JSON ah:
       // Check subscription access for the course
       const accessCheck = await checkCourseAccess(req.session.parentId, lesson.courseId);
       if (!accessCheck.hasAccess) {
-        // Fetch the course to get its slug for navigation
         const course = await storage.getCourse(lesson.courseId);
         return res.status(403).json({ 
-          error: accessCheck.reason || "Diiwaangelintaadii way dhammaatay",
+          error: "AccessDenied",
           subscriptionExpired: true,
           courseId: lesson.courseId,
           courseSlug: course?.courseId || null
@@ -5163,17 +5396,17 @@ Ka jawaab qaabkan JSON ah:
         });
       }
       
-      // Check if previous lesson is completed (sequential access requirement)
-      const prerequisiteCheck = await storage.checkPreviousLessonCompleted(req.session.parentId, lesson);
-      if (!prerequisiteCheck.canAccess) {
-        const course = await storage.getCourse(lesson.courseId);
-        return res.status(403).json({
-          error: "Dhammee Casharkii hore",
-          code: "PREREQUISITE_INCOMPLETE",
-          previousLessonId: prerequisiteCheck.previousLessonId,
-          previousLessonTitle: prerequisiteCheck.previousLessonTitle,
-          courseSlug: course?.courseId || null
-        });
+      // Prerequisite check removed - parents can now access any lesson without completing previous ones
+      
+      // Apply translations if language is specified
+      if (lang) {
+        lesson = await applyTranslations(
+          lesson,
+          'lesson',
+          lesson.id,
+          lang,
+          ['title', 'description', 'textContent']
+        );
       }
       
       res.json(lesson);
@@ -5364,11 +5597,23 @@ Ka jawaab qaabkan JSON ah:
 
   app.get("/api/quiz/:id", async (req, res) => {
     try {
+      const lang = req.query.lang as string;
       const quiz = await storage.getQuiz(req.params.id);
       if (!quiz) {
         return res.status(404).json({ error: "Quiz not found" });
       }
-      const questions = await storage.getQuizQuestions(req.params.id);
+      let questions = await storage.getQuizQuestions(req.params.id);
+      
+      // Apply translations if language is specified
+      if (lang) {
+        questions = await applyTranslationsToArray(
+          questions,
+          'quiz_question',
+          lang,
+          ['question', 'options', 'explanation']
+        );
+      }
+      
       res.json({ ...quiz, questions });
     } catch (error) {
       console.error("Error fetching quiz:", error);
@@ -5466,6 +5711,23 @@ Ka jawaab qaabkan JSON ah:
       // Check if we have payment details for auto-approval
       const canAutoApprove = paymentMethodId && customerName && customerPhone && planType;
       
+      // DUPLICATE CHECK: Check if this exact screenshot URL was already used in a payment submission
+      const existingSubmissionWithSameScreenshot = await db.select().from(paymentSubmissions)
+        .where(and(
+          eq(paymentSubmissions.screenshotUrl, screenshotUrl),
+          inArray(paymentSubmissions.status, ["approved", "pending"])
+        ))
+        .limit(1);
+      
+      if (existingSubmissionWithSameScreenshot.length > 0) {
+        console.log(`[RECEIPT] DUPLICATE SCREENSHOT detected! Same image already used in submission: ${existingSubmissionWithSameScreenshot[0].id}`);
+        return res.json({
+          valid: false,
+          autoApproved: false,
+          error: "Rasiidkan hore ayaa la isticmaalay. Fadlan soo dir rasiid cusub oo kale."
+        });
+      }
+      
       // Get server-side attempt count (PERSISTED across page refreshes)
       const parentId = req.session.parentId!;
       const attemptRecord = await storage.getReceiptAttempts(parentId, courseId);
@@ -5539,7 +5801,7 @@ You MUST IMMEDIATELY REJECT and set is_valid_receipt=false if ANY of these are t
 
 ✅ VALID RECEIPT MUST HAVE ALL OF THESE:
 1. Mobile money app UI visible (EVC Plus green, Zaad blue, E-Dahab, Sahal) OR remittance/xawilaad receipt (Taaj Services, Dahabshiil, Amal, Kaah with RID/reference number)
-2. Clear monetary amount in USD (like $30, $95, $114)
+2. Clear monetary amount in USD (like $15, $70, $114)
 3. Transaction reference number (Tix: XXXXXXXXX or similar code)
 4. Date of transaction visible - ALWAYS convert to DD/MM/YYYY format:
    * "07-Jan-2026" → "07/01/2026"
@@ -5563,9 +5825,9 @@ The payment MUST be sent to the academy owner. Valid recipient names include:
 - Phone number: 0907790584 or 907790584
 
 AMOUNT VALIDATION:
-- Monthly plan: $30 (or close to it)
+- Monthly plan: $15 (or close to it)
 - Yearly plan: $114 (or close to it)  
-- One-time plan: $95 (or close to it)
+- One-time plan: $70 (or close to it)
 
 EXTRACTIONS REQUIRED:
 1. Reference number (Tix: XXXXXXXXX) - CRITICAL, must extract
@@ -5880,22 +6142,39 @@ Respond in JSON format:
             });
           }
           
-          // Check amount matches plan type (also allow upgrade price $85 for yearly when upgrading from monthly)
-          const expectedAmounts: Record<string, number> = { monthly: 30, yearly: 114, onetime: 95 };
-          const upgradePrice = 85; // For monthly->yearly upgrades
+          // Check amount matches plan type - dynamically calculate upgrade price
+          const courseForPricing = await storage.getCourse(courseId);
+          const expectedAmounts: Record<string, number> = { 
+            monthly: courseForPricing?.priceMonthly || 15, 
+            yearly: courseForPricing?.priceYearly || 114, 
+            onetime: 70 
+          };
           const expectedAmount = expectedAmounts[planType];
+          
+          // Calculate dynamic upgrade price if user has existing monthly enrollment
+          let dynamicUpgradePrice = 0;
+          const existingForPricing = await storage.getEnrollmentByPhoneAndCourse(customerPhone, courseId);
+          if (existingForPricing && existingForPricing.planType === "monthly" && planType === "yearly") {
+            let monthlyPaid = courseForPricing?.priceMonthly || 15;
+            if (existingForPricing.paymentSubmissionId) {
+              const prevPayment = await storage.getPaymentSubmission(existingForPricing.paymentSubmissionId);
+              if (prevPayment) monthlyPaid = prevPayment.amount;
+            }
+            dynamicUpgradePrice = (courseForPricing?.priceYearly || 114) - monthlyPaid + 1;
+          }
+          
           if (expectedAmount && amountCents) {
             const detectedAmountDollars = amountCents / 100;
             const tolerance = 5; // Allow $5 tolerance
-            // For yearly plans, also accept $85 upgrade price
             const isValidAmount = Math.abs(detectedAmountDollars - expectedAmount) <= tolerance ||
-              (planType === "yearly" && Math.abs(detectedAmountDollars - upgradePrice) <= tolerance);
+              (planType === "yearly" && dynamicUpgradePrice > 0 && Math.abs(detectedAmountDollars - dynamicUpgradePrice) <= tolerance);
             if (!isValidAmount) {
-              console.log(`[RECEIPT] Amount mismatch! Expected: $${expectedAmount} (or $${upgradePrice} for upgrade), Detected: $${detectedAmountDollars}`);
+              const upgradeNote = dynamicUpgradePrice > 0 ? ` (ama $${dynamicUpgradePrice} upgrade)` : "";
+              console.log(`[RECEIPT] Amount mismatch! Expected: $${expectedAmount}${upgradeNote}, Detected: $${detectedAmountDollars}`);
               return res.json({
                 valid: false,
                 autoApproved: false,
-                error: `Lacagta rasiidka ($${detectedAmountDollars}) kuma habboona qorshaha aad dooratay ($${expectedAmount}). Fadlan hubi lacagta saxda ah.`,
+                error: `Lacagta rasiidka ($${detectedAmountDollars}) kuma habboona qorshaha aad dooratay ($${expectedAmount}${upgradeNote}). Fadlan hubi lacagta saxda ah.`,
                 details: result
               });
             }
@@ -5930,7 +6209,7 @@ Respond in JSON format:
           
           // Use the AI-detected amount from the receipt (already validated above)
           // If no amount detected, use default based on plan type
-          const planAmounts: Record<string, number> = { monthly: 30, yearly: 114, onetime: 95 };
+          const planAmounts: Record<string, number> = { monthly: 15, yearly: 114, onetime: 70 };
           const detectedAmount = amountCents ? amountCents / 100 : (planAmounts[planType] || 114);
           const amount = Math.round(detectedAmount); // Round to nearest dollar
           
@@ -6101,7 +6380,7 @@ Respond in JSON format:
           }
           
           // Create payment submission for manual admin review
-          const planAmounts: Record<string, number> = { monthly: 30, yearly: 114, onetime: 95 };
+          const planAmounts: Record<string, number> = { monthly: 15, yearly: 114, onetime: 70 };
           const amount = planAmounts[planType] || 114;
           
           const submission = await storage.createPaymentSubmission({
@@ -6291,8 +6570,25 @@ Respond in JSON format:
         existingEnrollment?.planType === "monthly" && 
         planType === "yearly";
       
-      // Determine upgrade payment
-      const isUpgradePayment = isUpgradeFromMonthly && submission.amount === 85;
+      // Determine upgrade payment - dynamic based on actual monthly paid
+      const courseForConfirm = await storage.getCourse(courseId);
+      const yearlyPriceConfirm = courseForConfirm?.priceYearly || 114;
+      let dynamicUpgradePriceConfirm = 0;
+      if (isUpgradeFromMonthly && existingEnrollment) {
+        let prevMonthlyPaid = courseForConfirm?.priceMonthly || 15;
+        if (existingEnrollment.paymentSubmissionId) {
+          const prevPay = await storage.getPaymentSubmission(existingEnrollment.paymentSubmissionId);
+          if (prevPay) prevMonthlyPaid = prevPay.amount;
+        }
+        dynamicUpgradePriceConfirm = Math.max(1, yearlyPriceConfirm - prevMonthlyPaid + 1);
+      }
+      const upgradeTolerance = 10;
+      const isUpgradePayment = isUpgradeFromMonthly && dynamicUpgradePriceConfirm > 0 &&
+        Math.abs(submission.amount - dynamicUpgradePriceConfirm) <= upgradeTolerance;
+      
+      if (isUpgradeFromMonthly) {
+        console.log(`[CONFIRM] Upgrade check: amount=$${submission.amount}, yearlyPrice=$${yearlyPriceConfirm}, expectedUpgrade=$${dynamicUpgradePriceConfirm}, isUpgrade=${isUpgradePayment}`);
+      }
       
       // Calculate access end date
       let baseDate = new Date();
@@ -6312,8 +6608,10 @@ Respond in JSON format:
         } else {
           accessEnd.setFullYear(accessEnd.getFullYear() + 1);
         }
+      } else if (planType === "onetime") {
+        accessEnd = new Date(baseDate);
+        accessEnd.setMonth(accessEnd.getMonth() + 6);
       }
-      // "onetime" = null = lifetime access
       
       // Find parent by email
       let parentId: string | null = null;
@@ -6366,7 +6664,7 @@ Respond in JSON format:
       // Send confirmation email
       if (customerEmail) {
         const course = await storage.getCourse(courseId);
-        const planLabels: Record<string, string> = { onetime: "Hal Mar ($95)", monthly: "Bille ($30)", yearly: "Sanad ($114)" };
+        const planLabels: Record<string, string> = { onetime: "Hal Mar ($70)", monthly: "Bille ($15)", yearly: "Sanad ($114)" };
         const formatDate = (date: Date) => {
           const day = date.getDate();
           const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -6517,7 +6815,7 @@ You MUST IMMEDIATELY REJECT if ANY of these are true:
 
 ✅ VALID RECEIPT MUST HAVE ALL OF THESE:
 1. Mobile money app UI visible (EVC Plus green, Zaad blue, E-Dahab, Sahal) OR remittance/xawilaad receipt (Taaj, Dahabshiil, Amal, Kaah)
-2. Clear monetary amount in USD (like $30, $95, $114)
+2. Clear monetary amount in USD (like $15, $70, $114)
 3. Transaction reference number (Tix: XXXXXXXXX or similar)
 4. Date of transaction visible
 
@@ -6701,7 +6999,7 @@ Return JSON:
       // Send email notification to admin
       const course = await storage.getCourse(submission.courseId);
       const paymentMethod = await storage.getPaymentMethod(submission.paymentMethodId);
-      const planLabels: Record<string, string> = { onetime: "Hal Mar ($95)", monthly: "Bille ($30)", yearly: "Sanad ($114)" };
+      const planLabels: Record<string, string> = { onetime: "Hal Mar ($70)", monthly: "Bille ($15)", yearly: "Sanad ($114)" };
       
       const adminEmail = process.env.SMTP_EMAIL;
       if (adminEmail) {
@@ -6794,6 +7092,7 @@ Return JSON:
       // If approved, create or renew enrollment
       if (status === "approved" && updated) {
         // Calculate access end date based on plan
+        // Monthly=$15 → 1 bil, Yearly/Dahabi=$114 → 12 bilood, Onetime=$70 → 6 bilood
         let accessEnd: Date | null = null;
         if (updated.planType === "monthly") {
           accessEnd = new Date();
@@ -6801,8 +7100,10 @@ Return JSON:
         } else if (updated.planType === "yearly") {
           accessEnd = new Date();
           accessEnd.setFullYear(accessEnd.getFullYear() + 1);
+        } else if (updated.planType === "onetime") {
+          accessEnd = new Date();
+          accessEnd.setMonth(accessEnd.getMonth() + 6);
         }
-        // "onetime" = null = lifetime access
 
         // Try to find parent by email to link enrollment
         let parentId: string | null = null;
@@ -6830,16 +7131,29 @@ Return JSON:
           }
           
           // Check if this is an UPGRADE from monthly to yearly
-          // Detect upgrade by: 1) existing is monthly, 2) new is yearly, 3) amount is $85 (upgrade price)
           const isUpgradeFromMonthly = 
             existingEnrollment.planType === "monthly" && 
-            updated.planType === "yearly" && 
-            (updated.amount === 85 || updated.amount === 114); // Accept both $85 (upgrade) or $114 (full yearly)
+            updated.planType === "yearly";
           
-          // For $85 amount specifically, apply upgrade logic (11 months)
-          const applyUpgradeExtension = existingEnrollment.planType === "monthly" && 
-            updated.planType === "yearly" && 
-            updated.amount === 85;
+          // Calculate dynamic upgrade price based on what was previously paid
+          let expectedUpgradeAmount = 0;
+          if (isUpgradeFromMonthly) {
+            let monthlyPaid = 15;
+            if (existingEnrollment.paymentSubmissionId) {
+              const prevPayment = await storage.getPaymentSubmission(existingEnrollment.paymentSubmissionId);
+              if (prevPayment) monthlyPaid = prevPayment.amount;
+            }
+            const courseForUpgrade = await storage.getCourse(updated.courseId);
+            const yearlyFull = courseForUpgrade?.priceYearly || 114;
+            expectedUpgradeAmount = Math.max(1, yearlyFull - monthlyPaid + 1);
+            console.log(`[UPGRADE] Monthly->Yearly: monthlyPaid=$${monthlyPaid}, yearlyFull=$${yearlyFull}, expectedUpgrade=$${expectedUpgradeAmount}, actualAmount=$${updated.amount}`);
+          }
+          
+          // Apply upgrade extension (11 months) if amount matches expected upgrade price (within tolerance)
+          const approvalUpgradeTolerance = 10;
+          const applyUpgradeExtension = isUpgradeFromMonthly && 
+            expectedUpgradeAmount > 0 &&
+            Math.abs(updated.amount - expectedUpgradeAmount) <= approvalUpgradeTolerance;
           
           // Calculate new accessEnd based on plan and renewal base date
           let newAccessEnd: Date | null = null;
@@ -7018,6 +7332,23 @@ Return JSON:
         return res.json({ valid: false, error: "Screenshot URL is required" });
       }
       
+      // DUPLICATE CHECK: Check if this exact screenshot URL was already used
+      const existingSubWithScreenshot = await db.select().from(paymentSubmissions)
+        .where(and(
+          eq(paymentSubmissions.screenshotUrl, screenshotUrl),
+          inArray(paymentSubmissions.status, ["approved", "pending"])
+        ))
+        .limit(1);
+      
+      if (existingSubWithScreenshot.length > 0) {
+        console.log(`[RECEIPT-SUB] DUPLICATE SCREENSHOT detected! Same image in submission: ${existingSubWithScreenshot[0].id}`);
+        return res.json({
+          valid: false,
+          autoApproved: false,
+          error: "Rasiidkan hore ayaa la isticmaalay. Fadlan soo dir rasiid cusub oo kale."
+        });
+      }
+      
       // Get parent info
       const parent = await storage.getParent(parentId);
       if (!parent) {
@@ -7086,7 +7417,7 @@ You MUST IMMEDIATELY REJECT and set is_receipt=false if ANY of these are true:
 
 ✅ VALID RECEIPT MUST HAVE ALL OF THESE:
 1. Mobile money app UI visible (EVC Plus green, Zaad blue, E-Dahab, Sahal) OR remittance/xawilaad receipt (Taaj Services, Dahabshiil, Amal, Kaah with RID/reference number)
-2. Clear monetary amount in USD (like $30, $95, $114)
+2. Clear monetary amount in USD (like $15, $70, $114)
 3. Transaction reference number (Tix: XXXXXXXXX or similar code)
 4. Date of transaction visible - ALWAYS convert to DD/MM/YYYY format:
    * "07-Jan-2026" → "07/01/2026"
@@ -7110,9 +7441,9 @@ The payment MUST be sent to the academy owner. Valid recipient names include:
 - Phone number: 0907790584 or 907790584
 
 AMOUNT VALIDATION:
-- Monthly plan: $30 (or close to it)
+- Monthly plan: $15 (or close to it)
 - Yearly plan: $114 (or close to it)  
-- One-time plan: $95 (or close to it)
+- One-time plan: $70 (or close to it)
 
 IMPORTANT: Set is_mobile_money_ui=true for BOTH:
 - Mobile money apps (EVC Plus, Zaad, E-Dahab, Sahal)
@@ -7371,7 +7702,7 @@ Return a JSON object with:
         }
         
         // Check amount matches plan type
-        const expectedAmountsCheck: Record<string, number> = { monthly: 30, yearly: 114 };
+        const expectedAmountsCheck: Record<string, number> = { monthly: 15, yearly: 114 };
         const expectedAmountCheck = expectedAmountsCheck[planType];
         if (expectedAmountCheck && amountCents) {
           const detectedAmountDollars = amountCents / 100;
@@ -7387,7 +7718,7 @@ Return a JSON object with:
         }
         
         // Auto-approve: Create payment submission and extend enrollments
-        const planAmounts: Record<string, number> = { monthly: 30, yearly: 114 };
+        const planAmounts: Record<string, number> = { monthly: 15, yearly: 114 };
         const amount = planAmounts[planType] || 114;
         
         // Get all courses for yearly plan
@@ -7571,7 +7902,7 @@ Return a JSON object with:
                 <p><strong>Waalid:</strong> ${customerName}</p>
                 <p><strong>Tel:</strong> ${customerPhone}</p>
                 <p><strong>Email:</strong> ${customerEmail || 'Ma jirto'}</p>
-                <p><strong>Qorshe:</strong> ${planType === 'yearly' ? 'Sanad ($114) - DHAMMAAN KOORSOOYIN' : 'Bille ($30)'}</p>
+                <p><strong>Qorshe:</strong> ${planType === 'yearly' ? 'Sanad ($114) - DHAMMAAN KOORSOOYIN' : 'Bille ($15)'}</p>
                 <p style="text-align: center; margin-top: 20px;">
                   <a href="https://appbarbaarintasan.com/admin" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Gal Admin</a>
                 </p>
@@ -7760,7 +8091,7 @@ Return a JSON object with:
   // Admin: Get all courses
   app.get("/api/admin/courses", requireAuth, async (req, res) => {
     try {
-      const allCourses = await storage.getCourses();
+      const allCourses = await storage.getAllCourses();
       res.json(allCourses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -7832,6 +8163,56 @@ Return a JSON object with:
     }
   });
 
+  // Admin: Get lesson accessibility report - shows which lessons are free/accessible
+  app.get("/api/admin/lesson-accessibility-report", requireAuth, async (req, res) => {
+    try {
+      const courses = await storage.getAllCourses();
+      const report = [];
+
+      for (const course of courses) {
+        const lessons = await storage.getLessonsByCourseId(course.id);
+        const totalLessons = lessons.length;
+        const freeLessons = lessons.filter(l => l.isFree).length;
+        const accessibilityPercentage = totalLessons > 0 ? Math.round((freeLessons / totalLessons) * 100) : 0;
+
+        report.push({
+          courseId: course.id,
+          courseTitle: course.title,
+          courseCourseId: course.courseId,
+          isCourseFreee: course.isFree,
+          totalLessons,
+          freeLessons,
+          paidLessons: totalLessons - freeLessons,
+          accessibilityPercentage,
+          lessons: lessons.map(l => ({
+            id: l.id,
+            title: l.title,
+            order: l.order,
+            isFree: l.isFree,
+            lessonType: l.lessonType,
+            unlockType: l.unlockType
+          }))
+        });
+      }
+
+      // Sort by accessibility percentage (most accessible first)
+      report.sort((a, b) => b.accessibilityPercentage - a.accessibilityPercentage);
+
+      res.json({
+        summary: {
+          totalCourses: courses.length,
+          freeCoursesCount: courses.filter(c => c.isFree).length,
+          totalLessonsAcrossAll: report.reduce((sum, r) => sum + r.totalLessons, 0),
+          freeLessonsAcrossAll: report.reduce((sum, r) => sum + r.freeLessons, 0),
+        },
+        courses: report
+      });
+    } catch (error) {
+      console.error("Error generating lesson accessibility report:", error);
+      res.status(500).json({ error: "Failed to generate accessibility report" });
+    }
+  });
+
   // ==================== END ADMIN COURSE MANAGEMENT ====================
 
   // Upload all course images to R2 (protected by cron secret)
@@ -7893,7 +8274,7 @@ Return a JSON object with:
         return res.status(500).json({ error: "R2 storage not configured" });
       }
       
-      const courses = await storage.getCourses();
+      const courses = await storage.getAllCourses();
       const results: { courseId: string; title: string; oldUrl: string; newUrl: string }[] = [];
       const errors: { courseId: string; error: string }[] = [];
       
@@ -7988,6 +8369,43 @@ Return a JSON object with:
     } catch (error) {
       console.error("Error fetching parent progress:", error);
       res.status(500).json({ error: "Failed to fetch parent progress" });
+    }
+  });
+
+  // Admin: Update payment submission amount (for fixing incorrect amounts)
+  app.patch("/api/admin/payments/:id/amount", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, reason } = req.body;
+      if (!amount || typeof amount !== "number" || amount < 1 || amount > 500) {
+        return res.status(400).json({ error: "Invalid amount (must be $1-$500)" });
+      }
+      const existing = await storage.getPaymentSubmission(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      const adminParent = await storage.getParent(req.session.parentId!);
+      const auditNote = `Amount corrected from $${existing.amount} to $${amount} by ${adminParent?.name || "admin"} on ${new Date().toISOString()}${reason ? ` - Reason: ${reason}` : ""}`;
+      const existingNotes = existing.notes ? existing.notes + "\n" : "";
+      await storage.updatePaymentSubmission(id, { notes: existingNotes + auditNote });
+      await db.update(paymentSubmissions).set({ amount }).where(eq(paymentSubmissions.id, id));
+      console.log(`[ADMIN] Payment ${id} amount updated: $${existing.amount} -> $${amount}`);
+      res.json({ success: true, oldAmount: existing.amount, newAmount: amount });
+    } catch (error) {
+      console.error("Error updating payment amount:", error);
+      res.status(500).json({ error: "Failed to update amount" });
+    }
+  });
+
+  // Admin: Manually trigger subscription expiration check
+  app.post("/api/admin/expire-subscriptions", requireAuth, async (req, res) => {
+    try {
+      const { expireSubscriptions } = await import("./cron");
+      const result = await expireSubscriptions();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Error running manual expiration:", error);
+      res.status(500).json({ error: "Failed to run expiration check" });
     }
   });
 
@@ -8276,7 +8694,11 @@ Return a JSON object with:
   // Public: Get published testimonials
   app.get("/api/testimonials", async (req, res) => {
     try {
-      const testimonialsList = await storage.getPublishedTestimonials();
+      const lang = req.query.lang as string;
+      let testimonialsList = await storage.getPublishedTestimonials();
+      if (lang) {
+        testimonialsList = await applyTranslationsToArray(testimonialsList, 'testimonial', lang, ['message', 'name', 'courseTag']);
+      }
       res.json(testimonialsList);
     } catch (error) {
       console.error("Error fetching testimonials:", error);
@@ -8443,7 +8865,11 @@ Return a JSON object with:
   // Public: Get active announcements for home page
   app.get("/api/announcements", async (req, res) => {
     try {
-      const announcementsList = await storage.getActiveAnnouncements();
+      const lang = req.query.lang as string;
+      let announcementsList = await storage.getActiveAnnouncements();
+      if (lang) {
+        announcementsList = await applyTranslationsToArray(announcementsList, 'announcement', lang, ['title', 'content']);
+      }
       res.json(announcementsList);
     } catch (error) {
       console.error("Error fetching announcements:", error);
@@ -8568,7 +8994,15 @@ Return a JSON object with:
   // Public: Get visible homepage sections (ordered)
   app.get("/api/homepage-sections", async (req, res) => {
     try {
-      const sections = await storage.getVisibleHomepageSections();
+      const lang = req.query.lang as string;
+      const cacheKey = `homepage-sections-${lang || 'default'}`;
+      const sections = await getCached(cacheKey, 120000, async () => {
+        let s = await storage.getVisibleHomepageSections();
+        if (lang) {
+          s = await applyTranslationsToArray(s, 'homepage_section', lang, ['title']);
+        }
+        return s;
+      });
       res.json(sections);
     } catch (error) {
       console.error("Error fetching homepage sections:", error);
@@ -8750,8 +9184,19 @@ Return a JSON object with:
   // Public: Get today's approved AI tip
   app.get("/api/ai-tips/today", async (req, res) => {
     try {
-      const tip = await storage.getApprovedTipForToday();
-      res.json(tip || null);
+      const lang = req.query.lang as string;
+      const cacheKey = `ai-tip-today-${lang || 'so'}`;
+      const cached = apiCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiry) {
+        return res.json(cached.data);
+      }
+      let tip = await storage.getApprovedTipForToday();
+      if (tip && lang) {
+        tip = await applyTranslations(tip, 'ai_tip', tip.id, lang, ['title', 'content', 'correctedContent']);
+      }
+      const result = tip || null;
+      apiCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching today's AI tip:", error);
       res.status(500).json({ error: "Failed to fetch today's tip" });
@@ -8982,6 +9427,7 @@ Return a JSON object with:
       // Use Veo API key for video generation
       const veoApiKey = process.env.GOOGLE_VEO_API_KEY;
       if (!veoApiKey) {
+        console.error("[AI-VIDEO] GOOGLE_VEO_API_KEY not configured in environment variables");
         return res.status(500).json({ error: "Veo API key not configured" });
       }
 
@@ -9031,6 +9477,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
             parameters: {
               aspectRatio: "16:9",
               durationSeconds: 8,
+              resolution: "1080p",
             },
           }),
         }
@@ -9038,7 +9485,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
       console.log("[AI-VIDEO] Response status:", response.status, response.statusText);
       const responseText = await response.text();
-      console.log("[AI-VIDEO] Response body:", responseText.substring(0, 500));
+      console.log("[AI-VIDEO] Response body:", responseText.substring(0, 1000));
 
       if (!response.ok) {
         console.error("[AI-VIDEO] Gemini Veo error:", response.status, responseText);
@@ -9046,8 +9493,12 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         try {
           const parsed = JSON.parse(responseText);
           errorMsg = parsed?.error?.message || errorMsg;
+          // Log detailed error for debugging
+          if (parsed?.error) {
+            console.error("[AI-VIDEO] Detailed error:", JSON.stringify(parsed.error, null, 2));
+          }
         } catch { 
-          errorMsg = responseText || errorMsg;
+          errorMsg = responseText.substring(0, 200) || errorMsg;
         }
         return res.status(500).json({ error: errorMsg });
       }
@@ -9599,22 +10050,27 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Stats: Get parent count (for homepage stats)
   app.get("/api/stats/parents", async (req, res) => {
     try {
-      const count = await storage.getParentCount();
-      res.json({ count }); // Show actual parent count
+      const data = await getCached('stats-parents', 120000, async () => {
+        const count = await storage.getParentCount();
+        return { count };
+      });
+      res.json(data);
     } catch (error) {
       res.json({ count: 0 });
     }
   });
 
-  // Stats: Get Telegram group member count
   app.get("/api/stats/telegram-members", async (req, res) => {
     try {
-      const { getTelegramGroupMemberCount } = await import("./telegram");
-      const count = await getTelegramGroupMemberCount();
-      res.json({ count: count || 9905 }); // Fallback to known count if API fails
+      const data = await getCached('stats-telegram', 300000, async () => {
+        const { getTelegramGroupMemberCount } = await import("./telegram");
+        const count = await getTelegramGroupMemberCount();
+        return { count: count || 9905 };
+      });
+      res.json(data);
     } catch (error) {
       console.error("Error fetching Telegram member count:", error);
-      res.json({ count: 9905 }); // Fallback to known count
+      res.json({ count: 9905 });
     }
   });
 
@@ -9880,6 +10336,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Register parent message routes (Dhambaalka Waalidka)
   registerParentMessageRoutes(app);
 
+  // Register parent tips routes (Talooyinka Waalidka)
+  registerParentTipsRoutes(app);
+
   // Register learning groups routes (Guruubada Waxbarashada)
   registerLearningGroupRoutes(app);
 
@@ -9888,6 +10347,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
   // Register dhambaal discussion routes (Wadahadal Dhambaalka)
   registerDhambaalDiscussionRoutes(app);
+
+  // Register OpenAI Batch API routes (Bulk Translation & Content Generation)
+  registerBatchApiRoutes(app);
 
   // Register video proxy routes (Google Drive video streaming)
   app.use(videoProxyRouter);
@@ -15538,37 +16000,72 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         console.log(`[WORDPRESS API] Auto-registered new user: ${normalizedEmail}, name: ${name}, id: ${parent.id}`);
       }
       
-      // Calculate subscription/access end date
-      const accessEnd = new Date();
+      // Determine if this is an all-access subscription or specific course
+      const isAllAccess = courseSlug === 'all-access';
+      let targetCourseId: string;
+      let enrollment: any;
+      
+      // Get existing enrollments to calculate additive access end date
+      const existingEnrollments = await storage.getEnrollmentsByParentId(parent.id);
+      
+      // Find the latest active accessEnd across all enrollments (for additive renewal)
+      let baseDate = new Date();
+      for (const e of existingEnrollments) {
+        if (e.status === 'active' && e.accessEnd && new Date(e.accessEnd) > baseDate) {
+          baseDate = new Date(e.accessEnd);
+        }
+      }
+      
+      // Calculate subscription/access end date (ADDITIVE - extends from existing end date)
+      // Monthly=$15 → 1 bil, Yearly/Dahabi=$114 → 12 bilood, Onetime=$70 → 6 bilood
+      const accessEnd = new Date(baseDate);
       if (plan_type === 'monthly') {
         accessEnd.setMonth(accessEnd.getMonth() + 1);
       } else if (plan_type === 'yearly') {
         accessEnd.setFullYear(accessEnd.getFullYear() + 1);
+      } else if (plan_type === 'onetime') {
+        accessEnd.setMonth(accessEnd.getMonth() + 6);
       } else if (plan_type === 'lifetime') {
-        // Lifetime access
         accessEnd.setFullYear(accessEnd.getFullYear() + 99);
       } else {
-        // Default to 1 year if unrecognized
-        accessEnd.setFullYear(accessEnd.getFullYear() + 1);
+        accessEnd.setMonth(accessEnd.getMonth() + 6);
       }
       
-      // Determine if this is an all-access subscription or specific course
-      const isAllAccess = courseSlug === 'all-access';
-      let targetCourseId: string;
+      console.log(`[WORDPRESS API] Additive renewal: baseDate=${baseDate.toISOString()}, newAccessEnd=${accessEnd.toISOString()}`);
       
       if (isAllAccess) {
-        const allAccessId = await getAllAccessCourseId();
-        if (!allAccessId) {
-          console.log(`[WORDPRESS API] All-access course not found in database`);
-          return res.status(500).json({ 
-            success: false,
-            error: "All-access course not configured",
-            message: "An 'all-access' course must be created in the admin panel before subscription purchases can be processed"
-          });
+        // Enroll user in ALL courses (subscription = all-access)
+        const allCourses = await storage.getAllCourses();
+        if (allCourses.length === 0) {
+          return res.status(500).json({ success: false, error: "No courses configured in the system" });
         }
-        targetCourseId = allAccessId;
+        
+        const normalizedPlan = (plan_type === 'lifetime') ? 'onetime' : plan_type;
+        const enrollAccessEnd = (plan_type === 'lifetime') ? null : accessEnd;
+        
+        for (const course of allCourses) {
+          const existing = existingEnrollments.find(e => e.courseId === course.id);
+          if (existing) {
+            await storage.renewEnrollment(existing.id, normalizedPlan, enrollAccessEnd);
+            console.log(`[WORDPRESS API] Updated enrollment for ${email} in ${course.title} (${normalizedPlan})`);
+          } else {
+            await storage.createEnrollment({
+              parentId: parent.id,
+              courseId: course.id,
+              planType: normalizedPlan,
+              status: 'active',
+              accessStart: new Date(),
+              accessEnd: enrollAccessEnd,
+            });
+            console.log(`[WORDPRESS API] Enrolled ${email} in ${course.title} (${normalizedPlan})`);
+          }
+        }
+        
+        // Use the all-access course ID for payment tracking, fallback to first course
+        const allAccessId = await getAllAccessCourseId();
+        targetCourseId = allAccessId || allCourses[0].id;
+        console.log(`[WORDPRESS API] All-access subscription: enrolled ${email} in ${allCourses.length} courses`);
       } else {
-        // Translate course slug to internal ID
         const course = await storage.getCourseByCourseId(courseSlug);
         if (!course) {
           console.log(`[WORDPRESS API] Course not found: ${courseSlug}`);
@@ -15579,32 +16076,59 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
           });
         }
         targetCourseId = course.id;
+        
+        const existingEnrollments = await storage.getEnrollmentsByParentId(parent.id);
+        const existingEnrollment = existingEnrollments.find(e => e.courseId === targetCourseId);
+        
+        if (existingEnrollment) {
+          enrollment = await storage.renewEnrollment(
+            existingEnrollment.id, 
+            plan_type, 
+            accessEnd
+          );
+        } else {
+          enrollment = await storage.createEnrollment({
+            parentId: parent.id,
+            courseId: targetCourseId,
+            planType: plan_type,
+            status: 'active',
+            accessStart: new Date(),
+            accessEnd: accessEnd,
+          });
+        }
       }
       
-      // Check for existing enrollment and update or create
-      const existingEnrollments = await storage.getEnrollmentsByParentId(parent.id);
-      const existingEnrollment = existingEnrollments.find(e => e.courseId === targetCourseId);
+      // Create payment submission record for admin dashboard tracking
+      const planAmounts: Record<string, number> = { monthly: 15, yearly: 114, onetime: 70, lifetime: 70 };
+      const submissionAmount = amount || planAmounts[plan_type] || 0;
       
-      let enrollment;
-      if (existingEnrollment) {
-        // Update existing enrollment using renewEnrollment
-        enrollment = await storage.renewEnrollment(
-          existingEnrollment.id, 
-          plan_type, 
-          accessEnd
-        );
-      } else {
-        // Create new enrollment
-        enrollment = await storage.createEnrollment({
-          parentId: parent.id,
-          courseId: targetCourseId,
-          planType: plan_type,
-          status: 'active',
-          accessStart: new Date(),
-          accessEnd: accessEnd,
+      // Use first real course ID for payment submission (foreign key requires valid course)
+      let submissionCourseId = targetCourseId;
+      if (targetCourseId === 'all-access-id' || !targetCourseId) {
+        const allCourses = await storage.getAllCourses();
+        if (allCourses.length > 0) {
+          submissionCourseId = allCourses[0].id;
+        }
+      }
+      
+      try {
+        await storage.createPaymentSubmission({
+          courseId: submissionCourseId,
+          customerName: parent.name || email.split('@')[0],
+          customerPhone: parent.phone || email,
+          customerEmail: parent.email,
+          planType: plan_type === 'lifetime' ? 'onetime' : plan_type,
+          amount: submissionAmount,
+          referenceCode: transaction_id || null,
+          status: 'approved',
+          paymentSource: `wordpress_${payment_method || 'unknown'}`,
+          notes: `WordPress payment - ${payment_method || 'unknown'} (auto-approved). Access until: ${accessEnd.toISOString().split('T')[0]}`,
         });
+        console.log(`[WORDPRESS API] Payment submission created for admin dashboard: ${email}`);
+      } catch (subErr: any) {
+        console.error(`[WORDPRESS API] Failed to create payment submission:`, subErr?.message || subErr);
       }
-      
+
       // Log the WordPress purchase
       console.log(`[WORDPRESS API] Purchase recorded: email=${email}, plan=${plan_type}, courseId=${targetCourseId}`);
       
@@ -15628,6 +16152,32 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     } catch (error) {
       console.error("[WORDPRESS API] Error recording purchase:", error);
       res.status(500).json({ error: "Failed to record purchase" });
+    }
+  });
+
+  // WordPress → App: Verify user password (for WordPress login of app-registered users)
+  app.post("/api/wordpress/verify-password", verifyWordPressApiKey, async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ verified: false, error: "Email and password required" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const parent = await storage.getParentByEmail(normalizedEmail);
+
+      if (!parent) {
+        return res.json({ verified: false, error: "User not found" });
+      }
+
+      const isValid = await bcrypt.compare(password, parent.password);
+      console.log(`[WP-VERIFY] Password verification for ${normalizedEmail}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
+
+      res.json({ verified: isValid });
+    } catch (error) {
+      console.error("[WP-VERIFY] Error verifying password:", error);
+      res.status(500).json({ verified: false, error: "Verification failed" });
     }
   });
 
@@ -15697,13 +16247,16 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
           
           if (parent) {
             // Determine plan type from amount
-            const planType = amount >= 100 ? 'yearly' : 'monthly';
+            // Monthly=$15 → 1 bil, Yearly/Dahabi=$114 → 12 bilood, Onetime=$70 → 6 bilood
+            const planType = amount >= 100 ? 'yearly' : amount >= 50 ? 'onetime' : 'monthly';
             
             const accessEnd = new Date();
             if (planType === 'monthly') {
               accessEnd.setMonth(accessEnd.getMonth() + 1);
-            } else {
+            } else if (planType === 'yearly') {
               accessEnd.setFullYear(accessEnd.getFullYear() + 1);
+            } else {
+              accessEnd.setMonth(accessEnd.getMonth() + 6);
             }
             
             // Get all-access course ID
@@ -15835,309 +16388,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     });
   });
 
-  // PayPal Web SDK Integration Routes
-  // Blueprint: javascript_paypal - DO NOT MODIFY PAYPAL HANDLER CODE
-  app.get("/paypal/setup", async (req, res) => {
-    try {
-      await loadPaypalDefault(req, res);
-    } catch (error: any) {
-      console.error("[PAYPAL] Setup error:", error?.message || error);
-      res.status(500).json({ error: "PayPal setup failed. Please check credentials." });
-    }
-  });
-
-  // Official subscription pricing - single source of truth for ALL PayPal operations
-  const SUBSCRIPTION_PRICES: Record<string, { amount: string; currency: string }> = {
-    monthly: { amount: "15.00", currency: "USD" },
-    yearly: { amount: "99.00", currency: "USD" },
-  };
-
-  // SECURE order creation endpoint - requires authentication and enforces server-side pricing
-  // This REPLACES the generic /paypal/order endpoint for subscription payments
-  app.post("/api/paypal/create-subscription-order", async (req, res) => {
-    if (!req.session.parentId) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    try {
-      const { planType } = req.body;
-      
-      if (!planType) {
-        return res.status(400).json({ error: "Missing plan type" });
-      }
-
-      // Look up canonical price from server-side pricing table
-      const pricing = SUBSCRIPTION_PRICES[planType];
-      if (!pricing) {
-        console.error(`[PAYPAL] Invalid plan type for order creation: ${planType}`);
-        return res.status(400).json({ error: "Invalid plan type" });
-      }
-
-      console.log(`[PAYPAL] Creating order for ${planType}: $${pricing.amount} ${pricing.currency}`);
-
-      // Inject server-defined pricing into request body before calling blueprint code
-      req.body.amount = pricing.amount;
-      req.body.currency = pricing.currency;
-      req.body.intent = "CAPTURE";
-
-      await createPaypalOrder(req, res);
-    } catch (error) {
-      console.error("[PAYPAL] Order creation error:", error);
-      res.status(500).json({ error: "Failed to create order" });
-    }
-  });
-
-  app.post("/paypal/order/:orderID/capture", async (req, res) => {
-    await capturePaypalOrder(req, res);
-  });
-
-  // SECURE order creation endpoint for COURSE purchases - requires authentication and enforces server-side pricing
-  app.post("/api/paypal/create-course-order", async (req, res) => {
-    if (!req.session.parentId) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    try {
-      const { courseId, planType } = req.body;
-      
-      if (!courseId || !planType) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      if (planType !== "monthly" && planType !== "yearly") {
-        return res.status(400).json({ error: "Invalid plan type" });
-      }
-
-      // Get the course to determine the correct price
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      // Use course-specific pricing or default prices
-      const monthlyPrice = course.priceMonthly || 30;
-      const yearlyPrice = course.priceYearly || 114;
-      const amount = planType === "yearly" ? yearlyPrice.toString() : monthlyPrice.toString();
-
-      console.log(`[PAYPAL] Creating course order for ${course.title}, ${planType}: $${amount} USD`);
-
-      // Inject server-defined pricing into request body before calling blueprint code
-      req.body.amount = amount;
-      req.body.currency = "USD";
-      req.body.intent = "CAPTURE";
-
-      await createPaypalOrder(req, res);
-    } catch (error) {
-      console.error("[PAYPAL] Course order creation error:", error);
-      res.status(500).json({ error: "Failed to create order" });
-    }
-  });
-
-  // PayPal subscription completion - grants access after successful payment
-  // SECURITY: Server-side verification of PayPal order before granting access
-  // SECURITY: Server-side pricing enforced - client-provided amounts are ignored
-  
-  app.post("/api/paypal/subscription-complete", async (req, res) => {
-    if (!req.session.parentId) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    try {
-      const { orderId, planType } = req.body;
-      
-      if (!orderId || !planType) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      // Validate planType and get expected price from server-side pricing table
-      const expectedPrice = SUBSCRIPTION_PRICES[planType];
-      if (!expectedPrice) {
-        console.error(`[PAYPAL] Invalid plan type: ${planType}`);
-        return res.status(400).json({ error: "Invalid plan type" });
-      }
-
-      const parent = await storage.getParentById(req.session.parentId);
-      if (!parent) {
-        return res.status(404).json({ error: "Parent not found" });
-      }
-
-      // SECURITY: Verify the PayPal order server-side with SERVER-DEFINED expected price
-      // This prevents attackers from paying $1 for a yearly plan by enforcing canonical pricing
-      const verification = await verifyPaypalOrder(orderId, expectedPrice.amount, expectedPrice.currency);
-      if (!verification.valid) {
-        console.error(`[PAYPAL] Order verification failed for ${orderId}: ${verification.error}`);
-        return res.status(400).json({ error: verification.error || "Payment verification failed" });
-      }
-
-      // Check if this order has already been used (prevent replay attacks)
-      const existingEnrollment = await storage.getEnrollmentByPaypalOrderId(orderId);
-      if (existingEnrollment) {
-        console.warn(`[PAYPAL] Duplicate order attempt: ${orderId} by parent ${parent.id}`);
-        return res.status(400).json({ error: "This order has already been processed" });
-      }
-
-      console.log(`[PAYPAL] Order ${orderId} verified: ${planType} = $${expectedPrice.amount} for parent ${parent.id}`);
-
-      // Calculate access period
-      const now = new Date();
-      let accessEnd: Date;
-      if (planType === "yearly") {
-        accessEnd = new Date(now);
-        accessEnd.setFullYear(accessEnd.getFullYear() + 1);
-      } else {
-        accessEnd = new Date(now);
-        accessEnd.setMonth(accessEnd.getMonth() + 1);
-      }
-
-      // Find or create all-access course for subscriptions
-      let allAccessCourse = await storage.getCourseByCourseId("all-access");
-      if (!allAccessCourse) {
-        allAccessCourse = await storage.createCourse({
-          courseId: "all-access",
-          title: "All-Access Subscription",
-          description: "Full platform access subscription",
-          category: "subscription",
-          isLive: false,
-          isFree: false,
-        });
-      }
-
-      // Create enrollment for the subscription
-      await storage.createEnrollment({
-        parentId: parent.id,
-        courseId: allAccessCourse.id,
-        planType: planType,
-        accessEnd: accessEnd,
-        status: "active",
-        paypalOrderId: orderId,
-        amountPaid: expectedPrice.amount,
-      });
-
-      console.log(`[PAYPAL] Subscription created for parent ${parent.id}: ${planType} plan, orderId: ${orderId}`);
-
-      // Send confirmation email
-      try {
-        await sendPurchaseConfirmationEmail(
-          parent.email,
-          parent.name || "Waalid",
-          planType === "yearly" ? "Xubin Dahabi (Sanad)" : "Xubin Bille",
-          planType,
-          expectedPrice.amount
-        );
-      } catch (emailError) {
-        console.error("[PAYPAL] Failed to send confirmation email:", emailError);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Subscription activated successfully",
-        accessEnd: accessEnd.toISOString()
-      });
-    } catch (error) {
-      console.error("[PAYPAL] Subscription completion error:", error);
-      res.status(500).json({ error: "Failed to complete subscription" });
-    }
-  });
-
-  // PayPal course purchase completion - grants access to specific course after successful payment
-  // SECURITY: Server-side verification of PayPal order before granting access
-  app.post("/api/paypal/course-purchase-complete", async (req, res) => {
-    if (!req.session.parentId) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    try {
-      const { orderId, courseId, planType } = req.body;
-      
-      if (!orderId || !courseId || !planType) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      // Validate planType
-      if (planType !== "monthly" && planType !== "yearly") {
-        return res.status(400).json({ error: "Invalid plan type" });
-      }
-
-      const parent = await storage.getParentById(req.session.parentId);
-      if (!parent) {
-        return res.status(404).json({ error: "Parent not found" });
-      }
-
-      // Get the course to determine the correct price
-      const course = await storage.getCourse(courseId);
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      // Use course-specific pricing or default prices
-      const monthlyPrice = course.priceMonthly || 30;
-      const yearlyPrice = course.priceYearly || 114;
-      const expectedAmount = planType === "yearly" ? yearlyPrice.toString() : monthlyPrice.toString();
-
-      // SECURITY: Verify the PayPal order server-side with SERVER-DEFINED expected price
-      const verification = await verifyPaypalOrder(orderId, expectedAmount, "USD");
-      if (!verification.valid) {
-        console.error(`[PAYPAL] Course purchase verification failed for ${orderId}: ${verification.error}`);
-        return res.status(400).json({ error: verification.error || "Payment verification failed" });
-      }
-
-      // Check if this order has already been used (prevent replay attacks)
-      const existingEnrollment = await storage.getEnrollmentByPaypalOrderId(orderId);
-      if (existingEnrollment) {
-        console.warn(`[PAYPAL] Duplicate course order attempt: ${orderId} by parent ${parent.id}`);
-        return res.status(400).json({ error: "This order has already been processed" });
-      }
-
-      console.log(`[PAYPAL] Course purchase verified: ${course.title}, ${planType} = $${expectedAmount} for parent ${parent.id}`);
-
-      // Calculate access period
-      const now = new Date();
-      let accessEnd: Date;
-      if (planType === "yearly") {
-        accessEnd = new Date(now);
-        accessEnd.setFullYear(accessEnd.getFullYear() + 1);
-      } else {
-        accessEnd = new Date(now);
-        accessEnd.setMonth(accessEnd.getMonth() + 1);
-      }
-
-      // Create enrollment for the course
-      await storage.createEnrollment({
-        parentId: parent.id,
-        courseId: course.id,
-        planType: planType,
-        accessEnd: accessEnd,
-        status: "active",
-        paypalOrderId: orderId,
-        amountPaid: expectedAmount,
-      });
-
-      console.log(`[PAYPAL] Course enrollment created for parent ${parent.id}: ${course.title}, ${planType} plan, orderId: ${orderId}`);
-
-      // Send confirmation email
-      try {
-        await sendPurchaseConfirmationEmail(
-          parent.email,
-          parent.name || "Waalid",
-          course.title,
-          planType,
-          parseFloat(expectedAmount),
-          course.slug || undefined
-        );
-      } catch (emailError) {
-        console.error("[PAYPAL] Failed to send confirmation email:", emailError);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Course access activated successfully",
-        accessEnd: accessEnd.toISOString()
-      });
-    } catch (error) {
-      console.error("[PAYPAL] Course purchase completion error:", error);
-      res.status(500).json({ error: "Failed to complete course purchase" });
-    }
-  });
 
   // ===========================================
   // STRIPE PAYMENT ROUTES
@@ -16296,6 +16546,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       const courseId = session.metadata?.courseId;
 
       // Calculate access period
+      // Monthly=$15 → 1 bil, Yearly/Dahabi=$114 → 12 bilood, Onetime=$70 → 6 bilood
       const now = new Date();
       let accessEnd: Date;
       if (planType === "yearly") {
@@ -16305,8 +16556,8 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         accessEnd = new Date(now);
         accessEnd.setMonth(accessEnd.getMonth() + 1);
       } else {
-        // One-time purchase - lifetime access
-        accessEnd = new Date("2099-12-31");
+        accessEnd = new Date(now);
+        accessEnd.setMonth(accessEnd.getMonth() + 6);
       }
 
       // Update Stripe subscription ID if it's a subscription
@@ -16403,7 +16654,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
 
   app.get("/api/meet-events", async (req, res) => {
     try {
-      const events = await storage.getActiveGoogleMeetEvents();
+      const events = await getCached('meet-events', 60000, () => storage.getActiveGoogleMeetEvents());
       res.json(events);
     } catch (error) {
       console.error("Error fetching meet events:", error);
@@ -16542,6 +16793,369 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     } catch (error) {
       console.error("Error deleting meet event:", error);
       res.status(500).json({ error: "Failed to delete meet event" });
+    }
+  });
+
+  // ==================== SSO TOKEN SYSTEM ====================
+  // Generate one-time SSO token for WordPress auto-login
+  app.post("/api/sso/generate-token", async (req, res) => {
+    if (!req.session?.parentId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const parent = await storage.getParent(req.session.parentId);
+      if (!parent) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await db.insert(ssoTokens).values({
+        token,
+        userId: parent.id,
+        email: parent.email,
+        name: parent.name,
+        expiresAt,
+      });
+
+      const ssoUrl = `https://barbaarintasan.com/wp-json/bsa/v1/sso-login?token=${token}&redirect=${encodeURIComponent('https://barbaarintasan.com/koorso-iibso/')}`;
+
+      console.log(`[SSO] Token generated for user ${parent.email}, expires in 10 minutes`);
+      res.json({ url: ssoUrl });
+    } catch (error) {
+      console.error("[SSO] Error generating token:", error);
+      res.status(500).json({ error: "Failed to generate SSO token" });
+    }
+  });
+
+  // WordPress calls this to validate SSO token
+  app.post("/api/sso/validate-token", async (req, res) => {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    const requestKey = req.headers['x-api-key'] as string;
+
+    if (!apiKey || requestKey !== apiKey) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: "Token required" });
+    }
+
+    try {
+      const [ssoToken] = await db.select().from(ssoTokens)
+        .where(and(
+          eq(ssoTokens.token, token),
+          eq(ssoTokens.used, false),
+        ))
+        .limit(1);
+
+      if (!ssoToken) {
+        return res.status(404).json({ error: "Token not found or already used" });
+      }
+
+      if (new Date() > ssoToken.expiresAt) {
+        await db.update(ssoTokens).set({ used: true }).where(eq(ssoTokens.id, ssoToken.id));
+        return res.status(410).json({ error: "Token expired" });
+      }
+
+      await db.update(ssoTokens).set({ used: true }).where(eq(ssoTokens.id, ssoToken.id));
+
+      console.log(`[SSO] Token validated for user ${ssoToken.email}`);
+      res.json({
+        email: ssoToken.email,
+        name: ssoToken.name,
+        user_id: ssoToken.userId,
+      });
+    } catch (error) {
+      console.error("[SSO] Error validating token:", error);
+      res.status(500).json({ error: "Failed to validate token" });
+    }
+  });
+
+  // ==================== WORDPRESS PAYMENT DATA EXPORT ====================
+  app.get("/api/wordpress/export-payments", async (req, res) => {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    const requestKey = (req.headers['x-wordpress-api-key'] || req.headers['x-api-key']) as string;
+
+    if (!apiKey || requestKey !== apiKey) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const submissions = await storage.getAllPaymentSubmissions();
+      
+      const allCourses = await storage.getAllCourses();
+      const allMethods = await storage.getActivePaymentMethods();
+      
+      const courseMap: Record<string, string> = {};
+      allCourses.forEach((c: any) => { courseMap[c.id] = c.title; });
+      const methodMap: Record<string, string> = {};
+      allMethods.forEach((m: any) => { methodMap[m.id] = m.name; });
+      
+      const exportData = submissions.map((s: any) => ({
+        id: s.id,
+        customerName: s.customerName,
+        customerPhone: s.customerPhone,
+        customerEmail: s.customerEmail,
+        courseId: s.courseId,
+        courseName: courseMap[s.courseId] || s.courseId,
+        planType: s.planType,
+        amount: s.amount,
+        referenceCode: s.referenceCode,
+        screenshotUrl: s.screenshotUrl,
+        status: s.status,
+        notes: s.notes,
+        paymentSource: s.paymentSource || 'manual',
+        paymentMethodId: s.paymentMethodId,
+        paymentMethodName: s.paymentMethodId ? (methodMap[s.paymentMethodId] || null) : null,
+        stripeSessionId: s.stripeSessionId,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        reviewedAt: s.reviewedAt,
+      }));
+
+      res.json({
+        success: true,
+        count: exportData.length,
+        payments: exportData,
+      });
+    } catch (error) {
+      console.error("[WP-EXPORT] Error exporting payments:", error);
+      res.status(500).json({ error: "Failed to export payments" });
+    }
+  });
+
+  // ==================== WORDPRESS PAYMENT WEBHOOK ====================
+  // WordPress calls this after successful payment to enroll user
+  app.post("/api/webhook/wordpress-payment", async (req, res) => {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    const requestKey = (req.headers['x-wordpress-api-key'] || req.headers['x-api-key']) as string;
+
+    if (!apiKey || requestKey !== apiKey) {
+      console.log(`[WP-WEBHOOK] Auth failed. Expected key exists: ${!!apiKey}, Received key: ${requestKey ? 'yes' : 'no'}`);
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { email, plan_type: raw_plan_type, course_id, amount, payment_method, transaction_id, name: userName, sku } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    try {
+      const skuOrPlan = sku || raw_plan_type || '';
+      const planTypeMap: Record<string, string> = {
+        'subscription-monthly': 'monthly',
+        'subscription-yearly': 'yearly',
+        'monthly': 'monthly',
+        'yearly': 'yearly',
+        'onetime': 'onetime',
+        'lifetime': 'lifetime',
+      };
+      const plan_type = planTypeMap[skuOrPlan.toLowerCase()] || raw_plan_type || 'monthly';
+      console.log(`[WP-WEBHOOK] SKU/plan mapping: raw="${raw_plan_type}", sku="${sku}", resolved="${plan_type}"`);
+
+      const normalizedEmail = email.toLowerCase().trim();
+      let [parent] = await db.select().from(parents)
+        .where(eq(parents.email, normalizedEmail))
+        .limit(1);
+
+      if (!parent && userName) {
+        const tempPassword = await bcrypt.hash(Math.random().toString(36).slice(-12), 10);
+        parent = await storage.createParent({
+          email: normalizedEmail,
+          password: tempPassword,
+          name: userName,
+          phone: null,
+          country: null,
+          city: null,
+          inParentingGroup: false,
+        });
+        console.log(`[WP-WEBHOOK] Auto-registered user: ${normalizedEmail}`);
+      }
+
+      if (!parent) {
+        console.log(`[WP-WEBHOOK] User not found in app: ${normalizedEmail}`);
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      console.log(`[WP-WEBHOOK] Processing payment for ${normalizedEmail}: plan=${plan_type}, course=${course_id}`);
+
+      const now = new Date();
+      
+      const existingParentEnrollments = await db.select().from(enrollments)
+        .where(and(
+          eq(enrollments.parentId, parent.id),
+          eq(enrollments.status, 'active')
+        ));
+      
+      let baseDate = new Date();
+      for (const e of existingParentEnrollments) {
+        if (e.accessEnd && new Date(e.accessEnd) > baseDate) {
+          baseDate = new Date(e.accessEnd);
+        }
+      }
+
+      if (plan_type === 'yearly' || plan_type === 'monthly') {
+        // ADDITIVE: extend from existing end date if still active
+        const expiresAt = new Date(baseDate);
+        if (plan_type === 'yearly') {
+          expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        } else {
+          expiresAt.setMonth(expiresAt.getMonth() + 1);
+        }
+
+        console.log(`[WP-WEBHOOK] Additive renewal: baseDate=${baseDate.toISOString()}, newAccessEnd=${expiresAt.toISOString()}`);
+
+        const allCourses = await db.select().from(courses);
+
+        for (const course of allCourses) {
+          const existingEnrollment = await db.select().from(enrollments)
+            .where(and(
+              eq(enrollments.parentId, parent.id),
+              eq(enrollments.courseId, course.id),
+            ))
+            .limit(1);
+
+          if (existingEnrollment.length === 0) {
+            await db.insert(enrollments).values({
+              parentId: parent.id,
+              courseId: course.id,
+              planType: plan_type,
+              accessStart: now,
+              accessEnd: expiresAt,
+              status: 'active',
+            });
+            console.log(`[WP-WEBHOOK] Enrolled ${normalizedEmail} in course ${course.title} (${plan_type})`);
+          } else {
+            await db.update(enrollments).set({
+              planType: plan_type,
+              accessStart: now,
+              accessEnd: expiresAt,
+              status: 'active',
+            }).where(eq(enrollments.id, existingEnrollment[0].id));
+            console.log(`[WP-WEBHOOK] Updated enrollment for ${normalizedEmail} in course ${course.title} (${plan_type})`);
+          }
+        }
+
+        console.log(`[WP-WEBHOOK] All-access subscription activated for ${normalizedEmail}: ${plan_type}, expires ${expiresAt.toISOString()}`);
+      } else if (plan_type === 'onetime') {
+        // Onetime=$70 → 6 bilood (ADDITIVE)
+        const onetimeExpiry = new Date(baseDate);
+        onetimeExpiry.setMonth(onetimeExpiry.getMonth() + 6);
+
+        console.log(`[WP-WEBHOOK] Additive onetime: baseDate=${baseDate.toISOString()}, newAccessEnd=${onetimeExpiry.toISOString()}`);
+
+        const allCourses = await db.select().from(courses);
+
+        for (const course of allCourses) {
+          const existingEnrollment = await db.select().from(enrollments)
+            .where(and(
+              eq(enrollments.parentId, parent.id),
+              eq(enrollments.courseId, course.id),
+            ))
+            .limit(1);
+
+          if (existingEnrollment.length === 0) {
+            await db.insert(enrollments).values({
+              parentId: parent.id,
+              courseId: course.id,
+              planType: 'onetime',
+              accessStart: now,
+              accessEnd: onetimeExpiry,
+              status: 'active',
+            });
+          } else {
+            await db.update(enrollments).set({
+              planType: 'onetime',
+              status: 'active',
+              accessStart: now,
+              accessEnd: onetimeExpiry,
+            }).where(eq(enrollments.id, existingEnrollment[0].id));
+          }
+        }
+
+        console.log(`[WP-WEBHOOK] 6-month access activated for ${normalizedEmail} (${allCourses.length} courses), expires ${onetimeExpiry.toISOString()}`);
+      } else if (plan_type === 'lifetime') {
+        // Lifetime = weligaa
+        const allCourses = await db.select().from(courses);
+
+        for (const course of allCourses) {
+          const existingEnrollment = await db.select().from(enrollments)
+            .where(and(
+              eq(enrollments.parentId, parent.id),
+              eq(enrollments.courseId, course.id),
+            ))
+            .limit(1);
+
+          if (existingEnrollment.length === 0) {
+            await db.insert(enrollments).values({
+              parentId: parent.id,
+              courseId: course.id,
+              planType: 'onetime',
+              accessStart: now,
+              accessEnd: null,
+              status: 'active',
+            });
+          } else {
+            await db.update(enrollments).set({
+              planType: 'onetime',
+              status: 'active',
+              accessEnd: null,
+            }).where(eq(enrollments.id, existingEnrollment[0].id));
+          }
+        }
+
+        console.log(`[WP-WEBHOOK] Lifetime all-access activated for ${normalizedEmail} (${allCourses.length} courses)`);
+      }
+
+      // Create payment submission for admin dashboard tracking
+      try {
+        // Use a valid course ID for the foreign key - fallback to first real course
+        let submissionCourseId: string | null = null;
+        const allAccessCourseId = await getAllAccessCourseId();
+        if (allAccessCourseId) {
+          submissionCourseId = allAccessCourseId;
+        } else {
+          const allCoursesList = await storage.getAllCourses();
+          if (allCoursesList.length > 0) {
+            submissionCourseId = allCoursesList[0].id;
+          }
+        }
+        
+        // Calculate the actual accessEnd for notes
+        const webhookAccessEnd = plan_type === 'monthly' 
+          ? new Date(new Date(baseDate).setMonth(baseDate.getMonth() + 1))
+          : plan_type === 'yearly' 
+            ? new Date(new Date(baseDate).setFullYear(baseDate.getFullYear() + 1))
+            : plan_type === 'onetime'
+              ? new Date(new Date(baseDate).setMonth(baseDate.getMonth() + 6))
+              : null;
+        
+        if (submissionCourseId) {
+          await storage.createPaymentSubmission({
+            courseId: submissionCourseId,
+            customerName: parent.name || userName || normalizedEmail.split('@')[0],
+            customerPhone: parent.phone || normalizedEmail,
+            customerEmail: normalizedEmail,
+            planType: plan_type === 'lifetime' ? 'onetime' : plan_type,
+            amount: amount || 0,
+            referenceCode: transaction_id || null,
+            paymentSource: `wordpress_${payment_method || 'webhook'}`,
+            notes: `WordPress webhook payment - ${payment_method || 'unknown'}. Access until: ${webhookAccessEnd ? webhookAccessEnd.toISOString().split('T')[0] : 'lifetime'}`,
+          });
+          console.log(`[WP-WEBHOOK] Payment submission created for admin dashboard: ${normalizedEmail}, amount: ${amount}`);
+        }
+      } catch (subErr: any) {
+        console.error(`[WP-WEBHOOK] Failed to create payment submission:`, subErr?.message || subErr);
+      }
+
+      res.json({ success: true, message: "Payment processed successfully" });
+    } catch (error) {
+      console.error("[WP-WEBHOOK] Error processing payment webhook:", error);
+      res.status(500).json({ error: "Failed to process payment" });
     }
   });
 

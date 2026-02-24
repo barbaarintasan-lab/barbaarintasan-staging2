@@ -3,66 +3,63 @@ import { Link, useLocation } from "wouter";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 
 const COUNTRIES = [
-  { value: "somalia", label: "🇸🇴 Soomaaliya" },
-  { value: "djibouti", label: "🇩🇯 Jabuuti" },
-  { value: "ethiopia", label: "🇪🇹 Itoobiya" },
-  { value: "kenya", label: "🇰🇪 Kenya" },
-  { value: "uganda", label: "🇺🇬 Uganda" },
-  { value: "tanzania", label: "🇹🇿 Tanzania" },
-  { value: "eritrea", label: "🇪🇷 Eritrea" },
-  { value: "sudan", label: "🇸🇩 Suudaan" },
-  { value: "south_sudan", label: "🇸🇸 Suudaan Koonfur" },
-  { value: "egypt", label: "🇪🇬 Masar" },
-  { value: "usa", label: "🇺🇸 Maraykanka (USA)" },
-  { value: "canada", label: "🇨🇦 Kanada" },
-  { value: "uk", label: "🇬🇧 Ingiriiska (UK)" },
-  { value: "germany", label: "🇩🇪 Jarmalka" },
-  { value: "france", label: "🇫🇷 Faransiiska" },
-  { value: "italy", label: "🇮🇹 Talyaaniga" },
-  { value: "spain", label: "🇪🇸 Isbaaniya" },
-  { value: "netherlands", label: "🇳🇱 Holland" },
-  { value: "belgium", label: "🇧🇪 Beljiyam" },
-  { value: "switzerland", label: "🇨🇭 Swiiserlaand" },
-  { value: "sweden", label: "🇸🇪 Iswiidhan" },
-  { value: "norway", label: "🇳🇴 Noorweey" },
-  { value: "denmark", label: "🇩🇰 Denmark" },
-  { value: "finland", label: "🇫🇮 Finland" },
-  { value: "austria", label: "🇦🇹 Osteeriya" },
-  { value: "turkey", label: "🇹🇷 Turkiga" },
-  { value: "saudi", label: "🇸🇦 Sacuudi Carabiya" },
-  { value: "uae", label: "🇦🇪 Imaaraadka (UAE)" },
-  { value: "qatar", label: "🇶🇦 Qadar" },
-  { value: "kuwait", label: "🇰🇼 Kuwait" },
-  { value: "bahrain", label: "🇧🇭 Baxrayn" },
-  { value: "oman", label: "🇴🇲 Cumaan" },
-  { value: "yemen", label: "🇾🇪 Yaman" },
-  { value: "jordan", label: "🇯🇴 Urdun" },
-  { value: "iraq", label: "🇮🇶 Ciraaq" },
-  { value: "australia", label: "🇦🇺 Awsteeraaliya" },
-  { value: "new_zealand", label: "🇳🇿 Niyuu Siilaan" },
-  { value: "south_africa", label: "🇿🇦 Koonfur Afrika" },
-  { value: "india", label: "🇮🇳 Hindiya" },
-  { value: "pakistan", label: "🇵🇰 Bakistaan" },
-  { value: "malaysia", label: "🇲🇾 Malaysia" },
-  { value: "other", label: "🌍 Wadan Kale" },
+  { value: "Somalia", label: "Soomaaliya" },
+  { value: "Djibouti", label: "Jabuuti" },
+  { value: "Ethiopia", label: "Itoobiya" },
+  { value: "Kenya", label: "Kenya" },
+  { value: "Uganda", label: "Uganda" },
+  { value: "Tanzania", label: "Tanzania" },
+  { value: "Eritrea", label: "Eritrea" },
+  { value: "Sudan", label: "Suudaan" },
+  { value: "Egypt", label: "Masar" },
+  { value: "USA", label: "Maraykanka (USA)" },
+  { value: "Canada", label: "Kanada" },
+  { value: "UK", label: "Ingiriiska (UK)" },
+  { value: "Germany", label: "Jarmalka" },
+  { value: "France", label: "Faransiiska" },
+  { value: "Italy", label: "Talyaaniga" },
+  { value: "Spain", label: "Isbaaniya" },
+  { value: "Netherlands", label: "Holland" },
+  { value: "Belgium", label: "Beljiyam" },
+  { value: "Switzerland", label: "Swiiserlaand" },
+  { value: "Sweden", label: "Iswiidhan" },
+  { value: "Norway", label: "Noorweey" },
+  { value: "Denmark", label: "Denmark" },
+  { value: "Finland", label: "Finland" },
+  { value: "Austria", label: "Osteeriya" },
+  { value: "Turkey", label: "Turkiga" },
+  { value: "Saudi Arabia", label: "Sacuudi Carabiya" },
+  { value: "UAE", label: "Imaaraadka (UAE)" },
+  { value: "Qatar", label: "Qadar" },
+  { value: "Kuwait", label: "Kuwait" },
+  { value: "Bahrain", label: "Baxrayn" },
+  { value: "Oman", label: "Cumaan" },
+  { value: "Yemen", label: "Yaman" },
+  { value: "Jordan", label: "Urdun" },
+  { value: "Iraq", label: "Ciraaq" },
+  { value: "Australia", label: "Awsteeraaliya" },
+  { value: "New Zealand", label: "Niyuu Siilaan" },
+  { value: "South Africa", label: "Koonfur Afrika" },
+  { value: "India", label: "Hindiya" },
+  { value: "Pakistan", label: "Bakistaan" },
+  { value: "Malaysia", label: "Malaysia" },
+  { value: "Other", label: "Wadan Kale" },
 ];
 
 export default function Register() {
   const { t } = useTranslation();
   const [location, setLocation] = useLocation();
-  const { registerWithEmail, loginWithEmail } = useParentAuth();
+  const { loginWithEmail, registerWithEmail } = useParentAuth();
   
   const urlParams = new URLSearchParams(window.location.search);
   const redirectUrl = urlParams.get("redirect") || "/";
   const returnUrl = urlParams.get("returnUrl");
-  const messageType = urlParams.get("message");
   
   const [isLogin, setIsLogin] = useState(location.includes("/login"));
   const [isLoading, setIsLoading] = useState(false);
@@ -70,12 +67,17 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const [formData, setFormData] = useState({
-    name: "",
+  const [loginData, setLoginData] = useState({
     email: "",
     password: "",
-    confirmPassword: "",
+  });
+
+  const [registerData, setRegisterData] = useState({
+    name: "",
+    email: "",
     phone: "",
+    password: "",
+    confirmPassword: "",
     country: "",
   });
 
@@ -98,38 +100,13 @@ export default function Register() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      if (isLogin) {
-        await loginWithEmail(formData.email, formData.password);
-        toast.success(t("auth.loginSuccess"));
-      } else {
-        if (!formData.name) {
-          toast.error("Magacaaga waa khasab");
-          setIsLoading(false);
-          return;
-        }
-        if (!formData.phone) {
-          toast.error("Taleefankaaga waa khasab");
-          setIsLoading(false);
-          return;
-        }
-        if (!formData.country) {
-          toast.error("Wadanka waa khasab");
-          setIsLoading(false);
-          return;
-        }
-        if (formData.password !== formData.confirmPassword) {
-          toast.error("Password-yada ma iska mid ahiin");
-          setIsLoading(false);
-          return;
-        }
-        await registerWithEmail(formData.email, formData.password, formData.name, formData.phone, formData.country, "", false);
-        toast.success(t("auth.registerSuccess"));
-      }
+      await loginWithEmail(loginData.email, loginData.password);
+      toast.success(t("auth.loginSuccess"));
       
       if (returnUrl && (returnUrl.startsWith("https://barbaarintasan.com") || returnUrl.startsWith("https://www.barbaarintasan.com"))) {
         window.location.href = returnUrl;
@@ -143,20 +120,191 @@ export default function Register() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (registerData.password !== registerData.confirmPassword) {
+      toast.error("Password-yada ma iska mid ahiin. Fadlan hubi.");
+      return;
+    }
+
+    if (registerData.password.length < 6) {
+      toast.error("Password-ku waa in uu ka badan yahay 6 xaraf.");
+      return;
+    }
+
+    if (!registerData.country) {
+      toast.error("Fadlan dooro wadankaaga.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await registerWithEmail(
+        registerData.email,
+        registerData.password,
+        registerData.name,
+        registerData.phone,
+        registerData.country
+      );
+      toast.success("Hambalyo! Akoonkaaga waa la sameeyey.");
+      setLocation(redirectUrl);
+    } catch (error: any) {
+      toast.error(error.message || "Is-diiwaangelinta khalad ka dhacay.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isLogin) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+          <div className="w-full max-w-[400px]">
+            <div className="text-center mb-8">
+              <img src={logoImage} alt="Barbaarintasan" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="text-register-title">
+                Sameyso Akoon
+              </h1>
+              <p className="text-gray-500 mt-1 text-sm">
+                Bilow safarka waxbarashada tarbiyadda
+              </p>
+            </div>
+
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <Input
+                  type="text"
+                  value={registerData.name}
+                  onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
+                  placeholder="Magacaaga oo dhamaystiran"
+                  required
+                  className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
+                  data-testid="input-name"
+                />
+              </div>
+
+              <div>
+                <Input
+                  type="email"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                  placeholder="Email"
+                  required
+                  className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
+                  data-testid="input-reg-email"
+                />
+              </div>
+
+              <div>
+                <Input
+                  type="tel"
+                  value={registerData.phone}
+                  onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
+                  placeholder="Taleefankaaga (+252...)"
+                  required
+                  className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
+                  data-testid="input-phone"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={registerData.password}
+                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                    placeholder="Password"
+                    required
+                    minLength={6}
+                    className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 pr-10 placeholder:text-gray-400"
+                    data-testid="input-reg-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={registerData.confirmPassword}
+                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                    placeholder="Xaqiiji Password"
+                    required
+                    minLength={6}
+                    className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 pr-10 placeholder:text-gray-400"
+                    data-testid="input-confirm-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <select
+                  value={registerData.country}
+                  onChange={(e) => setRegisterData({ ...registerData, country: e.target.value })}
+                  required
+                  className="w-full h-12 text-base border-2 border-gray-300 rounded-lg px-4 bg-white text-gray-900 appearance-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  data-testid="select-country"
+                >
+                  <option value="" disabled>Wadanka</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 rounded-lg"
+                data-testid="button-register-submit"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  "Is Diiwaan Geli"
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <p className="text-gray-600 text-sm">
+                Hadaad Akoon horay u lahayd?{" "}
+                <button
+                  onClick={() => { setIsLogin(true); setLocation("/login"); }}
+                  className="text-blue-600 font-semibold hover:underline"
+                  data-testid="button-switch-login"
+                >
+                  Soo Gal
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {messageType === "iibso" && (
-        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-900 p-3 text-center font-bold text-sm">
-          Fadlan soo gal si aad u iibsato xubin dahabi ah!
-        </div>
-      )}
-
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-[400px]">
           <div className="text-center mb-8">
             <img src={logoImage} alt="Barbaarintasan" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isLogin ? "Soo Gal" : "Sameyso Akoon"}
+            <h1 className="text-2xl font-bold text-gray-900" data-testid="text-login-title">
+              Soo Gal
             </h1>
           </div>
 
@@ -178,7 +326,7 @@ export default function Register() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {isLogin ? "Google-ga ku gal" : "Google isku Diiwaangeli"}
+                Google-ga ku gal
               </>
             )}
           </Button>
@@ -192,101 +340,36 @@ export default function Register() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <Input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Magacaaga oo dhamaystiran"
-                required={!isLogin}
-                className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
-                data-testid="input-name"
-              />
-            )}
-
+          <form onSubmit={handleLogin} className="space-y-4">
             <Input
               type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              value={loginData.email}
+              onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
               placeholder="Email"
               required
               className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
               data-testid="input-email"
             />
 
-            {!isLogin && (
+            <div className="relative">
               <Input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Taleefankaaga (+252...)"
-                required={!isLogin}
-                className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 placeholder:text-gray-400"
-                data-testid="input-phone"
+                type={showPassword ? "text" : "password"}
+                value={loginData.password}
+                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                placeholder="Password"
+                required
+                minLength={6}
+                className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 pr-10 placeholder:text-gray-400"
+                data-testid="input-password"
               />
-            )}
-
-            <div className={!isLogin ? "grid grid-cols-2 gap-3" : ""}>
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Password"
-                  required
-                  minLength={6}
-                  className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 pr-10 placeholder:text-gray-400"
-                  data-testid="input-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {!isLogin && (
-                <div className="relative">
-                  <Input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    placeholder="Xaqiiji Password"
-                    required
-                    minLength={6}
-                    className="h-12 text-base border-2 border-gray-300 rounded-lg px-4 pr-10 placeholder:text-gray-400"
-                    data-testid="input-confirm-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {!isLogin && (
-              <Select
-                value={formData.country}
-                onValueChange={(value) => setFormData({ ...formData, country: value })}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <SelectTrigger className="h-12 text-base border-2 border-gray-300 rounded-lg px-4" data-testid="select-country">
-                  <SelectValue placeholder="Wadanka" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {COUNTRIES.map((country) => (
-                    <SelectItem key={country.value} value={country.value}>
-                      {country.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
 
             <Button
               type="submit"
@@ -296,50 +379,33 @@ export default function Register() {
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isLogin ? (
-                "Soo Gal"
               ) : (
-                "Is Diiwaan Geli"
+                "Soo Gal"
               )}
             </Button>
 
-            {isLogin && (
-              <Link href="/forgot-password">
-                <button
-                  type="button"
-                  className="w-full text-center text-blue-600 hover:text-blue-700 text-sm font-medium mt-2"
-                  data-testid="button-forgot-password"
-                >
-                  Password-ka ma ilowday?
-                </button>
-              </Link>
-            )}
+            <Link href="/forgot-password">
+              <button
+                type="button"
+                className="w-full text-center text-blue-600 hover:text-blue-700 text-sm font-medium mt-2"
+                data-testid="button-forgot-password"
+              >
+                Password-ka ma ilowday?
+              </button>
+            </Link>
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-            {isLogin ? (
-              <p className="text-gray-600 text-sm">
-                Akoon ma haysatid?{" "}
-                <button
-                  onClick={() => { setIsLogin(false); setLocation("/register"); }}
-                  className="text-blue-600 font-semibold hover:underline"
-                  data-testid="button-switch-register"
-                >
-                  Is Diiwaan Geli
-                </button>
-              </p>
-            ) : (
-              <p className="text-gray-600 text-sm">
-                Hadaad Akoon horay u lahayd?{" "}
-                <button
-                  onClick={() => { setIsLogin(true); setLocation("/login"); }}
-                  className="text-blue-600 font-semibold hover:underline"
-                  data-testid="button-switch-login"
-                >
-                  Soo Gal
-                </button>
-              </p>
-            )}
+            <p className="text-gray-600 text-sm">
+              Akoon ma haysatid?{" "}
+              <button
+                onClick={() => { setIsLogin(false); setLocation("/register"); }}
+                className="text-blue-600 font-semibold hover:underline"
+                data-testid="button-switch-register"
+              >
+                Iska Diiwaangeli
+              </button>
+            </p>
           </div>
         </div>
       </div>

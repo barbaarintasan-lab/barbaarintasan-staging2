@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, BookOpen, Baby, Brain, Sparkles, Crown, Gift, Clock } from "lucide-react";
+import { ChevronLeft, BookOpen, Baby, Brain, Sparkles, Gift, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const courseImages: Record<string, string> = {
   "0-6": "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&h=300&fit=crop",
@@ -32,10 +33,11 @@ const courseColors: Record<string, { bg: string; border: string; text: string; g
 
 export default function Courses() {
   const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
     queryFn: async () => {
-      const res = await fetch("/api/courses");
+      const res = await fetch(`/api/courses?lang=${apiLanguage}`);
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
@@ -91,12 +93,8 @@ export default function Courses() {
 
       <div className="max-w-6xl mx-auto px-4 pt-8 pb-6 lg:px-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-yellow-100 px-4 py-2 rounded-full mb-4">
-            <Crown className="w-5 h-5 text-amber-600" />
-            <span className="text-sm font-semibold text-amber-700">Xubin Dahabi - $114/sanad</span>
-          </div>
           <p className="text-gray-600 max-w-xl mx-auto">
-            Dhammaan koorsooyinka waxaad ku heli kartaa qiimaha $30/bil ama $114/sanad (dhammaan koorsooyinka)
+            Dooro koorsada aad jeclaan lahayd inaad barato. 5-da cashar ee ugu horreeya waa bilaash!
           </p>
         </div>
       </div>

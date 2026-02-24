@@ -15,8 +15,8 @@ interface Exercise {
   lessonId: string;
   exerciseType: string;
   question: string;
-  options: any;
-  correctAnswer: any;
+  options: string | null;
+  correctAnswer: string | null;
   order: number;
 }
 
@@ -77,7 +77,14 @@ export function ExerciseManager() {
   });
 
   const createExercise = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: {
+      lessonId: string;
+      exerciseType: string;
+      question: string;
+      title: string;
+      options: string | null;
+      correctAnswer: string | null;
+    }) => {
       const res = await fetch("/api/admin/exercises", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,7 +167,14 @@ export function ExerciseManager() {
       return;
     }
 
-    let exerciseData: any = {
+    let exerciseData: {
+      lessonId: string;
+      exerciseType: string;
+      question: string;
+      title: string;
+      options: string | null;
+      correctAnswer: string | null;
+    } = {
       lessonId: String(selectedLesson),
       exerciseType,
       question,

@@ -71,7 +71,7 @@ export function registerLearningGroupRoutes(app: Express) {
 
       const membershipMap = new Map(myMemberships.map(m => [m.groupId, m.role]));
 
-      const creatorIds = [...new Set(allGroups.map(g => g.createdBy))];
+      const creatorIds = Array.from(new Set(allGroups.map(g => g.createdBy)));
       const creators = creatorIds.length > 0
         ? await db.select({ id: parents.id, name: parents.name, picture: parents.picture })
             .from(parents)

@@ -217,7 +217,7 @@ const fileTypeColors: Record<string, string> = {
   video: "from-blue-400 to-indigo-500",
 };
 
-type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages";
+type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages" | "meet-recordings";
 
 export default function Resources() {
   const { t } = useTranslation();
@@ -238,7 +238,7 @@ export default function Resources() {
     if (typeof window === "undefined") return "main";
     try {
       const hash = window.location.hash.replace('#', '') as LibrarySection;
-      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages"];
+      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages", "meet-recordings"];
       return validSections.includes(hash) ? hash : "main";
     } catch {
       return "main";
@@ -1840,16 +1840,23 @@ export default function Resources() {
     );
   }
 
+  if (activeSection === "meet-recordings") {
+    return (
+      <>
+        <MeetRecordingsArchive onBack={() => setActiveSection("main")} />
+        <BottomNav />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
       <header className="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 safe-top shadow-lg">
         <div className="px-4 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/">
-              <button className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
+              <button onClick={() => window.history.back()} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
-            </Link>
             <div>
               <h1 className="font-bold text-white text-lg">{t("resources.title")}</h1>
               <p className="text-blue-100 text-sm">{t("resources.subtitle")}</p>
@@ -1960,6 +1967,22 @@ export default function Resources() {
               <div>
                 <h3 className="font-bold text-white text-lg">Sheeko Archive</h3>
                 <p className="text-purple-200 text-xs mt-1">Wadahadalladii hore la duubay</p>
+              </div>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setActiveSection("meet-recordings")}
+            className="bg-gradient-to-br from-red-500 to-rose-700 rounded-2xl p-5 text-left shadow-lg active:scale-[0.98] transition-transform col-span-2"
+            data-testid="button-meet-recordings-section"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                <span className="text-3xl">🎧</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-lg">Kulamadii Hore</h3>
+                <p className="text-red-200 text-xs mt-1">Kulamadii Bahda Tarbiyadda Caruurta ee Hore</p>
               </div>
             </div>
           </button>
@@ -2297,6 +2320,86 @@ export default function Resources() {
       </Dialog>
 
       <BottomNav />
+    </div>
+  );
+}
+
+function MeetRecordingsArchive({ onBack }: { onBack: () => void }) {
+  const { data: archivedEvents = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/meet-events/archived"],
+    queryFn: async () => {
+      const res = await fetch("/api/meet-events/archived", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const formatSomaliDate = (dateStr: string) => {
+    const months = ["Janaayo", "Febraayo", "Maarso", "Abriil", "May", "Juun", "Luuliyo", "Ogosto", "Sebtembar", "Oktoobar", "Nofembar", "Disembar"];
+    const [y, m, d] = dateStr.split("-");
+    return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-red-600 to-rose-700 safe-top shadow-lg">
+        <div className="px-4 py-4">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back-meet-recordings">
+              <ArrowLeft className="w-5 h-5 text-white" />
+            </button>
+            <div>
+              <h1 className="font-bold text-white text-lg">Kulamadii Hore</h1>
+              <p className="text-red-100 text-sm">Kulamadii Bahda Tarbiyadda Caruurta ee Hore</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="px-4 py-4 space-y-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+          </div>
+        ) : archivedEvents.length === 0 ? (
+          <div className="text-center py-12">
+            <Headphones className="w-16 h-16 mx-auto mb-3 text-gray-300" />
+            <p className="text-gray-500 text-sm">Wali kulan la duubay lama kaydsan</p>
+          </div>
+        ) : (
+          archivedEvents.map((event: any) => (
+            <div key={event.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4" data-testid={`archived-meet-${event.id}`}>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Headphones className="w-5 h-5 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm text-gray-900 mb-1">{event.title}</h3>
+                  {event.description && <p className="text-xs text-gray-600 mb-2 line-clamp-2">{event.description}</p>}
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-full">{formatSomaliDate(event.eventDate)}</span>
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-full">{event.startTime} - {event.endTime}</span>
+                  </div>
+                  {event.driveFileId && (
+                    <a
+                      href={`/meet-watch/${event.id}`}
+                      className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                        event.mediaType === "audio"
+                          ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white"
+                          : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white"
+                      }`}
+                      data-testid={`btn-watch-archived-${event.id}`}
+                    >
+                      {event.mediaType === "audio" ? <Volume2 className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                      {event.mediaType === "audio" ? "Dhageyso Kulankii" : "Daawo Kulankii"}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

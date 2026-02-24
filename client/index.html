@@ -98,11 +98,13 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" id="app-manifest" />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://pub-45a105402fad43a3a6b592cf21a1d1fa.r2.dev">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
     <style>
       #app-splash {
@@ -208,15 +210,17 @@
         });
       }
       
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          const splash = document.getElementById('app-splash');
-          if (splash) {
-            splash.classList.add('hidden');
-            setTimeout(() => splash.remove(), 300);
-          }
-        }, 100);
-      });
+      window.__hideSplash = function() {
+        const splash = document.getElementById('app-splash');
+        if (splash) {
+          splash.classList.add('hidden');
+          setTimeout(() => splash.remove(), 300);
+        }
+      };
+      
+      setTimeout(function() {
+        window.__hideSplash();
+      }, 15000);
 
     </script>
   </body>

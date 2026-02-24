@@ -532,3 +532,60 @@ export function parseMaaweelContent(content: string, fileName: string): {
     return null;
   }
 }
+
+// Search for stories by character name in Google Drive backups
+export async function searchMaaweelByCharacter(characterName: string): Promise<{
+  id: string;
+  name: string;
+  createdTime: string;
+  title: string;
+  titleSomali: string;
+  content: string;
+  characterName: string;
+  moralLesson: string;
+  date: string;
+}[]> {
+  try {
+    const files = await listMaaweelFiles();
+    const results: {
+      id: string;
+      name: string;
+      createdTime: string;
+      title: string;
+      titleSomali: string;
+      content: string;
+      characterName: string;
+      moralLesson: string;
+      date: string;
+    }[] = [];
+    
+    for (const file of files) {
+      const content = await getFileContent(file.id);
+      if (!content) continue;
+      
+      const parsed = parseMaaweelContent(content, file.name);
+      if (!parsed) continue;
+      
+      // Check if this story matches the character name
+      if (parsed.characterName.toLowerCase().includes(characterName.toLowerCase())) {
+        results.push({
+          id: file.id,
+          name: file.name,
+          createdTime: file.createdTime,
+          title: parsed.title, // The backup saves titleSomali as title
+          titleSomali: parsed.title, // The backup saves titleSomali as title
+          content: parsed.body,
+          characterName: parsed.characterName,
+          moralLesson: parsed.moralLesson,
+          date: parsed.date,
+        });
+      }
+    }
+    
+    console.log(`[GDRIVE] Found ${results.length} stories for character: ${characterName}`);
+    return results;
+  } catch (error) {
+    console.error(`[GDRIVE] Failed to search for stories by character ${characterName}:`, error);
+    return [];
+  }
+}

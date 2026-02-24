@@ -14,7 +14,9 @@ import {
 } from "./telegram";
 import { generateDailyBedtimeStory } from "./bedtimeStories";
 import { generateAndSaveParentMessage } from "./parentMessages";
+import { generateAndSaveParentTip } from "./parentTips";
 import { db } from "./db";
+import { runBatchWorker, checkAllBatchJobsStatus } from "./batch-api";
 import {
   enrollments,
   appointments,
@@ -570,44 +572,74 @@ The image should:
   }
 }
 
-async function expireSubscriptions() {
+export async function expireSubscriptions() {
   console.log("[CRON] Checking for expired subscriptions...");
 
   try {
     const expiredEnrollments = await storage.getExpiredEnrollments();
+    console.log(`[CRON] Found ${expiredEnrollments.length} expired enrollment(s) to process`);
+
+    if (expiredEnrollments.length === 0) {
+      console.log("[CRON] No expired enrollments found - all good");
+      return { processed: 0, errors: 0 };
+    }
+
+    let processed = 0;
+    let errors = 0;
 
     for (const enrollment of expiredEnrollments) {
-      console.log(`[CRON] Expiring enrollment ${enrollment.id}`);
-      await storage.updateEnrollmentStatus(enrollment.id, "expired");
+      try {
+        console.log(`[CRON] Expiring enrollment ${enrollment.id} (parentId: ${enrollment.parentId}, courseId: ${enrollment.courseId}, accessEnd: ${enrollment.accessEnd})`);
+        await storage.updateEnrollmentStatus(enrollment.id, "expired");
+        processed++;
 
-      if (enrollment.parentId) {
-        const parent = await storage.getParent(enrollment.parentId);
-        const course = await storage.getCourse(enrollment.courseId);
+        if (enrollment.parentId) {
+          const parent = await storage.getParent(enrollment.parentId);
+          const course = await storage.getCourse(enrollment.courseId);
 
-        if (parent && course) {
-          if (parent.email) {
-            console.log(`[CRON] Sending expiration email to ${parent.email}`);
-            await sendSubscriptionExpiredEmail(
-              parent.email,
-              parent.name,
-              course.title,
-            );
-          }
-          if (parent.telegramChatId && parent.telegramOptin) {
-            console.log(
-              `[CRON] Sending expiration Telegram to ${parent.telegramChatId}`,
-            );
-            await sendTelegramSubscriptionExpired(
-              parent.telegramChatId,
-              parent.name,
-              course.title,
-            );
+          if (parent && course) {
+            console.log(`[CRON] Enrollment expired for ${parent.name} (${parent.email}) - ${course.title} - accessEnd was ${enrollment.accessEnd}`);
+            if (parent.email) {
+              console.log(`[CRON] Sending expiration email to ${parent.email}`);
+              try {
+                await sendSubscriptionExpiredEmail(
+                  parent.email,
+                  parent.name,
+                  course.title,
+                );
+                console.log(`[CRON] Expiration email sent to ${parent.email}`);
+              } catch (emailErr) {
+                console.error(`[CRON] Failed to send expiration email to ${parent.email}:`, emailErr);
+              }
+            }
+            if (parent.telegramChatId && parent.telegramOptin) {
+              console.log(`[CRON] Sending expiration Telegram to ${parent.telegramChatId}`);
+              try {
+                await sendTelegramSubscriptionExpired(
+                  parent.telegramChatId,
+                  parent.name,
+                  course.title,
+                );
+                console.log(`[CRON] Expiration Telegram sent to ${parent.telegramChatId}`);
+              } catch (tgErr) {
+                console.error(`[CRON] Failed to send expiration Telegram:`, tgErr);
+              }
+            }
+          } else {
+            console.warn(`[CRON] Could not find parent (${enrollment.parentId}) or course (${enrollment.courseId}) for expired enrollment`);
           }
         }
+      } catch (enrollErr) {
+        errors++;
+        console.error(`[CRON] Error processing enrollment ${enrollment.id}:`, enrollErr);
       }
     }
+
+    console.log(`[CRON] Expiration complete: ${processed} processed, ${errors} errors`);
+    return { processed, errors };
   } catch (error) {
     console.error("[CRON] Error expiring subscriptions:", error);
+    return { processed: 0, errors: 1 };
   }
 }
 
@@ -933,10 +965,11 @@ export function startCronJobs() {
     await checkAppointmentReminders();
   });
 
-  // Generate AI parenting tip daily at 6:00 AM
-  cron.schedule("0 6 * * *", async () => {
+  // Generate AI parenting tip every 3 hours from 6:00 AM to 9:00 PM East Africa Time
+  // Runs at: 6:00 AM, 9:00 AM, 12:00 PM, 3:00 PM, 6:00 PM, 9:00 PM EAT
+  cron.schedule("0 6,9,12,15,18,21 * * *", async () => {
     await generateAiParentingTip();
-  });
+  }, { timezone: "Africa/Nairobi" });
 
   // Generate AI flashcard images daily at 7:00 AM
   cron.schedule("0 7 * * *", async () => {
@@ -965,6 +998,19 @@ export function startCronJobs() {
     }
   }, { timezone: "Africa/Mogadishu" });
 
+  // Generate daily parent tips for one random stage at 7:30 AM East Africa Time
+  cron.schedule("30 7 * * *", async () => {
+    console.log("[CRON] Generating daily parent tip...");
+    try {
+      const stages = ["newborn-0-3m", "infant-3-6m", "infant-6-12m", "toddler-1-2y", "toddler-2-3y", "preschool-3-5y", "school-age-5-7y"];
+      const randomStage = stages[Math.floor(Math.random() * stages.length)];
+      await generateAndSaveParentTip(randomStage);
+      console.log(`[CRON] Daily parent tip generated successfully for ${randomStage}`);
+    } catch (error) {
+      console.error("[CRON] Failed to generate daily parent tip:", error);
+    }
+  }, { timezone: "Africa/Mogadishu" });
+
   // Send bedtime story notification at 6:00 PM East Africa Time
   cron.schedule("0 18 * * *", async () => {
     console.log("[CRON] Sending bedtime story notifications...");
@@ -977,8 +1023,30 @@ export function startCronJobs() {
     await sendInactiveParentNotifications();
   });
 
+  // Run OpenAI Batch API worker every night at 2:00 AM East Africa Time
+  cron.schedule("0 2 * * *", async () => {
+    console.log("[CRON] Running OpenAI Batch API worker for bulk translations and content generation...");
+    try {
+      await runBatchWorker();
+      console.log("[CRON] Batch API worker completed successfully");
+    } catch (error) {
+      console.error("[CRON] Failed to run batch API worker:", error);
+    }
+  }, { timezone: "Africa/Mogadishu" });
+
+  // Check batch job status every hour
+  cron.schedule("30 * * * *", async () => {
+    console.log("[CRON] Checking OpenAI Batch API job status...");
+    try {
+      await checkAllBatchJobsStatus();
+      console.log("[CRON] Batch API status check completed");
+    } catch (error) {
+      console.error("[CRON] Failed to check batch API status:", error);
+    }
+  }, { timezone: "Africa/Mogadishu" });
+
   console.log(
-    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips 6AM, flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h)",
+    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips every 3h (6AM-9PM EAT), flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h, batch worker 2AM EAT, batch status check hourly)",
   );
 
   setTimeout(async () => {
@@ -986,6 +1054,45 @@ export function startCronJobs() {
     await checkExpiringSubscriptions();
     await expireSubscriptions();
   }, 10000);
+
+  // Check for missed daily content on startup (catches days where cron didn't fire)
+  setTimeout(async () => {
+    console.log("[CRON] Checking for missed daily content on startup...");
+    try {
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' }); // YYYY-MM-DD Somalia time
+
+      // Check if today's Dhambaal exists
+      const todayDhambaal = await storage.getTodayParentMessage();
+      if (!todayDhambaal) {
+        console.log(`[CRON] No Dhambaal found for today (${todayStr}), generating now...`);
+        try {
+          await generateAndSaveParentMessage();
+          console.log("[CRON] Missed Dhambaal generated successfully on startup");
+        } catch (err) {
+          console.error("[CRON] Failed to generate missed Dhambaal on startup:", err);
+        }
+      } else {
+        console.log(`[CRON] Today's Dhambaal already exists: "${todayDhambaal.title}"`);
+      }
+
+      // Check if today's bedtime story exists
+      const todayStory = await storage.getTodayBedtimeStory();
+      if (!todayStory) {
+        console.log(`[CRON] No bedtime story found for today (${todayStr}), generating now...`);
+        try {
+          await generateDailyBedtimeStory();
+          console.log("[CRON] Missed bedtime story generated successfully on startup");
+        } catch (err) {
+          console.error("[CRON] Failed to generate missed bedtime story on startup:", err);
+        }
+      } else {
+        console.log(`[CRON] Today's bedtime story already exists: "${todayStory.titleSomali}"`);
+      }
+    } catch (error) {
+      console.error("[CRON] Error checking for missed daily content:", error);
+    }
+  }, 15000); // Wait 15 seconds after startup to allow DB connections to settle
 }
 
 // AI Lesson Settings - stored in JSON file

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { LogIn } from "lucide-react";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function TopBar() {
   const { parent } = useParentAuth();
@@ -37,8 +38,10 @@ export default function TopBar() {
             <span className="font-bold text-sm text-gray-800">Barbaarintasan</span>
           </div>
 
-          {/* Right: Empty space for balance */}
-          <div className="w-20" />
+          {/* Right: Language Switcher */}
+          <div className="w-20 flex justify-end">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
       <div className="h-12" />

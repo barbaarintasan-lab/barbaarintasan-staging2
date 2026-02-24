@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { useIsAuthPage } from "@/hooks/useIsAuthPage";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -29,6 +30,9 @@ export default function BottomNav() {
   const queryClient = useQueryClient();
   const { parent } = useParentAuth();
   const [showSocialSection, setShowSocialSection] = useState(false);
+
+  // Check if current page is an authentication page
+  const isAuthPage = useIsAuthPage();
 
   // Focus mode check from URL hash - reactive to hash changes
   const [isFocusMode, setIsFocusMode] = useState(
@@ -280,14 +284,15 @@ export default function BottomNav() {
       {/* Share Section - Above Navigation (only shows when scrolled to bottom) */}
       <div
         className={cn(
-          "bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-100 px-4 py-2 transition-all duration-300 overflow-hidden",
+          "bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-100 px-3 py-1.5 transition-all duration-300 overflow-hidden",
           showSocialSection &&
             location !== "/share-info" &&
             location !== "/sheeko" &&
             location !== "/ai-caawiye" &&
             location !== "/homework-helper" &&
-            location !== "/tarbiya-helper"
-            ? "max-h-20 opacity-100"
+            location !== "/tarbiya-helper" &&
+            !isAuthPage
+            ? "max-h-12 opacity-100"
             : "max-h-0 opacity-0 py-0 border-t-0",
         )}
       >
@@ -295,14 +300,14 @@ export default function BottomNav() {
           {/* Share Button */}
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-blue-200 shadow-sm hover:shadow-md transition-all active:scale-95"
+            className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-full border border-blue-200 shadow-sm hover:shadow-md transition-all active:scale-95"
           >
-            <Share2 className="w-3.5 h-3.5 text-blue-600" />
-            <span className="text-xs font-medium text-gray-700">Share</span>
+            <Share2 className="w-3 h-3 text-blue-600" />
+            <span className="text-[11px] font-medium text-gray-700">Share</span>
           </button>
 
           {/* Social Media Icons */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {socialLinks.map((social) => (
               <a
                 key={social.name}
@@ -310,11 +315,11 @@ export default function BottomNav() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center text-white transition-all active:scale-95",
+                  "w-6 h-6 rounded-full flex items-center justify-center text-white transition-all active:scale-95",
                   social.color,
                 )}
               >
-                <span className="w-4 h-4 flex items-center justify-center">
+                <span className="w-3 h-3 flex items-center justify-center">
                   {social.icon}
                 </span>
               </a>
@@ -431,7 +436,7 @@ export default function BottomNav() {
       </nav>
 
       {/* Floating Scroll to Top Button */}
-      {showScrollTop && (
+      {showScrollTop && !isAuthPage && (
         <button
           onClick={scrollToTop}
           className="fixed bottom-28 right-4 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 z-50"

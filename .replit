@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["zip", "ffmpeg", "rsync", "unzip"]
+packages = ["zip", "ffmpeg", "rsync", "unzip", "jdk17", "android-tools"]
 
 [deployment]
 deploymentTarget = "cloudrun"

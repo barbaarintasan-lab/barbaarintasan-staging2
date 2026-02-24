@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { Home, BookOpen, BrainCircuit, User, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface AppShellProps {
   children: ReactNode;
@@ -23,12 +25,13 @@ export default function AppShell({
 }: AppShellProps) {
   const [location] = useLocation();
   const { parent } = useParentAuth();
+  const { t } = useTranslation();
 
   const navItems = [
-    { icon: Home, label: "Hoyga", path: "/" },
-    { icon: BookOpen, label: "Koorsooyin", path: "/courses" },
+    { icon: Home, label: t("nav.home"), path: "/" },
+    { icon: BookOpen, label: t("nav.courses"), path: "/courses" },
     { icon: BrainCircuit, label: "Quiz", path: "/quiz" },
-    { icon: User, label: "Profile-kaaga", path: "/profile" },
+    { icon: User, label: t("nav.profile"), path: "/profile" },
   ];
 
   return (
@@ -50,6 +53,7 @@ export default function AppShell({
               
               {/* Desktop Nav Links */}
               <div className="flex items-center gap-2">
+                <LanguageSwitcher />
                 {navItems.map((item) => {
                   const isActive = location === item.path || 
                     (item.path === "/" && location === "/") ||

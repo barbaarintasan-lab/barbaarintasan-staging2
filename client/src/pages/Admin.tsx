@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings } from "lucide-react";
+import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages } from "lucide-react";
 import AIModerationPanel from "@/components/AIModerationPanel";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,9 @@ import { useUpload } from "@/hooks/use-upload";
 import Papa from "papaparse";
 import { ExerciseManager } from "@/components/admin/ExerciseManager";
 import { VoiceSpacesAdmin } from "@/components/admin/VoiceSpacesAdmin";
+import BatchTranslationAdmin from "@/components/admin/BatchTranslationAdmin";
 import { useTranslation } from "react-i18next";
+import type { FlashcardCategory, Flashcard, Parent, Course, Lesson, Module, Hadith, Reciter, ParentMessage, BedtimeStory, QuizQuestion, OpenEndedQuestion, DriveFile, LessonImage } from "@/types/admin";
 
 // Somali day and month names for date formatting
 const SOMALI_DAYS: Record<string, string> = {
@@ -218,7 +220,7 @@ function FlashcardManager() {
     }
   };
 
-  const { data: categories = [], isLoading: loadingCategories } = useQuery({
+  const { data: categories = [], isLoading: loadingCategories } = useQuery<FlashcardCategory[]>({
     queryKey: ["/api/admin/flashcard-categories"],
     queryFn: async () => {
       const res = await fetch("/api/admin/flashcard-categories", { credentials: "include" });
@@ -227,7 +229,7 @@ function FlashcardManager() {
     },
   });
 
-  const { data: flashcards = [], isLoading: loadingFlashcards } = useQuery({
+  const { data: flashcards = [], isLoading: loadingFlashcards } = useQuery<Flashcard[]>({
     queryKey: ["/api/admin/flashcard-categories", selectedCategoryId, "flashcards"],
     queryFn: async () => {
       if (!selectedCategoryId) return [];
@@ -281,7 +283,10 @@ function FlashcardManager() {
     },
     onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/flashcard-categories"] });
-      if (selectedCategoryId === deletedId) setSelectedCategoryId(null);
+      // Clear selected category if it was deleted
+      if (selectedCategoryId === deletedId) {
+        setSelectedCategoryId(null);
+      }
     },
   });
 
@@ -358,7 +363,7 @@ function FlashcardManager() {
     createCategoryMutation.mutate(categoryForm);
   };
 
-  const handleEditCategory = (cat: any) => {
+  const handleEditCategory = (cat: FlashcardCategory) => {
     setEditingCategory(cat.id);
     setCategoryForm({ name: cat.name, nameEnglish: cat.nameEnglish || "", iconEmoji: cat.iconEmoji || "", description: cat.description || "" });
   };
@@ -378,7 +383,7 @@ function FlashcardManager() {
     });
   };
 
-  const handleEditFlashcard = (card: any) => {
+  const handleEditFlashcard = (card: Flashcard) => {
     setEditingFlashcard(card.id);
     setFlashcardForm({ nameSomali: card.nameSomali, nameEnglish: card.nameEnglish || "", imageUrl: card.imageUrl });
   };
@@ -453,7 +458,7 @@ function FlashcardManager() {
           {loadingCategories ? (
             <p>Loading...</p>
           ) : (
-            categories.map((cat: any) => (
+            categories.map((cat: FlashcardCategory) => (
               <div
                 key={cat.id}
                 className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedCategoryId === cat.id ? "bg-blue-100 border-blue-500" : "bg-white hover:bg-gray-50"}`}
@@ -480,7 +485,7 @@ function FlashcardManager() {
       {/* Flashcards Section */}
       {selectedCategoryId && (
         <div className="bg-green-50 p-4 rounded-lg">
-          <h3 className="font-semibold mb-4">Kaararka: {categories.find((c: any) => c.id === selectedCategoryId)?.name}</h3>
+          <h3 className="font-semibold mb-4">Kaararka: {categories.find((c: FlashcardCategory) => c.id === selectedCategoryId)?.name}</h3>
           
           {/* Add/Edit Flashcard Form */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -548,7 +553,7 @@ function FlashcardManager() {
             ) : flashcards.length === 0 ? (
               <p className="col-span-full text-center text-gray-500 py-8">Weli kaaro ma jiraan. Ku dar mid cusub!</p>
             ) : (
-              flashcards.map((card: any) => (
+              flashcards.map((card: Flashcard) => (
                 <div key={card.id} className="bg-white rounded-lg border p-3 text-center" data-testid={`flashcard-item-${card.id}`}>
                   <img src={card.imageUrl} alt={card.nameSomali} className="w-full h-24 object-cover rounded-lg mb-2" />
                   <div className="font-bold text-lg">{card.nameSomali}</div>
@@ -603,7 +608,7 @@ export default function Admin() {
   // Inline quiz fields for lesson type = quiz
   const [inlineQuizTitle, setInlineQuizTitle] = useState("");
   const [inlineQuizDescription, setInlineQuizDescription] = useState("");
-  const [inlineQuizQuestions, setInlineQuizQuestions] = useState<{question: string; options: string[]; correctAnswer: number; explanation: string}[]>([]);
+  const [inlineQuizQuestions, setInlineQuizQuestions] = useState<QuizQuestion[]>([]);
   const [inlineQuestion, setInlineQuestion] = useState("");
   const [inlineOptions, setInlineOptions] = useState(["", "", "", ""]);
   const [inlineCorrectAnswer, setInlineCorrectAnswer] = useState(0);
@@ -641,7 +646,7 @@ export default function Admin() {
   const [videoOperationName, setVideoOperationName] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   // Open-ended (text-only) questions - Su'aalo qoraal ah oo keliya
-  const [openEndedQuestions, setOpenEndedQuestions] = useState<{question: string; hint?: string}[]>([]);
+  const [openEndedQuestions, setOpenEndedQuestions] = useState<OpenEndedQuestion[]>([]);
   const [newOpenEndedQuestion, setNewOpenEndedQuestion] = useState("");
   const [newOpenEndedHint, setNewOpenEndedHint] = useState("");
   const [editingOpenEndedIndex, setEditingOpenEndedIndex] = useState<number | null>(null);
@@ -678,6 +683,12 @@ export default function Admin() {
   const [isSeedingContent, setIsSeedingContent] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  
+  // Lesson accessibility report
+  const [showAccessibilityReport, setShowAccessibilityReport] = useState(false);
+  const [accessibilityReport, setAccessibilityReport] = useState<any>(null);
+  const [isLoadingAccessibilityReport, setIsLoadingAccessibilityReport] = useState(false);
+  const [isExportingUsersWP, setIsExportingUsersWP] = useState(false);
   
   // Content Creator states
   const [contentType, setContentType] = useState<"dhambaal" | "sheeko">("dhambaal");
@@ -776,10 +787,9 @@ export default function Admin() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   
   // Milestones states
-  const [milestoneAgeRange, setMilestoneAgeRange] = useState("0-6");
+  const [milestoneAgeRange, setMilestoneAgeRange] = useState("newborn-0-3m");
   const [milestoneTitle, setMilestoneTitle] = useState("");
   const [milestoneDescription, setMilestoneDescription] = useState("");
-  const [milestoneCategory, setMilestoneCategory] = useState("Jirka");
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
 
   // Parent management state
@@ -791,14 +801,14 @@ export default function Admin() {
   const [selectedParentForEnrollment, setSelectedParentForEnrollment] = useState<string | null>(null);
   const [enrollmentCourseId, setEnrollmentCourseId] = useState("");
   const [enrollmentPlanType, setEnrollmentPlanType] = useState("lifetime");
-  const [parentToDelete, setParentToDelete] = useState<any | null>(null);
+  const [parentToDelete, setParentToDelete] = useState<Parent | null>(null);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
-  const [paymentToDelete, setPaymentToDelete] = useState<any | null>(null);
-  const [adminToggleConfirm, setAdminToggleConfirm] = useState<{parent: any, makeAdmin: boolean} | null>(null);
-  const [hostToggleConfirm, setHostToggleConfirm] = useState<{parent: any, makeHost: boolean} | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number } | null>(null);
+  const [adminToggleConfirm, setAdminToggleConfirm] = useState<{parent: Parent, makeAdmin: boolean} | null>(null);
+  const [hostToggleConfirm, setHostToggleConfirm] = useState<{parent: Parent, makeHost: boolean} | null>(null);
 
   // Lesson AI Images state
-  const [lessonImages, setLessonImages] = useState<any[]>([]);
+  const [lessonImages, setLessonImages] = useState<LessonImage[]>([]);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [imageGenerateCount, setImageGenerateCount] = useState("3");
 
@@ -824,7 +834,7 @@ export default function Admin() {
   const [hadithSource, setHadithSource] = useState("");
   const [hadithNarrator, setHadithNarrator] = useState("");
   const [hadithTopic, setHadithTopic] = useState("");
-  const [editingHadith, setEditingHadith] = useState<any | null>(null);
+  const [editingHadith, setEditingHadith] = useState<Hadith | null>(null);
   const [editHadithSomaliText, setEditHadithSomaliText] = useState("");
   const [hadithSearchQuery, setHadithSearchQuery] = useState("");
   const [hadithFilterBook, setHadithFilterBook] = useState<string>("all");
@@ -1036,10 +1046,41 @@ export default function Admin() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success(`Waa la soo dejiyay! ${data.parentMessages?.length || 0} Dhambaal iyo ${data.bedtimeStories?.length || 0} Sheeko`);
-    } catch (error: any) {
-      toast.error(error.message || "Export-ku wuu fashilmay");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error(error instanceof Error ? error.message : "Export-ku wuu fashilmay");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportUsersWP = async () => {
+    if (isExportingUsersWP) return;
+    setIsExportingUsersWP(true);
+    try {
+      const res = await fetch("/api/admin/export-users-wp", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Export failed");
+      }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bsa-users-wp-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Waa la soo dejiyay! ${data.totalUsers} users (${data.totalWithEnrollments} enrolled)`);
+    } catch (error) {
+      console.error("WordPress users export error:", error);
+      toast.error(error instanceof Error ? error.message : "Export-ku wuu fashilmay");
+    } finally {
+      setIsExportingUsersWP(false);
     }
   };
 
@@ -1070,7 +1111,8 @@ export default function Admin() {
         } else {
           toast.error(result.error || "Import-ku wuu fashilmay");
         }
-      } catch (error: any) {
+      } catch (error) {
+        console.error("JSON import error:", error);
         toast.error("File-ka JSON-ka ma aha sax");
       } finally {
         setIsImporting(false);
@@ -1612,7 +1654,7 @@ export default function Admin() {
   });
 
   // Fetch Google Drive files for Maktabadda
-  const { data: driveFilesList = [], isLoading: driveFilesLoading } = useQuery<any[]>({
+  const { data: driveFilesList = [], isLoading: driveFilesLoading } = useQuery<DriveFile[]>({
     queryKey: ["adminDriveFiles"],
     queryFn: async () => {
       const res = await fetch("/api/drive/maktabada", { credentials: "include" });
@@ -1623,7 +1665,7 @@ export default function Admin() {
   });
 
   // Fetch Quran Reciters for admin (Shiikhyada Quraanka)
-  const { data: recitersList = [], refetch: refetchReciters } = useQuery<any[]>({
+  const { data: recitersList = [], refetch: refetchReciters } = useQuery<Reciter[]>({
     queryKey: ["adminQuranReciters"],
     queryFn: async () => {
       const res = await fetch("/api/quran-reciters/admin", { credentials: "include" });
@@ -1634,7 +1676,7 @@ export default function Admin() {
   });
 
   // Fetch Hadiths for admin (40 Xadiis)
-  const { data: hadithsList = [], refetch: refetchHadiths } = useQuery<any[]>({
+  const { data: hadithsList = [], refetch: refetchHadiths } = useQuery<Hadith[]>({
     queryKey: ["adminHadiths"],
     queryFn: async () => {
       const res = await fetch("/api/hadiths/admin", { credentials: "include" });
@@ -1645,7 +1687,7 @@ export default function Admin() {
   });
 
   // Fetch Parenting Books
-  const { data: parentingBooksList = [], refetch: refetchParentingBooks } = useQuery<any[]>({
+  const { data: parentingBooksList = [], refetch: refetchParentingBooks } = useQuery<Array<{ id: string; title: string; description: string; url: string; imageUrl: string }>>({
     queryKey: ["adminParentingBooks"],
     queryFn: async () => {
       const res = await fetch("/api/resources?category=parenting-books", { credentials: "include" });
@@ -1656,7 +1698,7 @@ export default function Admin() {
   });
 
   // Fetch Children's Books
-  const { data: childrenBooksList = [], refetch: refetchChildrenBooks } = useQuery<any[]>({
+  const { data: childrenBooksList = [], refetch: refetchChildrenBooks } = useQuery<Array<{ id: string; title: string; description: string; url: string; imageUrl: string }>>({
     queryKey: ["adminChildrenBooks"],
     queryFn: async () => {
       const res = await fetch("/api/resources?category=children-books", { credentials: "include" });
@@ -1667,7 +1709,7 @@ export default function Admin() {
   });
 
   // Fetch all parent messages (including unpublished for admin)
-  const { data: parentMessages = [], isLoading: isLoadingMessages, refetch: refetchParentMessages } = useQuery<any[]>({
+  const { data: parentMessages = [], isLoading: isLoadingMessages, refetch: refetchParentMessages } = useQuery<ParentMessage[]>({
     queryKey: ["/api/admin/parent-messages"],
     queryFn: async () => {
       const res = await fetch("/api/admin/parent-messages", { credentials: "include" });
@@ -1680,7 +1722,7 @@ export default function Admin() {
   });
 
   // Fetch all bedtime stories (including unpublished for admin)
-  const { data: bedtimeStories = [], isLoading: isLoadingStories, refetch: refetchBedtimeStories } = useQuery<any[]>({
+  const { data: bedtimeStories = [], isLoading: isLoadingStories, refetch: refetchBedtimeStories } = useQuery<BedtimeStory[]>({
     queryKey: ["/api/admin/bedtime-stories"],
     queryFn: async () => {
       const res = await fetch("/api/admin/bedtime-stories", { credentials: "include" });
@@ -2408,8 +2450,9 @@ ${baseUrl}/maaweelo`;
       // Set the image URL to the object path
       setNewCourseImageUrl(objectPath);
       toast.success("Sawirka waa la soo geliyay!");
-    } catch (error: any) {
-      toast.error(error.message || "Sawirka ma soo gelin");
+    } catch (error) {
+      console.error("Course image upload error:", error);
+      toast.error(error instanceof Error ? error.message : "Sawirka ma soo gelin");
     } finally {
       setUploadingCourseImage(false);
       // Reset input
@@ -2459,8 +2502,9 @@ ${baseUrl}/maaweelo`;
       
       toast.success("Sawirka waa la geliyay!");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-    } catch (error: any) {
-      toast.error(error.message || "Sawirka ma soo gelin");
+    } catch (error) {
+      console.error("Course image save error:", error);
+      toast.error(error instanceof Error ? error.message : "Sawirka ma soo gelin");
     } finally {
       setUploadingCourseImageId(null);
     }
@@ -2505,8 +2549,9 @@ ${baseUrl}/maaweelo`;
       toast.success(editingCourseId ? "Koorsada waa la bedelay" : "Koorsada cusub waa lagu daray");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       resetCourseForm();
-    } catch (error: any) {
-      toast.error(error.message || "Khalad ayaa dhacay");
+    } catch (error) {
+      console.error("Course save error:", error);
+      toast.error(error instanceof Error ? error.message : "Khalad ayaa dhacay");
     } finally {
       setSavingCourse(false);
     }
@@ -2528,8 +2573,8 @@ ${baseUrl}/maaweelo`;
   const handleReorderCourse = async (courseId: string, direction: 'up' | 'down') => {
     if (reorderingCourseId) return;
     
-    const sortedCourses = [...courses].sort((a: any, b: any) => a.order - b.order);
-    const currentIndex = sortedCourses.findIndex((c: any) => c.id === courseId);
+    const sortedCourses = [...courses].sort((a, b) => a.order - b.order);
+    const currentIndex = sortedCourses.findIndex((c) => c.id === courseId);
     
     if (currentIndex === -1) return;
     if (direction === 'up' && currentIndex === 0) return;
@@ -2873,6 +2918,25 @@ ${baseUrl}/maaweelo`;
     },
   });
 
+  // Fetch lesson accessibility report
+  const fetchAccessibilityReport = async () => {
+    setIsLoadingAccessibilityReport(true);
+    try {
+      const res = await fetch("/api/admin/lesson-accessibility-report", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch accessibility report");
+      const data = await res.json();
+      setAccessibilityReport(data);
+      setShowAccessibilityReport(true);
+    } catch (error) {
+      console.error("Error fetching accessibility report:", error);
+      toast.error("Lama soo saari karin warbixinta casharada");
+    } finally {
+      setIsLoadingAccessibilityReport(false);
+    }
+  };
+
   // Delete Google Drive file mutation
   const deleteDriveFileMutation = useMutation({
     mutationFn: async (fileId: string) => {
@@ -3128,10 +3192,9 @@ ${baseUrl}/maaweelo`;
   });
 
   const resetMilestoneForm = () => {
-    setMilestoneAgeRange("0-6");
+    setMilestoneAgeRange("newborn-0-3m");
     setMilestoneTitle("");
     setMilestoneDescription("");
-    setMilestoneCategory("Jirka");
     setEditingMilestoneId(null);
   };
 
@@ -3140,15 +3203,13 @@ ${baseUrl}/maaweelo`;
     setMilestoneAgeRange(milestone.ageRange);
     setMilestoneTitle(milestone.title);
     setMilestoneDescription(milestone.description || "");
-    setMilestoneCategory(milestone.category || "Jirka");
   };
 
   const handleSubmitMilestone = () => {
-    const data = {
+    const data: any = {
       ageRange: milestoneAgeRange,
       title: milestoneTitle,
       description: milestoneDescription || undefined,
-      category: milestoneCategory || undefined,
     };
     if (editingMilestoneId) {
       updateMilestoneMutation.mutate({ id: editingMilestoneId, data });
@@ -4223,7 +4284,7 @@ ${baseUrl}/maaweelo`;
               <span>Sheeko</span>
             </Button>
             <Button
-              variant={["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events"].includes(activeTab) ? "default" : "outline"}
+              variant={["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events", "batch-translation"].includes(activeTab) ? "default" : "outline"}
               className="flex items-center justify-center gap-1.5 h-10 text-xs sm:text-sm px-2 sm:px-3 rounded-lg shadow-sm hover:shadow-md transition-all"
               onClick={() => setActiveTab("homepage")}
               data-testid="nav-settings"
@@ -4455,7 +4516,7 @@ ${baseUrl}/maaweelo`;
             )}
             
             {/* Settings sub-tabs */}
-            {["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events"].includes(activeTab) && (
+            {["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events", "batch-translation"].includes(activeTab) && (
               <>
                 <Button
                   variant={activeTab === "homepage" ? "secondary" : "ghost"}
@@ -4519,6 +4580,15 @@ ${baseUrl}/maaweelo`;
                   data-testid="tab-meet-events"
                 >
                   <Video className="w-3 h-3 mr-1" /> Kulanka Meet
+                </Button>
+                <Button
+                  variant={activeTab === "batch-translation" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setActiveTab("batch-translation")}
+                  data-testid="tab-batch-translation"
+                >
+                  <Languages className="w-3 h-3 mr-1" /> Turjumaad
                 </Button>
               </>
             )}
@@ -4625,6 +4695,10 @@ ${baseUrl}/maaweelo`;
                                           {submission.paymentSource === 'stripe' ? (
                                             <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
                                               💳 Stripe
+                                            </Badge>
+                                          ) : submission.paymentSource?.startsWith('wordpress') ? (
+                                            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                              🌐 WordPress {submission.paymentSource.includes('stripe') ? '(Stripe)' : submission.paymentSource.includes('mobile') ? '(Mobile Money)' : ''}
                                             </Badge>
                                           ) : (
                                             <Badge variant="outline">{method?.name || "Unknown Method"}</Badge>
@@ -7032,11 +7106,25 @@ ${baseUrl}/maaweelo`;
             <TabsContent value="course-manager">
                 <Card className="border-none shadow-md bg-white">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <BookOpen className="w-5 h-5" />
-                          Maamulka Koorsooyinka
-                        </CardTitle>
-                        <CardDescription>Ku dar, wax ka bedel, ama tirtir koorsooyin. Sawiro iyo qiimayaal ayaad ku dari kartaa.</CardDescription>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <BookOpen className="w-5 h-5" />
+                              Maamulka Koorsooyinka
+                            </CardTitle>
+                            <CardDescription>Ku dar, wax ka bedel, ama tirtir koorsooyin. Sawiro iyo qiimayaal ayaad ku dari kartaa.</CardDescription>
+                          </div>
+                          <Button
+                            onClick={fetchAccessibilityReport}
+                            disabled={isLoadingAccessibilityReport}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            {isLoadingAccessibilityReport ? "Loading..." : "Casharada Furan"}
+                          </Button>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {/* Add New Course Form */}
@@ -8291,61 +8379,49 @@ ${baseUrl}/maaweelo`;
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Star className="w-5 h-5" />
-                    Horumarinta Ilmaha
+                    Su'aalaha Horumarinta Ilmaha
                   </CardTitle>
                   <CardDescription>
-                    Ku dar ama wax ka beddel horumarinta ilmaha ee da'yaha kala duwan
+                    Ku dar, wax ka beddel, ama ka tir su'aalaha horumarinta ilmaha ee 7-da marxaladood
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {/* Add/Edit Form */}
-                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                    <h3 className="font-semibold mb-4">{editingMilestoneId ? "Horumar Wax ka Beddel" : "Horumar Cusub Ku Dar"}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
+                    <h3 className="font-semibold mb-4 text-blue-900">{editingMilestoneId ? "Su'aal Wax ka Beddel ✏️" : "Su'aal Cusub Ku Dar ➕"}</h3>
+                    <div className="space-y-4">
                       <div>
-                        <Label>Da'da Ilmaha</Label>
+                        <Label className="text-sm font-medium">Marxaladda</Label>
                         <Select value={milestoneAgeRange} onValueChange={setMilestoneAgeRange}>
                           <SelectTrigger data-testid="select-milestone-age">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-[9999]">
-                            <SelectItem value="0-6">0-6 bilood</SelectItem>
-                            <SelectItem value="6-12">6-12 bilood</SelectItem>
-                            <SelectItem value="1-2">1-2 sano</SelectItem>
-                            <SelectItem value="2-4">2-4 sano</SelectItem>
-                            <SelectItem value="4-7">4-7 sano</SelectItem>
+                            <SelectItem value="newborn-0-3m">👶 Murjux (0-3 bilood)</SelectItem>
+                            <SelectItem value="infant-3-6m">🍼 Fadhi-barad (3-6 bilood)</SelectItem>
+                            <SelectItem value="infant-6-12m">🦶 Gurguurte (6-12 bilood)</SelectItem>
+                            <SelectItem value="toddler-1-2y">🧒 Socod barad (1-2 sano)</SelectItem>
+                            <SelectItem value="toddler-2-3y">🗣️ Inyow (2-3 sano)</SelectItem>
+                            <SelectItem value="preschool-3-5y">🎨 Dareeme (3-5 sano)</SelectItem>
+                            <SelectItem value="school-age-5-7y">🎒 Salaad-barad (5-7 sano)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <Label>Nooca</Label>
-                        <Select value={milestoneCategory} onValueChange={setMilestoneCategory}>
-                          <SelectTrigger data-testid="select-milestone-category">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Jirka">Jirka</SelectItem>
-                            <SelectItem value="Maskaxda">Maskaxda</SelectItem>
-                            <SelectItem value="Bulshada">Bulshada</SelectItem>
-                            <SelectItem value="Luuqadda">Luuqadda</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="md:col-span-2">
-                        <Label>Magaca Horumarinta</Label>
+                        <Label className="text-sm font-medium">Su'aasha (tusaale: "Ilmahaagu ma socon karaa keligiis?")</Label>
                         <Input
                           value={milestoneTitle}
                           onChange={(e) => setMilestoneTitle(e.target.value)}
-                          placeholder="Tusaale: Dhoolacaddaynta"
+                          placeholder="Ilmahaagu ... ma ...?"
                           data-testid="input-milestone-title"
                         />
                       </div>
-                      <div className="md:col-span-2">
-                        <Label>Faahfaahinta</Label>
+                      <div>
+                        <Label className="text-sm font-medium">Faahfaahinta (sharaxaad gaaban)</Label>
                         <Textarea
                           value={milestoneDescription}
                           onChange={(e) => setMilestoneDescription(e.target.value)}
-                          placeholder="Tusaale: Nuunaha wuxuu bilaabaa inuu dhoolacadeeyo marka waalidku la ciyaaraan cayaarta waji iska eega, ama u qoslaan."
+                          placeholder="Sharaxaad ku saabsan su'aaldan iyo waxa la fiiriyo..."
                           rows={2}
                           data-testid="input-milestone-description"
                         />
@@ -8367,55 +8443,70 @@ ${baseUrl}/maaweelo`;
                     </div>
                   </div>
 
-                  {/* Milestones List grouped by age */}
+                  {/* Milestones List grouped by 7 stages */}
                   <div className="space-y-6">
-                    {["0-6", "6-12", "1-2", "2-4", "4-7"].map((ageRange) => {
-                      const ageMilestones = milestonesList.filter((m: any) => m.ageRange === ageRange);
-                      if (ageMilestones.length === 0) return null;
+                    {[
+                      { value: "newborn-0-3m", label: "👶 Murjux (0-3 bilood)" },
+                      { value: "infant-3-6m", label: "🍼 Fadhi-barad (3-6 bilood)" },
+                      { value: "infant-6-12m", label: "🦶 Gurguurte (6-12 bilood)" },
+                      { value: "toddler-1-2y", label: "🧒 Socod barad (1-2 sano)" },
+                      { value: "toddler-2-3y", label: "🗣️ Inyow (2-3 sano)" },
+                      { value: "preschool-3-5y", label: "🎨 Dareeme (3-5 sano)" },
+                      { value: "school-age-5-7y", label: "🎒 Salaad-barad (5-7 sano)" },
+                    ].map((stage) => {
+                      const ageMilestones = milestonesList.filter((m: any) => m.ageRange === stage.value);
                       return (
-                        <div key={ageRange}>
-                          <h4 className="font-semibold text-lg mb-3 text-blue-800">{ageRange} {["0-6", "6-12"].includes(ageRange) ? "bilood" : "sano"}</h4>
-                          <div className="space-y-2">
-                            {ageMilestones.map((milestone: any) => (
-                              <div key={milestone.id} className="bg-white border rounded-lg p-3 flex justify-between items-start" data-testid={`milestone-item-${milestone.id}`}>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="outline">{milestone.category}</Badge>
-                                  </div>
-                                  <h5 className="font-medium">{milestone.title}</h5>
-                                  {milestone.description && (
-                                    <p className="text-sm text-gray-600">{milestone.description}</p>
-                                  )}
-                                </div>
-                                <div className="flex gap-1 ml-4">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEditMilestone(milestone)}
-                                    data-testid={`button-edit-milestone-${milestone.id}`}
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-red-500 hover:text-red-700"
-                                    onClick={() => deleteMilestoneMutation.mutate(milestone.id)}
-                                    disabled={deleteMilestoneMutation.isPending}
-                                    data-testid={`button-delete-milestone-${milestone.id}`}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
+                        <div key={stage.value}>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-semibold text-lg text-blue-800">{stage.label}</h4>
+                            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{ageMilestones.length} su'aalood</span>
                           </div>
+                          {ageMilestones.length > 0 ? (
+                            <div className="space-y-2">
+                              {ageMilestones.map((milestone: any, idx: number) => (
+                                <div key={milestone.id} className="bg-white border rounded-lg p-3 flex justify-between items-start" data-testid={`milestone-item-${milestone.id}`}>
+                                  <div className="flex-1 flex items-start gap-3">
+                                    <span className="text-gray-400 text-sm font-medium mt-0.5">{idx + 1}.</span>
+                                    <div>
+                                      <h5 className="font-medium text-gray-900">{milestone.title}</h5>
+                                      {milestone.description && (
+                                        <p className="text-sm text-gray-500 mt-1">{milestone.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1 ml-4 flex-shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEditMilestone(milestone)}
+                                      data-testid={`button-edit-milestone-${milestone.id}`}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-red-500 hover:text-red-700"
+                                      onClick={() => {
+                                        if (confirm("Ma hubtaa inaad tirtireyso su'aashan?")) {
+                                          deleteMilestoneMutation.mutate(milestone.id);
+                                        }
+                                      }}
+                                      disabled={deleteMilestoneMutation.isPending}
+                                      data-testid={`button-delete-milestone-${milestone.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-400 text-sm italic py-2">Weli su'aal ma jirto marxaladdan. Ku dar mid cusub!</p>
+                          )}
                         </div>
                       );
                     })}
-                    {milestonesList.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">Weli horumar ma jirto. Ku dar mid cusub!</p>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -8519,6 +8610,32 @@ ${baseUrl}/maaweelo`;
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Force Expire Button */}
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/admin/expire-subscriptions", { method: "POST", credentials: "include" });
+                        const data = await res.json();
+                        if (data.success) {
+                          alert(`Subscription check complete: ${data.processed} expired, ${data.errors} errors`);
+                          queryClient.invalidateQueries({ queryKey: ["/api/enrollments"] });
+                        } else {
+                          alert("Error: " + (data.error || "Unknown error"));
+                        }
+                      } catch (err) {
+                        alert("Failed to run expiration check");
+                      }
+                    }}
+                    data-testid="btn-force-expire"
+                  >
+                    ⏰ Dhici Qasab (Force Expire Check)
+                  </Button>
                 </div>
 
                 {/* Parent Search & List */}
@@ -8649,6 +8766,15 @@ ${baseUrl}/maaweelo`;
                           data-testid="btn-export-csv"
                         >
                           📥 CSV Export
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleExportUsersWP}
+                          disabled={isExportingUsersWP}
+                          data-testid="btn-export-users-wp"
+                        >
+                          {isExportingUsersWP ? "⏳ Exporting..." : "🔄 WordPress Export"}
                         </Button>
                       </div>
                       <div className="flex gap-2 text-sm text-gray-500">
@@ -8824,7 +8950,7 @@ ${baseUrl}/maaweelo`;
                                           </SelectTrigger>
                                           <SelectContent className="z-[9999]">
                                             <SelectItem value="lifetime">Nolosha oo dhan</SelectItem>
-                                            <SelectItem value="monthly">Bil ($30)</SelectItem>
+                                            <SelectItem value="monthly">Bil ($15)</SelectItem>
                                             <SelectItem value="yearly">Sannad ($114)</SelectItem>
                                           </SelectContent>
                                         </Select>
@@ -10126,6 +10252,10 @@ ${baseUrl}/maaweelo`;
               <MeetEventsAdmin />
             </TabsContent>
 
+            <TabsContent value="batch-translation">
+              <BatchTranslationAdmin />
+            </TabsContent>
+
             <TabsContent value="voice-spaces">
               <div className="space-y-4">
                 <div className="flex gap-2 mb-4">
@@ -10847,6 +10977,167 @@ ${baseUrl}/maaweelo`;
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Lesson Accessibility Report Dialog */}
+        <Dialog open={showAccessibilityReport} onOpenChange={setShowAccessibilityReport}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Warbixinta Casharada Furan (Lesson Accessibility Report)
+              </DialogTitle>
+              <DialogDescription>
+                Koorsooyin iyo casharada ay leeyihiin oo si bilaash ah u furan
+              </DialogDescription>
+            </DialogHeader>
+            {accessibilityReport && (
+              <div className="space-y-6">
+                {/* Export Button */}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => {
+                      try {
+                        // Prepare CSV data with summary
+                        const csvData = [];
+                        
+                        // Add summary rows
+                        const totalPercentage = accessibilityReport.summary.totalLessonsAcrossAll > 0 
+                          ? Math.round((accessibilityReport.summary.freeLessonsAcrossAll / accessibilityReport.summary.totalLessonsAcrossAll) * 100)
+                          : 0;
+                        csvData.push({
+                          "Koorsada/Course": "GUUD AHAAN (SUMMARY)",
+                          "ID": "",
+                          "Status": "",
+                          "Wadarta Casharada/Total Lessons": accessibilityReport.summary.totalLessonsAcrossAll,
+                          "Casharada Bilaash/Free Lessons": accessibilityReport.summary.freeLessonsAcrossAll,
+                          "Casharada Lacag/Paid Lessons": accessibilityReport.summary.totalLessonsAcrossAll - accessibilityReport.summary.freeLessonsAcrossAll,
+                          "% Bilaash": totalPercentage
+                        });
+                        csvData.push({}); // Empty row
+                        
+                        // Add course data
+                        accessibilityReport.courses.forEach((course: any) => {
+                          csvData.push({
+                            "Koorsada/Course": course.courseTitle,
+                            "ID": course.courseCourseId,
+                            "Status": course.isCourseFreee ? "Bilaash" : "Lacag",
+                            "Wadarta Casharada/Total Lessons": course.totalLessons,
+                            "Casharada Bilaash/Free Lessons": course.freeLessons,
+                            "Casharada Lacag/Paid Lessons": course.paidLessons,
+                            "% Bilaash": course.accessibilityPercentage
+                          });
+                        });
+                        
+                        // Generate CSV
+                        const csv = Papa.unparse(csvData);
+                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                        const link = document.createElement("a");
+                        link.href = URL.createObjectURL(blob);
+                        const date = new Date().toISOString().split('T')[0];
+                        link.download = `warbixinta-casharada_${date}.csv`;
+                        link.click();
+                        toast.success("Warbixinta waa la soo saaray! (Report exported successfully!)");
+                      } catch (error) {
+                        console.error("Export error:", error);
+                        toast.error("Lama soo saari karin warbixinta casharada");
+                      }
+                    }}
+                    variant="default"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Soo Saar CSV (Export CSV)
+                  </Button>
+                </div>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-700">{accessibilityReport.summary.totalCourses}</p>
+                      <p className="text-xs text-blue-600">Koorsooyin Wadarta</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-green-50 to-emerald-50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-green-700">{accessibilityReport.summary.freeCoursesCount}</p>
+                      <p className="text-xs text-green-600">Koorsooyin Bilaash</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-purple-50 to-violet-50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-purple-700">{accessibilityReport.summary.totalLessonsAcrossAll}</p>
+                      <p className="text-xs text-purple-600">Casharada Wadarta</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-amber-50 to-orange-50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-amber-700">{accessibilityReport.summary.freeLessonsAcrossAll}</p>
+                      <p className="text-xs text-amber-600">Casharada Bilaash</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                {/* Course Details */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Faahfaahinta Koorsada</h3>
+                  {accessibilityReport.courses.map((course: any) => (
+                    <Card key={course.courseId} className="border shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base flex items-center gap-2">
+                              {course.courseTitle}
+                              {course.isCourseFreee && <Badge className="bg-green-100 text-green-700 text-xs">Bilaash</Badge>}
+                            </h4>
+                            <p className="text-sm text-gray-600">ID: {course.courseCourseId}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-blue-600">{course.accessibilityPercentage}%</div>
+                            <p className="text-xs text-gray-500">Furan</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
+                          <div className="bg-gray-50 p-2 rounded">
+                            <p className="text-gray-600">Wadarta:</p>
+                            <p className="font-semibold">{course.totalLessons}</p>
+                          </div>
+                          <div className="bg-green-50 p-2 rounded">
+                            <p className="text-green-600">Bilaash:</p>
+                            <p className="font-semibold text-green-700">{course.freeLessons}</p>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded">
+                            <p className="text-blue-600">Lacag:</p>
+                            <p className="font-semibold text-blue-700">{course.paidLessons}</p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${course.accessibilityPercentage}%` }} />
+                        </div>
+                        {course.freeLessons > 0 && (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800">
+                              Casharada Bilaash ({course.freeLessons})
+                            </summary>
+                            <ul className="mt-2 space-y-1 text-sm">
+                              {course.lessons.filter((l: any) => l.isFree).map((lesson: any) => (
+                                <li key={lesson.id} className="flex items-center gap-2 p-2 bg-green-50 rounded">
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <span className="font-medium">#{lesson.order}</span>
+                                  <span>{lesson.title}</span>
+                                  <Badge variant="outline" className="text-xs">{lesson.lessonType}</Badge>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
@@ -14310,13 +14601,16 @@ function MeetEventsAdmin() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
-  const [title, setTitle] = useState("Kulanka Bahda Tarbiyadda Caruurta");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetLink, setMeetLink] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [mediaType, setMediaType] = useState("video");
+  const [mediaTitle, setMediaTitle] = useState("");
+  const [driveFileId, setDriveFileId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
@@ -14330,13 +14624,16 @@ function MeetEventsAdmin() {
   });
 
   const resetForm = () => {
-    setTitle("Kulanka Bahda Tarbiyadda Caruurta");
+    setTitle("");
     setDescription("");
     setMeetLink("");
     setEventDate("");
     setStartTime("");
     setEndTime("");
     setIsActive(true);
+    setMediaType("video");
+    setMediaTitle("");
+    setDriveFileId("");
     setEditingEvent(null);
     setShowForm(false);
   };
@@ -14350,6 +14647,9 @@ function MeetEventsAdmin() {
     setStartTime(event.startTime);
     setEndTime(event.endTime);
     setIsActive(event.isActive);
+    setMediaType(event.mediaType || "video");
+    setMediaTitle(event.mediaTitle || "");
+    setDriveFileId(event.driveFileId || "");
     setShowForm(true);
   };
 
@@ -14369,7 +14669,7 @@ function MeetEventsAdmin() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          title: title || "Kulanka Bahda Tarbiyadda Caruurta",
+          title: title,
           description: description || "",
           startDateTime,
           durationMinutes,
@@ -14390,13 +14690,13 @@ function MeetEventsAdmin() {
   };
 
   const handleSave = async () => {
-    if (!meetLink.trim() || !eventDate || !startTime || !endTime) {
+    if (!title.trim() || !meetLink.trim() || !eventDate || !startTime || !endTime) {
       toast.error("Fadlan buuxi dhammaan meelaha lagama maarmaanka ah");
       return;
     }
     setIsSaving(true);
     try {
-      const body = { title, description: description || null, meetLink, eventDate, startTime, endTime, isActive };
+      const body = { title, description: description || null, meetLink, eventDate, startTime, endTime, isActive, mediaType, mediaTitle: mediaTitle || null, driveFileId: driveFileId || null };
       const url = editingEvent ? `/api/admin/meet-events/${editingEvent.id}` : "/api/admin/meet-events";
       const method = editingEvent ? "PATCH" : "POST";
       const res = await fetch(url, {
@@ -14442,6 +14742,21 @@ function MeetEventsAdmin() {
       if (!res.ok) throw new Error("Failed to toggle");
       queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
       toast.success(event.isActive ? "Kulanka waa la damiyay" : "Kulanka waa la shaqeeyay");
+    } catch {
+      toast.error("Khalad ayaa dhacay");
+    }
+  };
+
+  const handleArchive = async (id: string) => {
+    if (!confirm("Kulanka Maktabada ma u wareejisaa? (Kulamadii Bahda Tarbiyadda Caruurta ee Hore)")) return;
+    try {
+      const res = await fetch(`/api/admin/meet-events/${id}/archive`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to archive");
+      toast.success("Kulanka Maktabada ayuu u wareegay");
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
     } catch {
       toast.error("Khalad ayaa dhacay");
     }
@@ -14552,6 +14867,49 @@ function MeetEventsAdmin() {
                 </div>
                 <p className="text-[10px] text-gray-500 mt-1">Riix "Samee Link" si uu Google Meet link cusub kuu abuuro, ama geli link-ka aad haysatid.</p>
               </div>
+              <div>
+                <Label className="text-xs font-semibold text-orange-700">Ciwaanka Duubista (Media Title)</Label>
+                <Input
+                  value={mediaTitle}
+                  onChange={(e) => setMediaTitle(e.target.value)}
+                  placeholder="Tusaale: Casharka 5aad - Tarbiyada Caruurta"
+                  className="mt-1"
+                  data-testid="input-meet-media-title"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Ciwaanka muuqaalka ama codka ee la duubay - wuxuu ku muuqanayaa bogga hore.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Nooca Media</Label>
+                  <select
+                    value={mediaType}
+                    onChange={(e) => setMediaType(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    data-testid="select-meet-media-type"
+                  >
+                    <option value="video">Video (Muuqaal)</option>
+                    <option value="audio">Audio (Cod)</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs">Google Drive File ID</Label>
+                  <Input
+                    value={driveFileId}
+                    onChange={(e) => {
+                      let val = e.target.value.trim();
+                      const dMatch = val.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                      const idMatch = val.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                      if (dMatch) val = dMatch[1];
+                      else if (idMatch) val = idMatch[1];
+                      setDriveFileId(val);
+                    }}
+                    placeholder="File ID ama Drive link"
+                    className="mt-1"
+                    data-testid="input-meet-drive-file-id"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Kadib kulanka, paste-garee Google Drive link-ga ama file ID-ga duubista.</p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
                 <span className="text-sm text-gray-700">Firfircoon</span>
@@ -14607,35 +14965,62 @@ function MeetEventsAdmin() {
                         <a href={event.meetLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
                           <ExternalLink className="w-3 h-3 inline mr-1" />{event.meetLink}
                         </a>
+                        {event.driveFileId && (
+                          <div className="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-100">
+                            <div className="flex items-center gap-1">
+                              {event.mediaType === "audio" ? <Volume2 className="w-3 h-3 text-purple-600" /> : <Video className="w-3 h-3 text-blue-600" />}
+                              <span className="text-[10px] font-semibold text-purple-700">
+                                {event.mediaType === "audio" ? "Cod (Audio)" : "Muuqaal (Video)"} - Drive ✓
+                              </span>
+                            </div>
+                            <p className="text-[9px] text-gray-500 mt-1 truncate">ID: {event.driveFileId}</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActive(event)}
-                          className="h-8 w-8 p-0"
-                          data-testid={`btn-toggle-meet-${event.id}`}
-                        >
-                          {event.isActive ? <EyeOff className="w-3.5 h-3.5 text-gray-500" /> : <Eye className="w-3.5 h-3.5 text-green-600" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(event)}
-                          className="h-8 w-8 p-0"
-                          data-testid={`btn-edit-meet-${event.id}`}
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(event.id)}
-                          className="h-8 w-8 p-0"
-                          data-testid={`btn-delete-meet-${event.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </Button>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleToggleActive(event)}
+                            className="h-8 w-8 p-0"
+                            data-testid={`btn-toggle-meet-${event.id}`}
+                          >
+                            {event.isActive ? <EyeOff className="w-3.5 h-3.5 text-gray-500" /> : <Eye className="w-3.5 h-3.5 text-green-600" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(event)}
+                            className="h-8 w-8 p-0"
+                            data-testid={`btn-edit-meet-${event.id}`}
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(event.id)}
+                            className="h-8 w-8 p-0"
+                            data-testid={`btn-delete-meet-${event.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                        {!event.isArchived && event.driveFileId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchive(event.id)}
+                            className="text-[10px] h-7 px-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+                            data-testid={`btn-archive-meet-${event.id}`}
+                          >
+                            <Archive className="w-3 h-3 mr-1" /> Maktabada u wareeji
+                          </Button>
+                        )}
+                        {event.isArchived && (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-[9px]">Maktabada</Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -14645,6 +15030,7 @@ function MeetEventsAdmin() {
           )}
         </CardContent>
       </Card>
+
     </div>
   );
 }

@@ -471,9 +471,9 @@ export default function ShareInfo() {
           </div>
 
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-4 text-center shadow-lg mb-4">
-            <p className="text-green-100 text-sm mb-1">Laba Koorso Oo Buuxa oo Casri ah</p>
-            <p className="text-4xl font-black text-white">$114</p>
-            <p className="text-green-100 text-sm">sanadkii kaliya!</p>
+            <p className="text-green-100 text-sm mb-1">Koorsooyinka Barbaarintasan</p>
+            <p className="text-2xl font-black text-white">5 Cashar Bilaash ah!</p>
+            <p className="text-green-100 text-sm">Bilow maanta</p>
           </div>
 
           <div className="text-center">

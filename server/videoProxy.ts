@@ -6,7 +6,7 @@ import { streamVideoFile } from "./google-drive";
 
 const router = Router();
 
-const MAX_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for smooth streaming
+const MAX_CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks for smooth streaming
 
 function extractGoogleDriveFileId(url: string): string | null {
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);

@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { queryClient } from '@/lib/queryClient';
 
 export default function LanguageSwitcher() {
   const { i18n, t } = useTranslation();
@@ -14,6 +15,7 @@ export default function LanguageSwitcher() {
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
     localStorage.setItem('barbaarintasan-lang', lng);
+    queryClient.invalidateQueries();
   };
 
   const currentLang = i18n.language;

@@ -1,9 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Moon, Star, Calendar, BookOpen, Loader2 } from "lucide-react";
+import { ArrowLeft, Moon, Star, Calendar, BookOpen, Loader2, Volume2, Play, Pause, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
+
+const BLESSING_TEXT = "(Allaha ka Raali Noqdo)";
+
+function getProxyAudioUrl(audioUrl: string | null): string | null {
+  if (!audioUrl) return null;
+  const match = audioUrl.match(/[?&]id=([^&]+)/);
+  if (match) {
+    return `/api/tts-audio/${match[1]}`;
+  }
+  return audioUrl;
+}
 
 interface BedtimeStory {
   id: number;
@@ -15,6 +27,7 @@ interface BedtimeStory {
   moralLesson: string;
   ageRange: string;
   images: string[];
+  audioUrl: string | null;
   storyDate: string;
   generatedAt: string;
   isPublished: boolean;
@@ -27,6 +40,12 @@ interface BedtimeStoriesArchiveProps {
 export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveProps) {
   const [selectedStory, setSelectedStory] = useState<BedtimeStory | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: allStories = [], isLoading } = useQuery<BedtimeStory[]>({
     queryKey: ["/api/bedtime-stories"],
@@ -36,6 +55,15 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
 
   const stories = allStories.filter(story => story.isPublished);
 
+  // Get current story index in the playlist
+  const currentStoryIndex = selectedStory 
+    ? stories.findIndex(story => story.id === selectedStory.id)
+    : -1;
+  
+  // Check if we're at the first or last story
+  const isFirstStory = currentStoryIndex === 0;
+  const isLastStory = currentStoryIndex === stories.length - 1;
+
   const formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), "dd/MM/yyyy");
@@ -43,6 +71,140 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
       return dateString;
     }
   };
+
+  const formatTime = (seconds: number): string => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const pauseCurrentAudio = () => {
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const toggleAudio = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.error("[Audio] Play failed:", err);
+      });
+    }
+  };
+
+  const handleAudioTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (audio && audio.duration) {
+      setAudioProgress((audio.currentTime / audio.duration) * 100);
+      setAudioCurrentTime(audio.currentTime);
+      setAudioDuration(audio.duration);
+    }
+  };
+
+  const handleAudioLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (audio && audio.duration) {
+      setAudioDuration(audio.duration);
+    }
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+    setAudioProgress(0);
+    setAudioCurrentTime(0);
+    
+    // Auto-play next lesson after 2 seconds if not at the last story
+    if (!isLastStory && currentStoryIndex >= 0) {
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        goToNextStory();
+      }, 2000);
+    }
+  };
+
+  const seekBackward = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+    setAudioProgress((audio.currentTime / audio.duration) * 100);
+  };
+
+  const seekForward = () => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    audio.currentTime = Math.min(audio.duration, audio.currentTime + 15);
+    setAudioProgress((audio.currentTime / audio.duration) * 100);
+  };
+
+  const goToPreviousStory = () => {
+    if (isFirstStory || currentStoryIndex < 0) return;
+    const previousStory = stories[currentStoryIndex - 1];
+    if (previousStory) {
+      pauseCurrentAudio();
+      setSelectedStory(previousStory);
+      setCurrentImageIndex(0);
+    }
+  };
+
+  const goToNextStory = () => {
+    if (isLastStory || currentStoryIndex < 0) return;
+    const nextStory = stories[currentStoryIndex + 1];
+    if (nextStory) {
+      pauseCurrentAudio();
+      setSelectedStory(nextStory);
+      setCurrentImageIndex(0);
+    }
+  };
+
+  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const audio = e.currentTarget;
+    console.error("[Audio] Error playing audio:", audio.error?.message, audio.error?.code);
+    setIsPlaying(false);
+  };
+
+  // Auto-slideshow when audio is playing
+  useEffect(() => {
+    if (!isPlaying || !selectedStory || selectedStory.images.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex(prev => (prev + 1) % selectedStory.images.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isPlaying, selectedStory]);
+
+  // Reset audio when story changes
+  useEffect(() => {
+    setIsPlaying(false);
+    setAudioProgress(0);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    
+    // Clear any pending auto-play timeout
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+  }, [selectedStory?.id]);
+
+  // Cleanup auto-play timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (autoPlayTimeoutRef.current) {
+        clearTimeout(autoPlayTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (selectedStory) {
     return (
@@ -91,16 +253,115 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
             </div>
           )}
 
+          {/* Audio Player */}
+          {selectedStory.audioUrl && (
+            <div className="bg-gradient-to-r from-purple-600/30 to-indigo-600/30 rounded-xl p-5 border border-purple-500/30 mb-6">
+              {/* Playlist Position Indicator and Navigation */}
+              {stories.length > 1 && currentStoryIndex >= 0 && (
+                <div className="flex items-center justify-between mb-3 pb-3 border-b border-purple-500/20">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-purple-300" />
+                    <span className="text-sm text-purple-200 font-medium">
+                      Casharka {currentStoryIndex + 1} / {stories.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={goToPreviousStory}
+                      disabled={isFirstStory}
+                      size="sm"
+                      className="h-8 px-3 bg-purple-700/50 hover:bg-purple-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      data-testid="button-previous-story"
+                    >
+                      <SkipBack className="w-4 h-4 text-white mr-1" />
+                      <span className="text-xs text-white">Hore</span>
+                    </Button>
+                    <Button
+                      onClick={goToNextStory}
+                      disabled={isLastStory}
+                      size="sm"
+                      className="h-8 px-3 bg-purple-700/50 hover:bg-purple-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      data-testid="button-next-story"
+                    >
+                      <span className="text-xs text-white">Xiga</span>
+                      <SkipForward className="w-4 h-4 text-white ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={seekBackward}
+                  size="icon"
+                  className="h-10 w-10 rounded-full bg-purple-700/50 hover:bg-purple-600/50 flex-shrink-0"
+                  data-testid="button-seek-backward"
+                >
+                  <RotateCcw className="w-5 h-5 text-white" />
+                </Button>
+                <Button
+                  onClick={toggleAudio}
+                  size="icon"
+                  className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 flex-shrink-0"
+                  data-testid="button-play-audio"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-6 h-6 text-white" />
+                  ) : (
+                    <Play className="w-6 h-6 text-white ml-1" />
+                  )}
+                </Button>
+                <Button
+                  onClick={seekForward}
+                  size="icon"
+                  className="h-10 w-10 rounded-full bg-purple-700/50 hover:bg-purple-600/50 flex-shrink-0"
+                  data-testid="button-seek-forward"
+                >
+                  <RotateCw className="w-5 h-5 text-white" />
+                </Button>
+                <div className="flex-1 ml-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Volume2 className="w-5 h-5 text-purple-300" />
+                    <h3 className="font-semibold text-purple-200">
+                      Dhagayso Sheekada
+                    </h3>
+                  </div>
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-400 to-pink-500 transition-all duration-200"
+                      style={{ width: `${audioProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-purple-200 mt-2" data-testid="text-audio-time">
+                    {formatTime(audioCurrentTime)} / {formatTime(audioDuration)}
+                  </p>
+                </div>
+              </div>
+              
+              <audio
+                ref={audioRef}
+                src={getProxyAudioUrl(selectedStory.audioUrl) || undefined}
+                onTimeUpdate={handleAudioTimeUpdate}
+                onLoadedMetadata={handleAudioLoadedMetadata}
+                onEnded={handleAudioEnded}
+                onError={handleAudioError}
+                preload="auto"
+                playsInline
+              />
+            </div>
+          )}
+
           <Card className="bg-slate-800/60 border-slate-700 mb-6">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
-                <div className="px-3 py-1 bg-indigo-500/30 text-indigo-300 rounded-full text-xs font-medium">
-                  {selectedStory.characterType === "sahabi" ? "Saxaabi" : "Taabiciin"}
-                </div>
-                <span className="text-slate-400 text-sm">{selectedStory.characterName}</span>
+                <Badge className="bg-indigo-600 text-white px-3 py-1">
+                  {selectedStory.characterType === "sahabi" ? "Saxaabi" : "Taabiciin"}: {selectedStory.characterName} {BLESSING_TEXT}
+                </Badge>
               </div>
-              <div className="text-slate-200 leading-relaxed whitespace-pre-wrap">
-                {selectedStory.content}
+              <div className={`${isPlaying ? 'hidden' : ''}`}>
+                <div className="text-slate-200 leading-relaxed whitespace-pre-wrap mb-4">
+                  {selectedStory.content}
+                </div>
               </div>
             </CardContent>
           </Card>

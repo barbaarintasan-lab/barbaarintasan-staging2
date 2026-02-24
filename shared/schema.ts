@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, real, uniqueIndex, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, real, uniqueIndex, date, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1638,6 +1638,7 @@ export const parentMessages = pgTable("parent_messages", {
   updatedAt: timestamp("updated_at"),
   isPublished: boolean("is_published").notNull().default(true),
   authorName: varchar("author_name", { length: 255 }).default("Musse Said Aw-Musse"),
+  ageCategory: varchar("age_category", { length: 50 }),
 }, (table) => [
   uniqueIndex("parent_messages_date_unique").on(table.messageDate),
 ]);
@@ -1645,6 +1646,38 @@ export const parentMessages = pgTable("parent_messages", {
 export const insertParentMessageSchema = createInsertSchema(parentMessages).omit({ id: true, generatedAt: true });
 export type InsertParentMessage = z.infer<typeof insertParentMessageSchema>;
 export type ParentMessage = typeof parentMessages.$inferSelect;
+
+// ============================================
+// TALOOYINKA WAALIDKA (PARENT TIPS BY DEV STAGE)
+// ============================================
+
+export const DEVELOPMENTAL_STAGES = [
+  { id: "newborn-0-3m", label: "Murjux (0-3 bilood)", labelEn: "Newborn (0-3 months)" },
+  { id: "infant-3-6m", label: "Fadhi-barad (3-6 bilood)", labelEn: "Infant (3-6 months)" },
+  { id: "infant-6-12m", label: "Gurguurte (6-12 bilood)", labelEn: "Infant (6-12 months)" },
+  { id: "toddler-1-2y", label: "Socod barad (1-2 sano)", labelEn: "Toddler (1-2 years)" },
+  { id: "toddler-2-3y", label: "Inyow (2-3 sano)", labelEn: "Toddler (2-3 years)" },
+  { id: "preschool-3-5y", label: "Dareeme (3-5 sano)", labelEn: "Preschool (3-5 years)" },
+  { id: "school-age-5-7y", label: "Salaad-barad (5-7 sano)", labelEn: "School Age (5-7 years)" },
+] as const;
+
+export const parentTips = pgTable("parent_tips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 500 }).notNull(),
+  content: text("content").notNull(),
+  stage: varchar("stage", { length: 50 }).notNull(),
+  topic: varchar("topic", { length: 255 }).notNull(),
+  keyPoints: text("key_points"),
+  images: text("images").array().notNull().default(sql`ARRAY[]::text[]`),
+  audioUrl: text("audio_url"),
+  tipDate: date("tip_date").notNull(),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  isPublished: boolean("is_published").notNull().default(true),
+});
+
+export const insertParentTipSchema = createInsertSchema(parentTips).omit({ id: true, generatedAt: true });
+export type InsertParentTip = z.infer<typeof insertParentTipSchema>;
+export type ParentTip = typeof parentTips.$inferSelect;
 
 // ============================================
 // CONTENT ENGAGEMENT (REACTIONS & COMMENTS)
@@ -2061,16 +2094,96 @@ export type ContentProgress = typeof contentProgress.$inferSelect;
 
 export const googleMeetEvents = pgTable("google_meet_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: text("title").notNull().default("Kulanka Bahda Tarbiyadda Caruurta"),
+  title: text("title").notNull(),
   description: text("description"),
   meetLink: text("meet_link").notNull(),
   eventDate: text("event_date").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  mediaType: text("media_type").notNull().default("video"),
+  mediaTitle: text("media_title"),
+  driveFileId: text("drive_file_id"),
+  isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertGoogleMeetEventSchema = createInsertSchema(googleMeetEvents).omit({ id: true, createdAt: true });
 export type InsertGoogleMeetEvent = z.infer<typeof insertGoogleMeetEventSchema>;
 export type GoogleMeetEvent = typeof googleMeetEvents.$inferSelect;
+
+// ============================================
+// OPENAI BATCH API PROCESSING
+// ============================================
+
+// Batch Jobs table - tracks OpenAI batch API jobs
+export const batchJobs = pgTable("batch_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: text("batch_id"), // OpenAI batch job ID
+  type: text("type").notNull(), // 'translation', 'summary', 'quiz_improvement'
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed, cancelled
+  inputFileId: text("input_file_id"), // OpenAI file ID for input
+  outputFileId: text("output_file_id"), // OpenAI file ID for output
+  errorFileId: text("error_file_id"), // OpenAI file ID for errors
+  totalRequests: integer("total_requests").notNull().default(0),
+  completedRequests: integer("completed_requests").notNull().default(0),
+  failedRequests: integer("failed_requests").notNull().default(0),
+  metadata: text("metadata"), // JSON string with additional info (consider jsonb in future for better queries)
+  error: text("error"), // Error message if failed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertBatchJobSchema = createInsertSchema(batchJobs).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBatchJob = z.infer<typeof insertBatchJobSchema>;
+export type BatchJob = typeof batchJobs.$inferSelect;
+
+// Batch Job Items table - tracks individual items within a batch
+export const batchJobItems = pgTable("batch_job_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchJobId: varchar("batch_job_id").notNull().references(() => batchJobs.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // 'lesson', 'quiz_question', etc.
+  entityId: varchar("entity_id").notNull(), // ID of the lesson/quiz/etc.
+  customId: text("custom_id").notNull(), // Custom ID for tracking in batch request
+  status: text("status").notNull().default("pending"), // pending, completed, failed
+  request: text("request"), // JSON string of the request
+  response: text("response"), // JSON string of the response
+  error: text("error"), // Error message if failed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertBatchJobItemSchema = createInsertSchema(batchJobItems).omit({ id: true, createdAt: true });
+export type InsertBatchJobItem = z.infer<typeof insertBatchJobItemSchema>;
+export type BatchJobItem = typeof batchJobItems.$inferSelect;
+
+// Translations table - stores translated content for lessons
+export const translations = pgTable("translations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // 'lesson', 'quiz_question', etc.
+  entityId: varchar("entity_id").notNull(), // ID of the lesson/quiz/etc.
+  fieldName: text("field_name").notNull(), // 'title', 'description', 'textContent', etc.
+  sourceLanguage: text("source_language").notNull().default("somali"),
+  targetLanguage: text("target_language").notNull(), // 'english', 'arabic', etc.
+  translatedText: text("translated_text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("translation_unique").on(table.entityType, table.entityId, table.fieldName, table.targetLanguage),
+]);
+
+export const insertTranslationSchema = createInsertSchema(translations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTranslation = z.infer<typeof insertTranslationSchema>;
+export type Translation = typeof translations.$inferSelect;
+
+export const ssoTokens = pgTable("sso_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  userId: integer("user_id").notNull(),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  used: boolean("used").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

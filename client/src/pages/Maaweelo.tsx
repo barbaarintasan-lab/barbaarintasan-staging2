@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { 
   Moon, 
   Star, 
@@ -35,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { toast } from "sonner";
 import { ShareButton, ContentReactions, ContentComments, ThankYouModal } from "@/components/engagement";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function getProxyAudioUrl(audioUrl: string | null): string | null {
   if (!audioUrl) return null;
@@ -62,6 +64,8 @@ interface BedtimeStory {
 }
 
 export default function Maaweelo() {
+  const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const [, setLocation] = useLocation();
   const [selectedStory, setSelectedStory] = useState<BedtimeStory | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -181,11 +185,11 @@ export default function Maaweelo() {
   }, [selectedStory?.id]);
 
   const { data: todayStory, isLoading: loadingToday } = useQuery<BedtimeStory>({
-    queryKey: ["/api/bedtime-stories/today"],
+    queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
   });
 
   const { data: allStories, isLoading: loadingAll } = useQuery<BedtimeStory[]>({
-    queryKey: ["/api/bedtime-stories"],
+    queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
   });
 
   const { data: sheekoProgress = [] } = useQuery<{ contentId: string }[]>({
@@ -215,7 +219,7 @@ export default function Maaweelo() {
       queryClient.invalidateQueries({ queryKey: ["earnedBadges"] });
       queryClient.invalidateQueries({ queryKey: ["contentProgressSummary"] });
       if (data.awardedBadges?.length > 0) {
-        toast.success(`🏆 Abaalmarin cusub: ${data.awardedBadges.join(", ")}`);
+        toast.success(t("maaweelo.newBadge", { badges: data.awardedBadges.join(", ") }));
       }
     },
   });
@@ -255,14 +259,14 @@ export default function Maaweelo() {
       return res.json();
     },
     onSuccess: (updatedStory) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bedtime-stories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bedtime-stories/today"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`] });
       setSelectedStory(updatedStory);
       setIsEditing(false);
-      toast.success("Sheekada waa la cusboonaysiiyay!");
+      toast.success(t("maaweelo.storyUpdated"));
     },
     onError: () => {
-      toast.error("Wax qalad ah ayaa dhacay");
+      toast.error(t("maaweelo.errorOccurred"));
     },
   });
 
@@ -275,13 +279,13 @@ export default function Maaweelo() {
       return res.json();
     },
     onSuccess: (updatedStory) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bedtime-stories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bedtime-stories/today"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`] });
       setSelectedStory(updatedStory);
-      toast.success("Codka waa la sameeyay!");
+      toast.success(t("maaweelo.audioGenerated"));
     },
     onError: () => {
-      toast.error("Codka lama samayn karin");
+      toast.error(t("maaweelo.audioError"));
     },
   });
 
@@ -366,7 +370,7 @@ export default function Maaweelo() {
               {isToday && (
                 <Badge className="absolute top-2 right-2 bg-yellow-500 text-black">
                   <Sparkles className="w-3 h-3 mr-1" />
-                  Caawaysinka
+                  {t("maaweelo.tonightBadge")}
                 </Badge>
               )}
             </div>
@@ -381,16 +385,16 @@ export default function Maaweelo() {
             </div>
             <div className="flex items-center gap-2">
               <Badge className="text-xs bg-indigo-600 text-white">
-                {story.characterType === "sahabi" ? "Saxaabi" : "Taabiciin"}
+                {story.characterType === "sahabi" ? t("maaweelo.sahabi") : t("maaweelo.taabiciin")}
               </Badge>
               <span className="text-sm text-white font-medium">
-                {story.characterName} (Allaha ka Raali Noqdo)
+                {story.characterName} {t("maaweelo.blessing")}
               </span>
             </div>
             {parent && readIds.has(story.id) && (
               <div className="flex items-center gap-1 mt-1">
                 <CheckCircle2 className="w-4 h-4 text-indigo-400" />
-                <span className="text-indigo-400 text-xs">Waa la dhageystay</span>
+                <span className="text-indigo-400 text-xs">{t("maaweelo.alreadyListened")}</span>
               </div>
             )}
           </div>
@@ -440,10 +444,10 @@ export default function Maaweelo() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">
-                Sheekada Hurdada
+                {t("maaweelo.title")}
               </h1>
               <p className="text-slate-400 text-sm">
-                ku saabsan Saxaabadii & Taabiciyiintii Hore
+                {t("maaweelo.subtitle")}
               </p>
             </div>
           </div>
@@ -454,15 +458,15 @@ export default function Maaweelo() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-indigo-400" />
-                <span className="text-white font-semibold text-sm">Horumarka Dhagaysigaaga</span>
+                <span className="text-white font-semibold text-sm">{t("maaweelo.listeningProgress")}</span>
               </div>
               <span className="text-indigo-300 text-sm font-bold">{readIds.size}/{allStories.length}</span>
             </div>
             <Progress value={(readIds.size / allStories.length) * 100} className="h-2 bg-slate-700" />
             <p className="text-slate-400 text-xs mt-2">
-              {readIds.size === 0 ? "Billow dhagaysigaaga maanta!" : 
-               readIds.size === allStories.length ? "Hambalyo! Dhammaan ayaad dhageysatay! 🎉" :
-               `${allStories.length - readIds.size} sheeko ayaad weli dhageysan la'dahay`}
+              {readIds.size === 0 ? t("maaweelo.startListeningToday") : 
+               readIds.size === allStories.length ? t("maaweelo.congratsAllListened") :
+               t("maaweelo.remainingStories", { count: allStories.length - readIds.size })}
             </p>
           </div>
         )}
@@ -479,7 +483,7 @@ export default function Maaweelo() {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-              <h2 className="text-xl font-semibold text-white">Sheekadeena Cawaysinka</h2>
+              <h2 className="text-xl font-semibold text-white">{t("maaweelo.tonightsStory")}</h2>
             </div>
             <StoryCard story={todayStory} isToday />
           </div>
@@ -488,10 +492,10 @@ export default function Maaweelo() {
             <CardContent className="p-8 text-center">
               <Moon className="w-12 h-12 text-slate-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-300 mb-2">
-                Maanta sheeko cusub ma jirto
+                {t("maaweelo.noStoryToday")}
               </h3>
               <p className="text-slate-500 text-sm">
-                Sheekooyin cusub way imanayaan!
+                {t("maaweelo.newStoriesComing")}
               </p>
             </CardContent>
           </Card>
@@ -500,7 +504,7 @@ export default function Maaweelo() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-xl font-semibold text-white">Sheekooyinkeeni Hore</h2>
+            <h2 className="text-xl font-semibold text-white">{t("maaweelo.previousStories")}</h2>
           </div>
           
           {loadingAll ? (
@@ -565,7 +569,7 @@ export default function Maaweelo() {
               <CardContent className="p-8 text-center">
                 <BookOpen className="w-12 h-12 text-slate-500 mx-auto mb-4" />
                 <p className="text-slate-400">
-                  Sheekooyinka aan wali la diyaarin
+                  {t("maaweelo.storiesNotPrepared")}
                 </p>
               </CardContent>
             </Card>
@@ -690,7 +694,7 @@ export default function Maaweelo() {
                         <div className="flex items-center gap-2 mb-1">
                           <Volume2 className="w-5 h-5 text-purple-300" />
                           <h3 className="font-semibold text-purple-200">
-                            Dhagayso Sheekada
+                            {t("maaweelo.listenToStory")}
                           </h3>
                         </div>
                         <div className="h-2 bg-white/20 rounded-full overflow-hidden">
@@ -700,7 +704,7 @@ export default function Maaweelo() {
                           />
                         </div>
                         <p className="text-sm text-purple-200 mt-2" data-testid="text-audio-time">
-                          Dhagaysiga cajladani waa: {formatTime(audioCurrentTime)} / {formatTime(audioDuration)}
+                          {t("maaweelo.audioPlaybackTime")} {formatTime(audioCurrentTime)} / {formatTime(audioDuration)}
                         </p>
                       </div>
                     </div>
@@ -721,7 +725,7 @@ export default function Maaweelo() {
                 <div className="bg-slate-800/50 rounded-xl p-4 mb-4 space-y-4">
                   <ShareButton
                     title={selectedStory.titleSomali}
-                    text={`${selectedStory.titleSomali} - Sheeko caruurta oo Soomaaliya ah`}
+                    text={`${selectedStory.titleSomali} - ${t("maaweelo.shareText")}`}
                     url={`${window.location.origin}/maaweelo?story=${selectedStory.id}`}
                   />
                   
@@ -755,8 +759,8 @@ export default function Maaweelo() {
                       <Users className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-white font-bold text-sm">Ku Biir Guruubka lagu falanqeeyo Casharkan</p>
-                      <p className="text-indigo-100 text-xs">Waalidiinta kale la wadaag fikradahaaga</p>
+                      <p className="text-white font-bold text-sm">{t("maaweelo.joinGroup")}</p>
+                      <p className="text-indigo-100 text-xs">{t("maaweelo.shareIdeas")}</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-white/80" />
                   </div>
@@ -767,7 +771,7 @@ export default function Maaweelo() {
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
                       <Badge className="mb-3 bg-indigo-600 text-white px-3 py-1">
-                        {selectedStory.characterType === "sahabi" ? "Saxaabi" : "Taabiciin"}: {selectedStory.characterName} (Allaha ka Raali Noqdo)
+                        {selectedStory.characterType === "sahabi" ? t("maaweelo.sahabi") : t("maaweelo.taabiciin")}: {selectedStory.characterName} {t("maaweelo.blessing")}
                       </Badge>
                       <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
                         {selectedStory.titleSomali}
@@ -795,7 +799,7 @@ export default function Maaweelo() {
                           <Heart className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
                           <div>
                             <h3 className="font-semibold text-yellow-300 mb-1">
-                              Casharka Muhiimka ah
+                              {t("maaweelo.importantLesson")}
                             </h3>
                             <p className="text-yellow-100/80">
                               {selectedStory.moralLesson}
@@ -829,7 +833,7 @@ export default function Maaweelo() {
                           data-testid="button-edit-story"
                         >
                           <Pencil className="w-4 h-4 mr-2" />
-                          Sheekada Wax Ka Badel
+                          {t("maaweelo.editStory")}
                         </Button>
                         <Button
                           onClick={() => selectedStory && generateAudioMutation.mutate(selectedStory.id)}
@@ -842,7 +846,7 @@ export default function Maaweelo() {
                           ) : (
                             <Mic className="w-4 h-4 mr-2" />
                           )}
-                          {generateAudioMutation.isPending ? "Codka waa la sameynayaa..." : (selectedStory?.audioUrl ? "Codka Dib u Samee" : "Codka Samee")}
+                          {generateAudioMutation.isPending ? t("maaweelo.generatingAudio") : (selectedStory?.audioUrl ? t("maaweelo.regenerateAudio") : t("maaweelo.generateAudio"))}
                         </Button>
                       </div>
                     </div>
@@ -852,38 +856,38 @@ export default function Maaweelo() {
                     <div className="pt-6 border-t border-slate-700 space-y-4">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                         <Pencil className="w-5 h-5 text-indigo-400" />
-                        Sheekada Wax Ka Badel
+                        {t("maaweelo.editStory")}
                       </h3>
                       
                       <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Cinwaanka Soomaaliga</label>
+                        <label className="text-sm text-slate-400 mb-1 block">{t("maaweelo.somaliTitleLabel")}</label>
                         <Input
                           value={editTitle}
                           onChange={(e) => setEditTitle(e.target.value)}
                           className="bg-slate-800 border-slate-600 text-white"
-                          placeholder="Cinwaanka sheekada..."
+                          placeholder={t("maaweelo.storyTitlePlaceholder")}
                           data-testid="input-edit-title"
                         />
                       </div>
                       
                       <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Sheekada</label>
+                        <label className="text-sm text-slate-400 mb-1 block">{t("maaweelo.storyLabel")}</label>
                         <Textarea
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
                           className="bg-slate-800 border-slate-600 text-white min-h-[200px]"
-                          placeholder="Sheekada oo buuxa..."
+                          placeholder={t("maaweelo.fullStoryPlaceholder")}
                           data-testid="input-edit-content"
                         />
                       </div>
                       
                       <div>
-                        <label className="text-sm text-slate-400 mb-1 block">Casharka Muhiimka ah</label>
+                        <label className="text-sm text-slate-400 mb-1 block">{t("maaweelo.moralLessonLabel")}</label>
                         <Textarea
                           value={editMoralLesson}
                           onChange={(e) => setEditMoralLesson(e.target.value)}
                           className="bg-slate-800 border-slate-600 text-white min-h-[80px]"
-                          placeholder="Casharka sheekada..."
+                          placeholder={t("maaweelo.storyLessonPlaceholder")}
                           data-testid="input-edit-moral"
                         />
                       </div>
@@ -896,7 +900,7 @@ export default function Maaweelo() {
                           data-testid="button-cancel-edit"
                         >
                           <X className="w-4 h-4 mr-2" />
-                          Ka noqo
+                          {t("maaweelo.cancel")}
                         </Button>
                         <Button
                           onClick={saveChanges}
@@ -909,7 +913,7 @@ export default function Maaweelo() {
                           ) : (
                             <Save className="w-4 h-4 mr-2" />
                           )}
-                          Kaydi
+                          {t("maaweelo.save")}
                         </Button>
                       </div>
                     </div>

@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { openSSOLink } from "@/lib/api";
 import { ArrowLeft, Video, Calendar, Clock, Users, CheckCircle, ExternalLink, Play, Lock, X } from "lucide-react";
 import { Link } from "wouter";
 import BottomNav from "@/components/BottomNav";
@@ -42,6 +44,7 @@ interface Enrollment {
 }
 
 export default function Events() {
+  const { t } = useTranslation();
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
   const [playingEventId, setPlayingEventId] = useState<string | null>(null);
@@ -107,9 +110,9 @@ export default function Events() {
   };
 
   const eventTypeLabels: Record<string, string> = {
-    qa: "Su'aal & Jawaab",
+    qa: t("events:qaLabel"),
     webinar: "Webinar",
-    workshop: "Warshad",
+    workshop: t("events:workshopLabel"),
   };
 
   return (
@@ -123,8 +126,8 @@ export default function Events() {
               </button>
             </Link>
             <div>
-              <h1 className="font-bold text-white text-lg">Live Q&A iyo Dhacdooyinka</h1>
-              <p className="text-red-100 text-sm">Ku soo biir wareysiyada tooska ah</p>
+              <h1 className="font-bold text-white text-lg">{t("events:headerTitle")}</h1>
+              <p className="text-red-100 text-sm">{t("events:headerSubtitle")}</p>
             </div>
           </div>
         </div>
@@ -135,7 +138,7 @@ export default function Events() {
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Dhacdooyinka Soo Socda
+              {t("events:upcomingEvents")}
             </h2>
             <div className="space-y-3">
               {upcomingEvents.map(event => {
@@ -166,7 +169,7 @@ export default function Events() {
                           {event.duration && (
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {event.duration} daqiiqo
+                              {event.duration} {t("events:minutes")}
                             </span>
                           )}
                           {event.hostName && (
@@ -181,7 +184,7 @@ export default function Events() {
                             {hasRsvp ? (
                               <div className="flex items-center gap-2 text-green-600">
                                 <CheckCircle className="w-4 h-4" />
-                                <span className="text-sm font-medium">Waxaad is diwaangelisay!</span>
+                                <span className="text-sm font-medium">{t("events:rsvpConfirmed")}</span>
                               </div>
                             ) : (
                               <button
@@ -190,7 +193,7 @@ export default function Events() {
                                 className="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all disabled:opacity-50"
                                 data-testid={`button-rsvp-${event.id}`}
                               >
-                                Is Diwaangeli
+                                {t("events:rsvpButton")}
                               </button>
                             )}
                             {event.meetingUrl && (
@@ -203,14 +206,14 @@ export default function Events() {
                                   data-testid={`button-join-${event.id}`}
                                 >
                                   <Video className="w-4 h-4" />
-                                  Ku biir Meeting-ka
+                                  {t("events:joinMeeting")}
                                   <ExternalLink className="w-3 h-3" />
                                 </a>
                               ) : (
-                                <div className="flex items-center gap-2 bg-gray-100 text-gray-500 text-sm px-4 py-2 rounded-lg">
+                                <button onClick={openSSOLink} className="flex items-center gap-2 bg-gray-100 text-gray-500 text-sm px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
                                   <Lock className="w-4 h-4" />
-                                  <span>Koorso iibso si aad meeting-ka ugu biirto</span>
-                                </div>
+                                  <span>{t("events:visitWebsiteForMeeting")}</span>
+                                </button>
                               )
                             )}
                           </div>
@@ -218,7 +221,7 @@ export default function Events() {
                         {!parent && event.meetingUrl && (
                           <div className="mt-3 flex items-center gap-2 bg-gray-100 text-gray-500 text-sm px-4 py-2 rounded-lg">
                             <Lock className="w-4 h-4" />
-                            <span>Gal akoonkaaga si aad meeting-ka ugu biirto</span>
+                            <span>{t("events:loginForMeeting")}</span>
                           </div>
                         )}
                       </div>
@@ -232,7 +235,7 @@ export default function Events() {
 
         {pastEvents.length > 0 && (
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-3">Dhacdooyinkii Hore</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">{t("events:pastEvents")}</h2>
             <div className="space-y-3">
               {pastEvents.map(event => (
                 <div
@@ -252,7 +255,7 @@ export default function Events() {
                           {playingEventId === event.id ? (
                             <div className="mt-3">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-700">Recording-ka</span>
+                                <span className="text-sm font-medium text-gray-700">{t("events:recording")}</span>
                                 <button
                                   onClick={() => setPlayingEventId(null)}
                                   className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center"
@@ -279,7 +282,7 @@ export default function Events() {
                                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                                 >
                                   <ExternalLink className="w-4 h-4" />
-                                  Fur Recording-ka
+                                  {t("events:openRecording")}
                                 </a>
                               )}
                             </div>
@@ -290,7 +293,7 @@ export default function Events() {
                               data-testid={`button-play-${event.id}`}
                             >
                               <Play className="w-4 h-4" />
-                              Daawo Recording-ka
+                              {t("events:watchRecording")}
                             </button>
                           )}
                         </>
@@ -306,13 +309,13 @@ export default function Events() {
         {events.length === 0 && (
           <div className="bg-white rounded-xl p-8 text-center">
             <Video className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">Wali ma jiraan dhacdooyin la qorsheeyay</p>
+            <p className="text-gray-500">{t("events:noEventsPlanned")}</p>
           </div>
         )}
 
         {!parent && events.length > 0 && (
           <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 text-center">
-            <p className="text-red-800 text-sm">Fadlan gal akoonkaaga si aad u is diwaangeliso dhacdooyinka</p>
+            <p className="text-red-800 text-sm">{t("events:loginToRegister")}</p>
           </div>
         )}
       </div>

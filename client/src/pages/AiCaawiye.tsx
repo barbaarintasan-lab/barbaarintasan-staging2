@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { ChevronLeft, BookOpen, Heart, Bot, ChevronRight, Sparkles, Crown, Timer, Star, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { openSSOLink } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useEffect, useState } from "react";
@@ -23,7 +24,6 @@ export default function AiCaawiye() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [goldSuccessShown, setGoldSuccessShown] = useState(false);
 
   const handleShareAi = async () => {
     const shareData = {
@@ -60,27 +60,6 @@ export default function AiCaawiye() {
     },
   });
 
-  const goldCheckoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/ai/gold-checkout");
-      return res.json();
-    },
-    onSuccess: (data: { url: string }) => {
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-  });
-
-  useEffect(() => {
-    if (!goldSuccessShown && location.includes("gold=success")) {
-      setGoldSuccessShown(true);
-      toast({
-        title: "Hambalyo! 🎉",
-        description: "Waxaad noqotay Xubin Dahabi. Ku raaxayso AI Caawiyaha!",
-      });
-    }
-  }, [location, goldSuccessShown, toast]);
 
   if (!parent) {
     return (
@@ -103,33 +82,27 @@ export default function AiCaawiye() {
 
   if (accessStatus?.trialExpired) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col items-center justify-center px-4">
-        <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-full flex items-center justify-center mb-4 shadow-lg">
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center justify-center px-4">
+        <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center mb-4 shadow-lg">
           <Crown className="w-10 h-10 text-white" />
         </div>
         <h2 className="text-xl font-bold text-gray-800 mb-3" data-testid="text-trial-expired-title">
-          Trial-kaagii wuu dhammaaday
+          Tijaabadaadii way dhamaatay
         </h2>
-        {accessStatus.membershipAdvice && (
-          <p className="text-gray-600 mb-6 text-center max-w-md leading-relaxed" data-testid="text-membership-advice">
-            {accessStatus.membershipAdvice}
-          </p>
-        )}
+        <p className="text-gray-600 mb-6 text-center max-w-md leading-relaxed" data-testid="text-membership-advice">
+          Si aad AI Caawiye u sii isticmaasho, fadlan booqo websaydhkeena barbaarintasan.com
+        </p>
         <Button
-          onClick={() => goldCheckoutMutation.mutate()}
-          disabled={goldCheckoutMutation.isPending}
-          className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold px-8 py-3 text-lg rounded-xl shadow-lg"
-          data-testid="button-gold-checkout"
+          onClick={openSSOLink}
+          className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-8 py-3 text-lg rounded-xl shadow-lg"
+          data-testid="button-visit-website"
         >
-          <Crown className="w-5 h-5 mr-2" />
-          {goldCheckoutMutation.isPending ? "Sugitaan..." : "Noqo Xubin Dahabi 💛"}
+          🌐 Booqo barbaarintasan.com
         </Button>
-        <Link href="/">
-          <Button variant="ghost" className="mt-4 text-gray-500" data-testid="button-back-home">
+        <Button variant="ghost" className="mt-4 text-gray-500" data-testid="button-back-home" onClick={() => window.history.back()}>
             <ChevronLeft className="w-4 h-4 mr-1" />
             Ku noqo Bogga Hore
           </Button>
-        </Link>
       </div>
     );
   }
@@ -148,16 +121,15 @@ export default function AiCaawiye() {
 
       <header className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white sticky top-0 z-40 shadow-lg">
         <div className="px-4 py-3 flex items-center gap-3">
-          <Link href="/">
             <Button
               variant="ghost"
               size="icon"
               className="rounded-full text-white hover:bg-white/20"
               data-testid="button-back"
+              onClick={() => window.history.back()}
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
-          </Link>
           <div className="flex items-center gap-2 flex-1">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <Sparkles className="w-4 h-4" />

@@ -235,6 +235,45 @@ Guruubka Barbaarintasan Academy`;
 }
 
 // Appointment reminder - 1 hour before
+export async function sendTelegramAudio(
+  audioUrl: string,
+  caption: string,
+  chatId?: string
+): Promise<{ messageId: number; fileId: string } | null> {
+  const targetChatId = chatId || TELEGRAM_GROUP_CHAT_ID;
+  if (!TELEGRAM_BOT_TOKEN || !targetChatId) {
+    console.error("[Telegram] Bot token or chat ID not configured for audio send");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}/sendAudio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: targetChatId,
+        audio: audioUrl,
+        caption: caption,
+        parse_mode: "HTML",
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      console.error("[Telegram] Failed to send audio:", result.description);
+      return null;
+    }
+
+    const messageId = result.result.message_id;
+    const fileId = result.result.audio?.file_id || "";
+    console.log(`[Telegram] Audio sent successfully, message_id: ${messageId}, file_id: ${fileId}`);
+    return { messageId, fileId };
+  } catch (error) {
+    console.error("[Telegram] Error sending audio:", error);
+    return null;
+  }
+}
+
 export async function sendTelegramAppointmentReminder(
   chatId: string,
   parentName: string,
