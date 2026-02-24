@@ -2434,6 +2434,14 @@ Ka jawaab qaabkan JSON ah:
       // Mark token as used
       await storage.markPasswordResetTokenUsed(token);
 
+      // Sync password reset to WordPress
+      const parent = await storage.getParent(resetToken.parentId);
+      if (parent?.email) {
+        syncPasswordResetToWordPress(parent.email, hashedPassword).catch(err => {
+          console.error('[WP-SYNC] Background password sync failed:', err);
+        });
+      }
+
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
       console.error("Reset password error:", error);
@@ -15690,6 +15698,35 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       }
     } catch (error) {
       console.error(`[WP-SYNC] Error syncing user to WordPress: ${email}`, error);
+    }
+  }
+
+  async function syncPasswordResetToWordPress(email: string, newPasswordHash: string) {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-SYNC] WORDPRESS_API_KEY not set - skipping password reset sync');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${WORDPRESS_SITE_URL}/wp-json/bsa/v1/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, password_hash: newPasswordHash }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log(`[WP-SYNC] Password reset synced to WordPress: ${email}`);
+      } else {
+        console.error(`[WP-SYNC] Failed to sync password reset to WordPress: ${email}`, result);
+      }
+    } catch (error) {
+      console.error(`[WP-SYNC] Error syncing password reset to WordPress: ${email}`, error);
     }
   }
 
