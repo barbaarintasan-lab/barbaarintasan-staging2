@@ -21,6 +21,14 @@ export async function serveStatic(app: Express, server: Server) {
     immutable: true,
   }));
 
+  app.use("/.well-known", express.static(path.join(distPath, ".well-known"), {
+    dotfiles: "allow",
+    maxAge: 0,
+    setHeaders: (res) => {
+      res.setHeader("Content-Type", "application/json");
+    },
+  }));
+
   app.use(express.static(distPath, {
     maxAge: 0,
     setHeaders: (res, filePath) => {
