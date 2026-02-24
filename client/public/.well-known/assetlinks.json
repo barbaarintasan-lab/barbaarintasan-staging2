@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.barbaarintasan.academy",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_YOUR_SHA256_FINGERPRINT"
+        "5A:C3:60:89:CA:37:D5:81:E9:37:CC:18:94:C2:1C:E8:43:C8:A3:B9:72:B0:C7:8D:BF:BD:E1:CC:8A:14:BE:62"
       ]
     }
   }
