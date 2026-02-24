@@ -1,5 +1,6 @@
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
+const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 const STATIC_ASSETS = [
@@ -53,7 +54,12 @@ self.addEventListener('fetch', (event) => {
   }
   
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(event.request));
+    const cachableApis = ['/api/courses', '/api/homepage-sections', '/api/testimonials', '/api/quran-reciters'];
+    if (cachableApis.some(p => url.pathname === p)) {
+      event.respondWith(staleWhileRevalidate(event.request));
+    } else {
+      event.respondWith(networkFirst(event.request));
+    }
     return;
   }
 
@@ -149,6 +155,31 @@ async function networkFirst(request) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(API_CACHE_NAME);
+  const cachedResponse = await cache.match(request);
+  
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  }).catch(() => null);
+
+  if (cachedResponse) {
+    fetchPromise;
+    return cachedResponse;
+  }
+  
+  const networkResponse = await fetchPromise;
+  if (networkResponse) return networkResponse;
+  
+  return new Response(JSON.stringify({ error: 'Offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 async function cacheFirst(request) {
