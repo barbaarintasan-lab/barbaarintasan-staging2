@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm install --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -21,9 +21,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install production dependencies
+# Install production dependencies only
 COPY package*.json ./
-RUN npm ci --omit=dev && npm ls stripe 2>/dev/null || npm install stripe
+RUN npm install --omit=dev --ignore-scripts && npm ls stripe 2>/dev/null || npm install stripe
 
 # Copy built assets from builder
 # dist/ contains: index.js (bundled server) and public/ (client build)
