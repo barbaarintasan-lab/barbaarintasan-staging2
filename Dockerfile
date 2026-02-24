@@ -6,9 +6,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (need postinstall scripts for esbuild/vite binaries)
 COPY package*.json ./
-RUN npm install --ignore-scripts
+RUN npm install
 
 # Copy source code
 COPY . .
