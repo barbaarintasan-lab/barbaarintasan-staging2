@@ -15,6 +15,14 @@ function getGoogleDriveEmbedUrl(url: string): string | null {
   return null;
 }
 
+function getGoogleDriveDirectUrl(url: string): string | null {
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    return `https://drive.google.com/file/d/${match[1]}/view`;
+  }
+  return null;
+}
+
 interface LiveEvent {
   id: string;
   title: string;
@@ -265,24 +273,38 @@ export default function Events() {
                                 </button>
                               </div>
                               {getGoogleDriveEmbedUrl(event.recordingUrl) ? (
-                                <div className="relative w-full rounded-xl overflow-hidden bg-black" style={{ paddingBottom: "56.25%" }}>
-                                  <iframe
-                                    src={getGoogleDriveEmbedUrl(event.recordingUrl)!}
-                                    className="absolute top-0 left-0 w-full h-full"
-                                    allow="autoplay; encrypted-media"
-                                    allowFullScreen
-                                    data-testid={`video-player-${event.id}`}
-                                  />
+                                <div>
+                                  <div className="relative w-full rounded-xl overflow-hidden bg-black" style={{ paddingBottom: "56.25%" }}>
+                                    <iframe
+                                      src={getGoogleDriveEmbedUrl(event.recordingUrl)!}
+                                      className="absolute top-0 left-0 w-full h-full"
+                                      allow="autoplay; encrypted-media"
+                                      allowFullScreen
+                                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                                      referrerPolicy="no-referrer"
+                                      data-testid={`video-player-${event.id}`}
+                                    />
+                                  </div>
+                                  <a
+                                    href={getGoogleDriveDirectUrl(event.recordingUrl) || event.recordingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 mt-3 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-all w-full justify-center"
+                                    data-testid={`link-open-recording-${event.id}`}
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                    {t("events:openRecording", "Ku fur Google Drive")}
+                                  </a>
                                 </div>
                               ) : (
                                 <a
                                   href={event.recordingUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                  className="inline-flex items-center gap-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-all"
                                 >
                                   <ExternalLink className="w-4 h-4" />
-                                  {t("events:openRecording")}
+                                  {t("events:openRecording", "Ku fur Google Drive")}
                                 </a>
                               )}
                             </div>
