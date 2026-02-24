@@ -78,7 +78,7 @@ function PageLoader() {
       <div className="text-center">
         <img src={logoImage} alt="Barbaarintasan Academy" className="w-20 h-20 mx-auto mb-4 animate-pulse" />
         <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
-        <p className="text-sm text-gray-500">Waa la soo rariyayaa...</p>
+        <p className="text-sm text-gray-500">Sug wax yar waa la dajinayaa...</p>
       </div>
     </div>
   );
