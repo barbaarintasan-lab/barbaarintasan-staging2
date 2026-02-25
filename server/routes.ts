@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, paymentSubmissions, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -4557,7 +4557,7 @@ Ka jawaab qaabkan JSON ah:
       }
 
       if (completed === true) {
-        await storage.markLessonComplete(req.session.parentId, lesson);
+        await storage.markLessonComplete(req.session.parentId, lesson.id, lesson.courseId);
       }
 
       res.json({ success: true, synced: true });
@@ -5329,9 +5329,9 @@ Ka jawaab qaabkan JSON ah:
         },
         course: {
           id: course?.id,
-          name: course?.name,
+          title: course?.title,
           description: course?.description,
-          thumbnailUrl: course?.thumbnailUrl
+          imageUrl: course?.imageUrl
         },
         assets: [] as string[]
       };
@@ -7247,14 +7247,14 @@ Return JSON:
         if (updated.customerEmail) {
           const course = await storage.getCourse(updated.courseId);
           const courseName = course?.title || "Koorsada";
-          const courseSlug = course?.slug || undefined;
+          const courseId = course?.courseId || undefined;
           const emailSent = await sendPurchaseConfirmationEmail(
             updated.customerEmail,
             updated.customerName,
             courseName,
             updated.planType,
             updated.amount,
-            courseSlug
+            courseId
           );
           if (emailSent) {
             console.log(`Purchase confirmation email sent to ${updated.customerEmail}`);
@@ -8336,7 +8336,7 @@ Return a JSON object with:
       res.json({
         success: true,
         uploaded: results.length,
-        errors: errors.length,
+        errorCount: errors.length,
         results,
         errors: errors
       });
@@ -15546,7 +15546,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       const parent = await storage.getParentById(parentId);
       const progress = await storage.getProgressByParentId(parentId);
       const enrollments = await storage.getEnrollmentsByParentId(parentId);
-      const notifications = await storage.getNotificationsByParentId(parentId);
       const consent = await storage.getUserConsent(parentId);
 
       const exportData = {
@@ -15560,10 +15559,9 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         learningProgress: progress,
         enrollments: enrollments.map(e => ({
           courseId: e.courseId,
-          enrolledAt: e.enrolledAt,
-          subscriptionType: e.subscriptionType,
+          enrolledAt: e.accessStart,
+          subscriptionType: e.planType,
         })),
-        notificationCount: notifications.length,
         consentRecord: consent,
       };
 
@@ -16268,7 +16266,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   });
 
   // Webhook endpoint for payment providers (Flutterwave, etc.)
-  app.post("/api/wordpress/webhook/payment", async (req, res) => {
+  app.post("/api/wordpress/webhook/payment", verifyWordPressApiKey, async (req, res) => {
     try {
       const { event, data } = req.body;
       
@@ -16307,18 +16305,12 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
               );
               
               if (existingSubscription) {
-                await storage.updateEnrollment(existingSubscription.id, {
-                  status: 'active',
-                  planType: planType,
-                  accessEnd: accessEnd,
-                });
+                await storage.renewEnrollment(existingSubscription.id, planType, accessEnd);
               } else {
-                const enrollment = await storage.createEnrollment({
+                await storage.createEnrollment({
                   parentId: parent.id,
                   courseId: allAccessCourseId,
                   planType: planType,
-                });
-                await storage.updateEnrollment(enrollment.id, {
                   status: 'active',
                   accessEnd: accessEnd,
                 });

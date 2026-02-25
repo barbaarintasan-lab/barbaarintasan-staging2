@@ -326,8 +326,8 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
 }
 
 export async function generateAndSaveParentMessage(): Promise<void> {
+  const today = getSomaliaToday();
   try {
-    const today = getSomaliaToday();
     
     const existingMessage = await storage.getParentMessageByDate(today);
     if (existingMessage) {
