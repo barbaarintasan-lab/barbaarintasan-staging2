@@ -335,7 +335,7 @@ export async function generateAndUploadAudio(
 ): Promise<string> {
   const audioBuffer = await synthesizeSpeech(text, options);
 
-  // Try R2 first (works on Fly.io), then fall back to Google Drive (Replit only)
+  // Try R2 first (works on Fly.io)
   if (isR2Configured()) {
     try {
       console.log(`[TTS] Using R2 storage (${bucketType} bucket) for audio upload...`);
@@ -349,28 +349,12 @@ export async function generateAndUploadAudio(
       console.log(`[TTS] Uploaded MP3 audio to R2: ${result.url}`);
       return result.url;
     } catch (r2Error) {
-      console.warn("[TTS] R2 upload failed, trying Google Drive:", r2Error);
+      console.error("[TTS] R2 upload failed:", r2Error);
+      throw r2Error; // Re-throw instead of falling back to Drive
     }
   }
 
-  // Fall back to Google Drive (Replit only)
-  try {
-    const folderId = await getOrCreateFolder(folderName);
-    const result = await uploadToGoogleDrive(
-      audioBuffer,
-      `${fileName}.mp3`,
-      "audio/mpeg",
-      folderId
-    );
-    console.log(`[TTS] Uploaded MP3 audio to Drive: ${result.fileId}`);
-    return `https://drive.google.com/uc?export=download&id=${result.fileId}`;
-  } catch (driveError) {
-    console.error("[TTS] Google Drive upload failed:", driveError);
-    // Last resort: return base64 data URL
-    console.log("[TTS] Falling back to base64 data URL");
-    const base64Audio = audioBuffer.toString("base64");
-    return `data:audio/mpeg;base64,${base64Audio}`;
-  }
+  throw new Error("R2 is not configured and Google Drive is disabled");
 }
 
 export async function generateBedtimeStoryAudio(

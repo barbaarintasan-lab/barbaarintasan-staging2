@@ -390,12 +390,12 @@ function RadioWavePlayer({ url, title, authorName }: { url: string; title?: stri
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden" data-testid="radio-wave-player">
-      <div className="bg-gradient-to-br from-emerald-900/80 via-teal-900/70 to-slate-900/90 p-4 backdrop-blur-sm border border-emerald-800/30 rounded-2xl">
+      <div className="bg-blue-50 p-4 border border-blue-200 rounded-2xl">
         {title && (
-          <p className="text-emerald-100 font-semibold text-sm mb-1 truncate">{title}</p>
+          <p className="text-gray-800 font-semibold text-sm mb-1 truncate">{title}</p>
         )}
         {authorName && !title && (
-          <p className="text-emerald-300/70 text-xs mb-2">{authorName}</p>
+          <p className="text-gray-500 text-xs mb-2">{authorName}</p>
         )}
 
         <div className="flex items-center gap-3">
@@ -403,8 +403,8 @@ function RadioWavePlayer({ url, title, authorName }: { url: string; title?: stri
             onClick={toggle}
             className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
               playing
-                ? 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/30'
-                : 'bg-gradient-to-br from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 shadow-emerald-500/20'
+                ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/30'
+                : 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 shadow-blue-500/20'
             }`}
             data-testid="button-play-audio"
           >
@@ -428,12 +428,12 @@ function RadioWavePlayer({ url, title, authorName }: { url: string; title?: stri
         </div>
 
         <div className="flex items-center justify-between mt-1.5 px-1">
-          <span className="text-emerald-300/60 text-[10px] font-mono">{formatTime(currentTime)}</span>
+          <span className="text-gray-500 text-[10px] font-mono">{formatTime(currentTime)}</span>
           <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${playing ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-            <span className="text-emerald-300/50 text-[10px]">{playing ? 'LIVE' : 'READY'}</span>
+            <div className={`w-1.5 h-1.5 rounded-full ${playing ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`} />
+            <span className="text-gray-500 text-[10px]">{playing ? 'LIVE' : 'READY'}</span>
           </div>
-          <span className="text-emerald-300/60 text-[10px] font-mono">{duration > 0 ? formatTime(duration) : '--:--'}</span>
+          <span className="text-gray-500 text-[10px] font-mono">{duration > 0 ? formatTime(duration) : '--:--'}</span>
         </div>
       </div>
     </div>
@@ -542,33 +542,33 @@ function MemberProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gradient-to-br from-indigo-950 to-slate-900 border-indigo-700/50 text-white max-w-sm">
+      <DialogContent className="bg-white border-gray-200 max-w-sm">
         <DialogHeader>
           <DialogTitle className="sr-only">Profile</DialogTitle>
           <DialogDescription className="sr-only">Xubin profile</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center pt-2 pb-4">
-          <Avatar className="w-20 h-20 border-2 border-indigo-500 mb-3">
+          <Avatar className="w-20 h-20 border-2 border-blue-500 mb-3">
             <AvatarImage src={member.picture || undefined} />
-            <AvatarFallback className="bg-indigo-800 text-indigo-200 text-xl">
+            <AvatarFallback className="bg-blue-100 text-blue-700 text-xl">
               {getInitials(member.name)}
             </AvatarFallback>
           </Avatar>
-          <h3 className="text-lg font-bold text-white mb-1">{member.name || "Aan la aqoon"}</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">{member.name || "Aan la aqoon"}</h3>
 
           <div className="flex items-center gap-6 mb-4">
             <div className="text-center">
-              <p className="text-lg font-bold text-white">{followCounts?.followersCount ?? 0}</p>
-              <p className="text-indigo-400 text-xs">Followers</p>
+              <p className="text-lg font-bold text-gray-900">{followCounts?.followersCount ?? 0}</p>
+              <p className="text-gray-500 text-xs">Followers</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-white">{followCounts?.followingCount ?? 0}</p>
-              <p className="text-indigo-400 text-xs">Following</p>
+              <p className="text-lg font-bold text-gray-900">{followCounts?.followingCount ?? 0}</p>
+              <p className="text-gray-500 text-xs">Following</p>
             </div>
           </div>
 
           {followStatus?.isFollowedBy && !isSelf && (
-            <p className="text-indigo-400 text-xs mb-3 flex items-center gap-1">
+            <p className="text-gray-500 text-xs mb-3 flex items-center gap-1">
               <UserCheck className="w-3 h-3" />
               Wuu ku follow-gareeysanayaa
             </p>
@@ -579,8 +579,8 @@ function MemberProfileDialog({
               <Button
                 className={`flex-1 ${
                   followStatus?.isFollowing
-                    ? "bg-indigo-700 hover:bg-indigo-600 text-indigo-200"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                    ? "bg-gray-200 hover:bg-gray-300 text-gray-600"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
                 onClick={() => {
                   if (followStatus?.isFollowing) {
@@ -602,7 +602,7 @@ function MemberProfileDialog({
                 {followStatus?.isFollowing ? "Following" : "Follow"}
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => {
                   onOpenChange(false);
                   onOpenChat(member.id);
@@ -646,7 +646,7 @@ function ChatView({
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   useEffect(() => {
@@ -698,29 +698,29 @@ function ChatView({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-3 bg-indigo-950/80 border-b border-indigo-800/50">
+      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
         <Button
           variant="ghost"
           size="icon"
-          className="text-white hover:bg-indigo-800/50"
+          className="text-gray-700 hover:bg-gray-100"
           onClick={onBack}
           data-testid="button-back-from-chat"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <Avatar className="w-8 h-8 border border-indigo-700">
+        <Avatar className="w-8 h-8 border border-gray-200">
           <AvatarImage src={partnerPicture || undefined} />
-          <AvatarFallback className="bg-indigo-800 text-indigo-200 text-xs">
+          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
             {getInitials(partnerName)}
           </AvatarFallback>
         </Avatar>
-        <span className="text-white font-semibold text-sm truncate">{partnerName || "Aan la aqoon"}</span>
+        <span className="text-gray-900 font-semibold text-sm truncate">{partnerName || "Aan la aqoon"}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0" style={{ maxHeight: "calc(100vh - 320px)" }}>
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
           </div>
         ) : messages && messages.length > 0 ? (
           messages.map((msg) => {
@@ -734,15 +734,15 @@ function ChatView({
                 <div
                   className={`max-w-[80%] px-3 py-2 rounded-2xl ${
                     isMine
-                      ? "bg-indigo-600 text-white rounded-br-sm"
-                      : "bg-indigo-800/60 text-indigo-100 rounded-bl-sm"
+                      ? "bg-blue-600 text-white rounded-br-sm"
+                      : "bg-gray-100 text-gray-700 rounded-bl-sm"
                   }`}
                 >
                   {msg.audioUrl && (
                     <div className="mb-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Mic className="w-3.5 h-3.5 text-emerald-300" />
-                        <span className="text-[11px] text-emerald-300 font-medium">Fariin cod ah</span>
+                        <Mic className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-[11px] text-blue-500 font-medium">Fariin cod ah</span>
                       </div>
                       <audio src={msg.audioUrl} controls controlsList="nodownload" className="w-full" style={{ maxWidth: '100%', height: '36px', minHeight: '36px', filter: 'invert(1) hue-rotate(180deg)', opacity: 0.9, borderRadius: '8px' }} />
                     </div>
@@ -754,7 +754,7 @@ function ChatView({
                     <span className="text-[10px] opacity-60">{timeAgo}</span>
                     {isMine && (
                       msg.isRead ? (
-                        <CheckCheck className="w-3 h-3 text-emerald-400" />
+                        <CheckCheck className="w-3 h-3 text-blue-500" />
                       ) : (
                         <Check className="w-3 h-3 opacity-50" />
                       )
@@ -766,24 +766,24 @@ function ChatView({
           })
         ) : (
           <div className="text-center py-12">
-            <Mail className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-            <p className="text-indigo-400 text-sm">Billow sheekada!</p>
+            <Mail className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">Billow sheekada!</p>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-indigo-800/50 bg-indigo-950/60">
+      <div className="p-3 border-t border-gray-200 bg-white">
         {dmRecorder.isRecording && (
-          <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-red-900/30 border border-red-700/40 rounded-xl">
+          <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl">
             <div className="relative">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
             </div>
-            <span className="text-red-200 text-sm flex-1">Duubayo... {dmRecorder.formatDuration(dmRecorder.recordingDuration)}</span>
+            <span className="text-red-600 text-sm flex-1">Duubayo... {dmRecorder.formatDuration(dmRecorder.recordingDuration)}</span>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-red-300 hover:text-white hover:bg-red-800/40 rounded-full"
+              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-100 rounded-full"
               onClick={dmRecorder.stopRecording}
               data-testid="button-dm-stop-recording"
             >
@@ -793,15 +793,15 @@ function ChatView({
         )}
 
         {dmRecorder.audioPreviewUrl && !dmRecorder.isRecording && (
-          <div className="mb-2 bg-emerald-900/40 border border-emerald-700/30 rounded-xl p-2.5">
+          <div className="mb-2 bg-blue-50 border border-blue-200 rounded-xl p-2.5">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-emerald-300 text-xs font-medium flex items-center gap-1">
+              <span className="text-blue-600 text-xs font-medium flex items-center gap-1">
                 <Mic className="w-3 h-3" /> Cod duuban
               </span>
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-5 w-5 text-emerald-400/60 hover:text-red-400 rounded-full"
+                className="h-5 w-5 text-gray-400 hover:text-red-400 rounded-full"
                 onClick={dmRecorder.clearRecording}
                 data-testid="button-dm-clear-recording"
               >
@@ -817,7 +817,7 @@ function ChatView({
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             placeholder={dmRecorder.audioPreviewUrl ? "Faahfaahin ku dar (ikhtiyaari)..." : "Fariin qor..."}
-            className="bg-indigo-800/30 border-indigo-700 text-white placeholder:text-indigo-500 text-sm"
+            className="bg-gray-50 border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 if (dmRecorder.audioPreviewUrl) {
@@ -832,7 +832,7 @@ function ChatView({
           <Button
             size="icon"
             variant="ghost"
-            className={`h-9 w-9 shrink-0 rounded-full ${dmRecorder.isRecording ? 'text-red-400 bg-red-900/20' : dmRecorder.audioPreviewUrl ? 'text-emerald-400 bg-emerald-900/20' : 'text-indigo-400 hover:text-indigo-200 hover:bg-indigo-800/50'}`}
+            className={`h-9 w-9 shrink-0 rounded-full ${dmRecorder.isRecording ? 'text-red-500 bg-red-50' : dmRecorder.audioPreviewUrl ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'}`}
             onClick={dmRecorder.isRecording ? dmRecorder.stopRecording : dmRecorder.startRecording}
             disabled={isSendingVoice || (!!dmRecorder.audioPreviewUrl && !dmRecorder.isRecording)}
             data-testid="button-dm-record"
@@ -841,7 +841,7 @@ function ChatView({
           </Button>
           <Button
             size="icon"
-            className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 w-9 shrink-0"
+            className="bg-blue-600 hover:bg-blue-700 text-white h-9 w-9 shrink-0"
             onClick={() => {
               if (dmRecorder.audioPreviewUrl) {
                 sendVoiceDm();
@@ -890,7 +890,7 @@ function MessagesView({
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   if (chatPartner) {
@@ -917,12 +917,12 @@ function MessagesView({
     <div className="space-y-3">
       {isLoading ? (
         Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="bg-indigo-900/40 border-indigo-800/50">
+          <Card key={i} className="bg-white border-gray-200">
             <CardContent className="p-3 flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-full bg-indigo-800/50" />
+              <Skeleton className="h-10 w-10 rounded-full bg-gray-200" />
               <div className="flex-1">
-                <Skeleton className="h-4 w-24 bg-indigo-800/50 mb-1" />
-                <Skeleton className="h-3 w-40 bg-indigo-800/50" />
+                <Skeleton className="h-4 w-24 bg-gray-200 mb-1" />
+                <Skeleton className="h-3 w-40 bg-gray-200" />
               </div>
             </CardContent>
           </Card>
@@ -931,7 +931,7 @@ function MessagesView({
         <>
           {memberConvos.length > 0 && (
             <>
-              <p className="text-indigo-400 text-xs font-medium uppercase tracking-wider px-1">Fariimaha</p>
+              <p className="text-gray-500 text-xs font-medium uppercase tracking-wider px-1">Fariimaha</p>
               {memberConvos.map((convo) => {
                 let timeAgo = "";
                 try {
@@ -940,7 +940,7 @@ function MessagesView({
                 return (
                   <Card
                     key={convo.partnerId}
-                    className="bg-indigo-900/40 border-indigo-800/50 cursor-pointer hover:border-indigo-600/50 transition-colors"
+                    className="bg-white border-gray-200 cursor-pointer hover:border-blue-300 transition-colors"
                     onClick={() => setChatPartner({
                       id: convo.partnerId,
                       name: convo.partnerName,
@@ -950,30 +950,30 @@ function MessagesView({
                   >
                     <CardContent className="p-3 flex items-center gap-3">
                       <div className="relative">
-                        <Avatar className="w-10 h-10 border border-indigo-700">
+                        <Avatar className="w-10 h-10 border border-gray-200">
                           <AvatarImage src={convo.partnerPicture || undefined} />
-                          <AvatarFallback className="bg-indigo-800 text-indigo-200 text-sm">
+                          <AvatarFallback className="bg-blue-100 text-blue-700 text-sm">
                             {getInitials(convo.partnerName)}
                           </AvatarFallback>
                         </Avatar>
                         {convo.unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                          <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                             {convo.unreadCount}
                           </span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-semibold truncate ${convo.unreadCount > 0 ? 'text-white' : 'text-indigo-200'}`}>
+                          <span className={`text-sm font-semibold truncate ${convo.unreadCount > 0 ? 'text-gray-900' : 'text-gray-600'}`}>
                             {convo.partnerName}
                           </span>
-                          <span className="text-indigo-500 text-[10px] shrink-0 ml-2">{timeAgo}</span>
+                          <span className="text-blue-500 text-[10px] shrink-0 ml-2">{timeAgo}</span>
                         </div>
-                        <p className={`text-xs truncate mt-0.5 ${convo.unreadCount > 0 ? 'text-indigo-200 font-medium' : 'text-indigo-400'}`}>
+                        <p className={`text-xs truncate mt-0.5 ${convo.unreadCount > 0 ? 'text-gray-600 font-medium' : 'text-gray-500'}`}>
                           {convo.lastMessage}
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-blue-600 shrink-0" />
                     </CardContent>
                   </Card>
                 );
@@ -983,11 +983,11 @@ function MessagesView({
 
           {otherMembers.length > 0 && (
             <>
-              <p className="text-indigo-400 text-xs font-medium uppercase tracking-wider px-1 mt-4">Xubnaha kale</p>
+              <p className="text-gray-500 text-xs font-medium uppercase tracking-wider px-1 mt-4">Xubnaha kale</p>
               {otherMembers.map((m) => (
                 <Card
                   key={m.id}
-                  className="bg-indigo-900/40 border-indigo-800/50 cursor-pointer hover:border-indigo-600/50 transition-colors"
+                  className="bg-white border-gray-200 cursor-pointer hover:border-blue-300 transition-colors"
                   onClick={() => setChatPartner({
                     id: m.id,
                     name: m.name || "Aan la aqoon",
@@ -996,19 +996,19 @@ function MessagesView({
                   data-testid={`dm-member-${m.id}`}
                 >
                   <CardContent className="p-3 flex items-center gap-3">
-                    <Avatar className="w-10 h-10 border border-indigo-700">
+                    <Avatar className="w-10 h-10 border border-gray-200">
                       <AvatarImage src={m.picture || undefined} />
-                      <AvatarFallback className="bg-indigo-800 text-indigo-200 text-sm">
+                      <AvatarFallback className="bg-blue-100 text-blue-700 text-sm">
                         {getInitials(m.name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <span className="text-indigo-200 text-sm font-semibold truncate block">
+                      <span className="text-gray-600 text-sm font-semibold truncate block">
                         {m.name || "Aan la aqoon"}
                       </span>
-                      <span className="text-indigo-500 text-xs">Fariin dir</span>
+                      <span className="text-blue-500 text-xs">Fariin dir</span>
                     </div>
-                    <Mail className="w-4 h-4 text-indigo-500" />
+                    <Mail className="w-4 h-4 text-blue-500" />
                   </CardContent>
                 </Card>
               ))}
@@ -1017,8 +1017,8 @@ function MessagesView({
 
           {memberConvos.length === 0 && otherMembers.length === 0 && (
             <div className="text-center py-12">
-              <Mail className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-              <p className="text-indigo-300 text-sm">Wali fariin la ma dirin</p>
+              <Mail className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">Wali fariin la ma dirin</p>
             </div>
           )}
         </>
@@ -1138,20 +1138,20 @@ function GroupsListView({
   const isLoading = tab === "all" ? loadingAll : loadingMy;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-indigo-900 to-slate-900">
-      <div className="sticky top-0 z-10 bg-indigo-950/90 backdrop-blur-md border-b border-indigo-800/50">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-indigo-800/50"
+              className="text-gray-700 hover:bg-gray-100"
               onClick={() => navigate("/")}
               data-testid="button-back"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-lg font-bold text-white">
+            <h1 className="text-lg font-bold text-gray-900">
               Guruubada Waxbarashada
             </h1>
           </div>
@@ -1159,53 +1159,53 @@ function GroupsListView({
             <DialogTrigger asChild>
               <Button
                 size="icon"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-full"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-full"
                 data-testid="button-create-group"
               >
                 <Plus className="w-5 h-5" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-indigo-950 border-indigo-800 text-white max-w-sm">
+            <DialogContent className="bg-white border-gray-200 max-w-sm">
               <DialogHeader>
-                <DialogTitle>Guruub Cusub Samee</DialogTitle>
-                <DialogDescription className="text-indigo-300">
+                <DialogTitle className="text-gray-900">Guruub Cusub Samee</DialogTitle>
+                <DialogDescription className="text-gray-500">
                   Samee guruub waxbarasho oo aad la wadaagto dadka kale
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">
                 <div>
-                  <label className="text-sm text-indigo-300 mb-1 block">
+                  <label className="text-sm text-gray-600 mb-1 block">
                     Magaca Guruubka
                   </label>
                   <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Tusaale: Waalidiinta Cusub"
-                    className="bg-indigo-900/50 border-indigo-700 text-white placeholder:text-indigo-400"
+                    className="border-gray-300 text-gray-800 placeholder:text-gray-400"
                     data-testid="input-group-name"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-indigo-300 mb-1 block">
+                  <label className="text-sm text-gray-600 mb-1 block">
                     Sharaxaad
                   </label>
                   <Textarea
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                     placeholder="Guruubka maxuu ku saabsan yahay?"
-                    className="bg-indigo-900/50 border-indigo-700 text-white placeholder:text-indigo-400 min-h-[80px]"
+                    className="border-gray-300 text-gray-800 placeholder:text-gray-400 min-h-[80px]"
                     data-testid="input-group-description"
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-indigo-300">
+                  <span className="text-sm text-gray-600">
                     Guruub Waalidiinta
                   </span>
                   <button
                     type="button"
                     onClick={() => setNewIsPublic(!newIsPublic)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      newIsPublic ? "bg-indigo-500" : "bg-indigo-800"
+                      newIsPublic ? "bg-blue-600" : "bg-gray-300"
                     }`}
                     data-testid="toggle-public"
                   >
@@ -1217,7 +1217,7 @@ function GroupsListView({
                   </button>
                 </div>
                 <Button
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={() => createMutation.mutate()}
                   disabled={!newName.trim() || createMutation.isPending}
                   data-testid="button-submit-group"
@@ -1240,8 +1240,8 @@ function GroupsListView({
             size="sm"
             className={
               tab === "all"
-                ? "bg-indigo-600 text-white"
-                : "text-indigo-300 hover:bg-indigo-800/50"
+                ? "bg-blue-600 text-white"
+                : "text-gray-600 hover:bg-gray-100"
             }
             onClick={() => setTab("all")}
             data-testid="tab-all-groups"
@@ -1253,8 +1253,8 @@ function GroupsListView({
             size="sm"
             className={
               tab === "my"
-                ? "bg-indigo-600 text-white"
-                : "text-indigo-300 hover:bg-indigo-800/50"
+                ? "bg-blue-600 text-white"
+                : "text-gray-600 hover:bg-gray-100"
             }
             onClick={() => setTab("my")}
             data-testid="tab-my-groups"
@@ -1269,31 +1269,26 @@ function GroupsListView({
           Array.from({ length: 3 }).map((_, i) => (
             <Card
               key={i}
-              className="bg-indigo-900/40 border-indigo-800/50"
+              className="bg-white border-gray-200"
             >
               <CardContent className="p-4 space-y-3">
-                <Skeleton className="h-5 w-3/4 bg-indigo-800/50" />
-                <Skeleton className="h-4 w-full bg-indigo-800/50" />
-                <Skeleton className="h-8 w-24 bg-indigo-800/50" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-8 w-24" />
               </CardContent>
             </Card>
           ))
         ) : tab === "all" ? (
           allGroups && allGroups.length > 0 ? (
-            allGroups.map((group, index) => (
-              <motion.div
-                key={group.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
+            allGroups.map((group) => (
+              <div key={group.id}>
                 <Card
-                  className={`bg-gradient-to-br from-indigo-900/60 to-blue-900/40 border-indigo-700/50 transition-colors ${
-                    !group.hasAccess && !group.isMember ? 'opacity-80 cursor-default' : 'cursor-pointer hover:border-indigo-500/50'
+                  className={`bg-white border-gray-200 transition-colors ${
+                    !group.hasAccess && !group.isMember ? 'opacity-70 cursor-default' : 'cursor-pointer hover:border-blue-300 hover:shadow-sm'
                   }`}
                   onClick={() => {
                     if (!group.hasAccess && !group.isMember) {
-                      toast.error("🔒 Dadka koorsada qaata ayaa geli kara guruubkan. Fadlan koorsada iibasdo.");
+                      toast.error("Dadka koorsada qaata ayaa geli kara guruubkan. Fadlan koorsada iibasdo.");
                       return;
                     }
                     onSelectGroup(group.id);
@@ -1303,18 +1298,18 @@ function GroupsListView({
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-white text-base truncate">
+                        <h3 className="font-bold text-gray-900 text-base truncate">
                           {group.name}
                         </h3>
                         {group.description && (
-                          <p className="text-indigo-300 text-sm mt-1 line-clamp-2">
+                          <p className="text-gray-500 text-sm mt-1 line-clamp-2">
                             {group.description}
                           </p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-3 text-indigo-400 text-xs">
+                      <div className="flex items-center gap-3 text-gray-500 text-xs">
                         <span className="flex items-center gap-1">
                           <Users className="w-3.5 h-3.5" />
                           {group.memberCount}
@@ -1329,7 +1324,7 @@ function GroupsListView({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20 text-xs h-8"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs h-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             leaveMutation.mutate(group.id);
@@ -1341,14 +1336,14 @@ function GroupsListView({
                           Ka bax
                         </Button>
                       ) : !group.hasAccess ? (
-                        <div className="flex items-center gap-1 text-amber-400 text-xs">
+                        <div className="flex items-center gap-1 text-amber-500 text-xs">
                           <Lock className="w-3.5 h-3.5" />
                           <span>Xiran</span>
                         </div>
                       ) : (
                         <Button
                           size="sm"
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             joinMutation.mutate(group.id);
@@ -1363,26 +1358,21 @@ function GroupsListView({
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             ))
           ) : (
             <div className="text-center py-16">
-              <Users className="w-12 h-12 text-indigo-500 mx-auto mb-3" />
-              <p className="text-indigo-300">
+              <Users className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+              <p className="text-gray-500">
                 Wali guruub la ma samayn. Noqo kii ugu horreeya!
               </p>
             </div>
           )
         ) : myGroups && myGroups.length > 0 ? (
-          myGroups.map((group, index) => (
-            <motion.div
-              key={group.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
+          myGroups.map((group) => (
+            <div key={group.id}>
               <Card
-                className="bg-gradient-to-br from-indigo-900/60 to-blue-900/40 border-indigo-700/50 cursor-pointer hover:border-indigo-500/50 transition-colors"
+                className="bg-white border-gray-200 cursor-pointer hover:border-blue-300 hover:shadow-sm transition-colors"
                 onClick={() => onSelectGroup(group.id)}
                 data-testid={`card-group-${group.id}`}
               >
@@ -1390,24 +1380,24 @@ function GroupsListView({
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-white text-base truncate">
+                        <h3 className="font-bold text-gray-900 text-base truncate">
                           {group.name}
                         </h3>
                         {group.role === "admin" && (
-                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">
+                          <Badge className="bg-amber-50 text-amber-600 border-amber-200 text-[10px]">
                             <Crown className="w-3 h-3 mr-0.5" />
                             Admin
                           </Badge>
                         )}
                       </div>
                       {group.description && (
-                        <p className="text-indigo-300 text-sm mt-1 line-clamp-2">
+                        <p className="text-gray-500 text-sm mt-1 line-clamp-2">
                           {group.description}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-indigo-400 text-xs mt-2">
+                  <div className="flex items-center gap-3 text-gray-500 text-xs mt-2">
                     <span className="flex items-center gap-1">
                       <Users className="w-3.5 h-3.5" />
                       {group.memberCount}
@@ -1415,12 +1405,12 @@ function GroupsListView({
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           ))
         ) : (
           <div className="text-center py-16">
-            <Users className="w-12 h-12 text-indigo-500 mx-auto mb-3" />
-            <p className="text-indigo-300">
+            <Users className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+            <p className="text-gray-500">
               Wali guruub kuma jirtid. Ku biir mid ama samee mid cusub!
             </p>
           </div>
@@ -1561,17 +1551,17 @@ function PostItem({
 
   return (
     <Card
-      className="bg-indigo-900/40 border-indigo-800/50"
+      className="bg-white border-gray-200"
       data-testid={`card-post-${post.id}`}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <Avatar
-            className="w-9 h-9 border border-indigo-700 cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
+            className="w-9 h-9 border border-gray-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
             onClick={() => onMemberClick?.({ id: post.userId, name: post.author.name, picture: post.author.picture })}
           >
             <AvatarImage src={post.author.picture || undefined} />
-            <AvatarFallback className="bg-indigo-800 text-indigo-200 text-xs">
+            <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
               {getInitials(post.author.name)}
             </AvatarFallback>
           </Avatar>
@@ -1579,19 +1569,19 @@ function PostItem({
             <div className="flex items-center justify-between">
               <div>
                 <button
-                  className="text-white text-sm font-semibold hover:text-indigo-300 transition-colors text-left"
+                  className="text-gray-900 text-sm font-semibold hover:text-gray-600 transition-colors text-left"
                   onClick={() => onMemberClick?.({ id: post.userId, name: post.author.name, picture: post.author.picture })}
                   data-testid={`button-author-${post.userId}`}
                 >
                   {post.author.name || "Aan la aqoon"}
                 </button>
-                <span className="text-indigo-400 text-xs ml-2">{timeAgo}</span>
+                <span className="text-gray-500 text-xs ml-2">{timeAgo}</span>
               </div>
               {post.userId === currentUserId && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-indigo-400 hover:text-red-400 hover:bg-red-900/20 h-7 w-7"
+                  className="text-gray-500 hover:text-red-400 hover:bg-red-50 h-7 w-7"
                   onClick={() => deleteMutation.mutate()}
                   disabled={deleteMutation.isPending}
                   data-testid={`button-delete-post-${post.id}`}
@@ -1603,7 +1593,7 @@ function PostItem({
             {post.audioUrl ? (
               <>
                 {post.content && !post.title && (
-                  <p className="text-indigo-200 text-sm mt-1 whitespace-pre-wrap">
+                  <p className="text-gray-600 text-sm mt-1 whitespace-pre-wrap">
                     {post.content}
                   </p>
                 )}
@@ -1613,7 +1603,7 @@ function PostItem({
                   authorName={post.author.name}
                 />
                 {post.title && post.content && (
-                  <p className="text-indigo-300/80 text-xs mt-2 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-gray-500/80 text-xs mt-2 whitespace-pre-wrap leading-relaxed">
                     {post.content}
                   </p>
                 )}
@@ -1621,7 +1611,7 @@ function PostItem({
             ) : (
               <>
                 {post.content && (
-                  <p className="text-indigo-200 text-sm mt-1 whitespace-pre-wrap">
+                  <p className="text-gray-600 text-sm mt-1 whitespace-pre-wrap">
                     {post.content}
                   </p>
                 )}
@@ -1641,8 +1631,8 @@ function PostItem({
                     key={r.emoji}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all ${
                       optimisticMyReactions.includes(r.emoji)
-                        ? "bg-indigo-600/50 border border-indigo-400/60 text-white"
-                        : "bg-indigo-800/40 border border-indigo-700/40 text-indigo-300 hover:bg-indigo-700/50"
+                        ? "bg-blue-600/50 border border-blue-400 text-white"
+                        : "bg-gray-100 border border-gray-200/40 text-gray-500 hover:bg-gray-200"
                     }`}
                     onClick={() => reactionMutation.mutate(r.emoji)}
                     data-testid={`reaction-${r.emoji}-${post.id}`}
@@ -1658,7 +1648,7 @@ function PostItem({
                 className={`flex items-center gap-1.5 text-xs transition-colors ${
                   post.isLiked
                     ? "text-red-400"
-                    : "text-indigo-400 hover:text-red-400"
+                    : "text-gray-500 hover:text-red-400"
                 }`}
                 onClick={() => likeMutation.mutate()}
                 disabled={likeMutation.isPending}
@@ -1670,14 +1660,14 @@ function PostItem({
                 {post.likeCount > 0 && post.likeCount}
               </button>
               <button
-                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-200 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-600 transition-colors"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 data-testid={`button-emoji-picker-${post.id}`}
               >
                 <SmilePlus className="w-4 h-4" />
               </button>
               <button
-                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-200 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-600 transition-colors"
                 onClick={() => setShowComments(!showComments)}
                 data-testid={`button-comments-post-${post.id}`}
               >
@@ -1690,13 +1680,13 @@ function PostItem({
                     initial={{ opacity: 0, scale: 0.9, y: 5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 5 }}
-                    className="absolute bottom-8 left-0 bg-indigo-900 border border-indigo-700 rounded-xl p-2 shadow-xl z-10 flex gap-1"
+                    className="absolute bottom-8 left-0 bg-white border border-gray-200 rounded-xl p-2 shadow-xl z-10 flex gap-1"
                   >
                     {GROUP_EMOJIS.map((emoji) => (
                       <button
                         key={emoji}
-                        className={`text-lg p-1 rounded-lg transition-all hover:bg-indigo-700/50 ${
-                          optimisticMyReactions.includes(emoji) ? "bg-indigo-600/50 ring-1 ring-indigo-400" : ""
+                        className={`text-lg p-1 rounded-lg transition-all hover:bg-gray-200 ${
+                          optimisticMyReactions.includes(emoji) ? "bg-blue-600/50 ring-1 ring-blue-400" : ""
                         }`}
                         onClick={() => {
                           reactionMutation.mutate(emoji);
@@ -1722,10 +1712,10 @@ function PostItem({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 pt-3 border-t border-indigo-800/50 space-y-3">
+              <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                 {loadingComments ? (
                   <div className="flex justify-center py-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
                   </div>
                 ) : (
                   comments?.map((comment) => {
@@ -1743,24 +1733,24 @@ function PostItem({
                         className="flex items-start gap-2"
                         data-testid={`card-comment-${comment.id}`}
                       >
-                        <Avatar className="w-6 h-6 border border-indigo-700">
+                        <Avatar className="w-6 h-6 border border-gray-200">
                           <AvatarImage
                             src={comment.author.picture || undefined}
                           />
-                          <AvatarFallback className="bg-indigo-800 text-indigo-200 text-[10px]">
+                          <AvatarFallback className="bg-blue-100 text-blue-700 text-[10px]">
                             {getInitials(comment.author.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 bg-indigo-800/30 rounded-lg px-3 py-2">
+                        <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-white text-xs font-semibold">
+                            <span className="text-gray-900 text-xs font-semibold">
                               {comment.author.name || "Aan la aqoon"}
                             </span>
-                            <span className="text-indigo-500 text-[10px]">
+                            <span className="text-blue-500 text-[10px]">
                               {commentTime}
                             </span>
                           </div>
-                          <p className="text-indigo-200 text-xs mt-0.5">
+                          <p className="text-gray-600 text-xs mt-0.5">
                             {comment.content}
                           </p>
                         </div>
@@ -1773,7 +1763,7 @@ function PostItem({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Faallo dhig..."
-                    className="bg-indigo-800/30 border-indigo-700 text-white placeholder:text-indigo-500 text-sm h-9"
+                    className="bg-gray-50 border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm h-9"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && commentText.trim()) {
                         commentMutation.mutate();
@@ -1783,7 +1773,7 @@ function PostItem({
                   />
                   <Button
                     size="icon"
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 w-9 shrink-0"
+                    className="bg-blue-600 hover:bg-blue-700 text-white h-9 w-9 shrink-0"
                     onClick={() => commentMutation.mutate()}
                     disabled={!commentText.trim() || commentMutation.isPending}
                     data-testid={`button-send-comment-${post.id}`}
@@ -2033,37 +2023,37 @@ function GroupDashboard({
 
   if (loadingGroup) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-indigo-900 to-slate-900 p-4 space-y-4">
-        <Skeleton className="h-10 w-full bg-indigo-800/50" />
-        <Skeleton className="h-24 w-full bg-indigo-800/50" />
-        <Skeleton className="h-40 w-full bg-indigo-800/50" />
+      <div className="min-h-screen bg-gray-50 p-4 space-y-4">
+        <Skeleton className="h-10 w-full bg-gray-200" />
+        <Skeleton className="h-24 w-full bg-gray-200" />
+        <Skeleton className="h-40 w-full bg-gray-200" />
       </div>
     );
   }
 
   if (!group) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-indigo-900 to-slate-900 flex items-center justify-center">
-        <p className="text-indigo-300">Guruubka lama helin</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">Guruubka lama helin</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-indigo-900 to-slate-900">
-      <div className="sticky top-0 z-10 bg-indigo-950/90 backdrop-blur-md border-b border-indigo-800/50">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-200">
         <div className="flex items-center gap-3 px-4 py-3">
           <Button
             variant="ghost"
             size="icon"
-            className="text-white hover:bg-indigo-800/50"
+            className="text-gray-700 hover:bg-gray-100"
             onClick={onBack}
             data-testid="button-back-to-list"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-white truncate">
+            <h1 className="text-lg font-bold text-gray-900 truncate">
               {group.name}
             </h1>
           </div>
@@ -2071,7 +2061,7 @@ function GroupDashboard({
             <Button
               variant="ghost"
               size="icon"
-              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50"
               onClick={() => deleteMutation.mutate()}
               disabled={deleteMutation.isPending}
               data-testid="button-delete-group"
@@ -2083,15 +2073,15 @@ function GroupDashboard({
       </div>
 
       <div className="px-4 py-4 pb-40">
-        <Card className="bg-gradient-to-br from-indigo-800/50 to-blue-900/30 border-indigo-700/50 mb-4">
+        <Card className="bg-white border-gray-200 mb-4">
           <CardContent className="p-4">
             {group.description && (
-              <p className="text-indigo-200 text-sm mb-3">
+              <p className="text-gray-600 text-sm mb-3">
                 {group.description}
               </p>
             )}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-indigo-400 text-sm">
+              <div className="flex items-center gap-2 text-gray-500 text-sm">
                 <Users className="w-4 h-4" />
                 <span>
                   {group.memberCount} xubnood
@@ -2102,7 +2092,7 @@ function GroupDashboard({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 text-xs"
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs"
                     onClick={() => leaveMutation.mutate()}
                     disabled={leaveMutation.isPending}
                     data-testid="button-leave-group"
@@ -2114,7 +2104,7 @@ function GroupDashboard({
               ) : (
                 <Button
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
                   onClick={() => joinMutation.mutate()}
                   disabled={joinMutation.isPending}
                   data-testid="button-join-group"
@@ -2133,17 +2123,17 @@ function GroupDashboard({
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <TabsList className="w-full bg-indigo-900/50 border border-indigo-800/50 grid grid-cols-4">
+            <TabsList className="w-full bg-gray-100 border border-gray-200 grid grid-cols-4">
               <TabsTrigger
                 value="posts"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-indigo-300 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
                 data-testid="tab-posts"
               >
                 Posts
               </TabsTrigger>
               <TabsTrigger
                 value="messages"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-indigo-300 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
                 data-testid="tab-messages"
               >
                 <Mail className="w-3.5 h-3.5 mr-1" />
@@ -2151,14 +2141,14 @@ function GroupDashboard({
               </TabsTrigger>
               <TabsTrigger
                 value="members"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-indigo-300 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
                 data-testid="tab-members"
               >
                 Xubnaha
               </TabsTrigger>
               <TabsTrigger
                 value="progress"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-indigo-300 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
                 data-testid="tab-progress"
               >
                 Horumarka
@@ -2166,27 +2156,27 @@ function GroupDashboard({
             </TabsList>
 
             <TabsContent value="posts" className="mt-4 space-y-4">
-              <Card className="bg-indigo-900/40 border-indigo-800/50">
+              <Card className="bg-white border-gray-200">
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
-                    <Avatar className="w-9 h-9 border border-indigo-700 shrink-0">
+                    <Avatar className="w-9 h-9 border border-gray-200 shrink-0">
                       <AvatarImage src={parent?.picture || undefined} />
-                      <AvatarFallback className="bg-indigo-800 text-indigo-200 text-xs">
+                      <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                         {getInitials(parent?.name || null)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       {recorder.isRecording && (
-                        <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-gradient-to-r from-red-900/40 to-red-800/20 border border-red-700/40 rounded-xl">
+                        <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
                           <div className="relative">
                             <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                             <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping opacity-30" />
                           </div>
-                          <span className="text-red-200 text-sm font-medium flex-1">Duubayo... {recorder.formatDuration(recorder.recordingDuration)}</span>
+                          <span className="text-red-600 text-sm font-medium flex-1">Duubayo... {recorder.formatDuration(recorder.recordingDuration)}</span>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 text-red-300 hover:text-white hover:bg-red-800/40 rounded-full"
+                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-100 rounded-full"
                             onClick={recorder.stopRecording}
                             data-testid="button-stop-recording"
                           >
@@ -2197,15 +2187,15 @@ function GroupDashboard({
 
                       {recorder.audioPreviewUrl && !recorder.isRecording && (
                         <div className="mb-3 space-y-2">
-                          <div className="bg-gradient-to-br from-emerald-900/60 via-teal-900/50 to-slate-900/70 border border-emerald-800/30 rounded-xl p-3">
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-emerald-300 text-xs font-medium flex items-center gap-1.5">
+                              <span className="text-blue-600 text-xs font-medium flex items-center gap-1.5">
                                 <Mic className="w-3.5 h-3.5" /> Audio duuban
                               </span>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-6 w-6 text-emerald-400/60 hover:text-red-400 hover:bg-red-900/20 rounded-full"
+                                className="h-6 w-6 text-gray-400 hover:text-red-400 hover:bg-red-50 rounded-full"
                                 onClick={() => { recorder.clearRecording(); setAudioTitle(""); }}
                                 data-testid="button-clear-recording"
                               >
@@ -2217,14 +2207,14 @@ function GroupDashboard({
                               value={audioTitle}
                               onChange={(e) => setAudioTitle(e.target.value)}
                               placeholder="Ciwaan ku dar (tusaale: Talo waalid)"
-                              className="bg-emerald-900/30 border-emerald-700/40 text-emerald-100 placeholder:text-emerald-600 text-sm mb-2 rounded-lg"
+                              className="bg-white border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm mb-2 rounded-lg"
                               data-testid="input-audio-title"
                             />
                             <Textarea
                               value={postContent}
                               onChange={(e) => setPostContent(e.target.value)}
                               placeholder="Faahfaahin yar ku dar (ikhtiyaari)..."
-                              className="bg-emerald-900/30 border-emerald-700/40 text-emerald-100 placeholder:text-emerald-600 text-sm min-h-[50px] resize-none rounded-lg"
+                              className="bg-white border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm min-h-[50px] resize-none rounded-lg"
                               data-testid="input-post-content"
                             />
                           </div>
@@ -2236,7 +2226,7 @@ function GroupDashboard({
                           value={postContent}
                           onChange={(e) => setPostContent(e.target.value)}
                           placeholder="Wax la wadaag guruubka..."
-                          className="bg-indigo-800/30 border-indigo-700 text-white placeholder:text-indigo-500 text-sm min-h-[60px] resize-none"
+                          className="bg-gray-50 border-gray-200 text-gray-800 placeholder:text-gray-400 text-sm min-h-[60px] resize-none"
                           data-testid="input-post-content-text"
                         />
                       )}
@@ -2245,7 +2235,7 @@ function GroupDashboard({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className={`h-9 w-9 rounded-full ${recorder.isRecording ? 'text-red-400 hover:text-red-300 bg-red-900/20' : recorder.audioPreviewUrl ? 'text-emerald-400 bg-emerald-900/20' : 'text-indigo-400 hover:text-indigo-200 hover:bg-indigo-800/50'}`}
+                          className={`h-9 w-9 rounded-full ${recorder.isRecording ? 'text-red-500 hover:text-red-400 bg-red-50' : recorder.audioPreviewUrl ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'}`}
                           onClick={recorder.isRecording ? recorder.stopRecording : recorder.startRecording}
                           disabled={postMutation.isPending || (!!recorder.audioPreviewUrl && !recorder.isRecording)}
                           data-testid="button-record-audio"
@@ -2254,7 +2244,7 @@ function GroupDashboard({
                         </Button>
                         <Button
                           size="sm"
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={() => postMutation.mutate()}
                           disabled={
                             (!postContent.trim() && !recorder.audioBlob) || postMutation.isPending || isUploadingAudio
@@ -2278,14 +2268,14 @@ function GroupDashboard({
                 Array.from({ length: 3 }).map((_, i) => (
                   <Card
                     key={i}
-                    className="bg-indigo-900/40 border-indigo-800/50"
+                    className="bg-white border-gray-200"
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center gap-3">
-                        <Skeleton className="h-9 w-9 rounded-full bg-indigo-800/50" />
-                        <Skeleton className="h-4 w-32 bg-indigo-800/50" />
+                        <Skeleton className="h-9 w-9 rounded-full bg-gray-200" />
+                        <Skeleton className="h-4 w-32 bg-gray-200" />
                       </div>
-                      <Skeleton className="h-12 w-full bg-indigo-800/50" />
+                      <Skeleton className="h-12 w-full bg-gray-200" />
                     </CardContent>
                   </Card>
                 ))
@@ -2303,7 +2293,7 @@ function GroupDashboard({
                   {hasMorePosts && (
                     <Button
                       variant="outline"
-                      className="w-full border-indigo-700 text-indigo-300 hover:bg-indigo-800/50 hover:text-white"
+                      className="w-full border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-white"
                       onClick={loadMorePosts}
                       disabled={loadingMorePosts}
                       data-testid="button-load-more-posts"
@@ -2317,8 +2307,8 @@ function GroupDashboard({
                 </>
               ) : (
                 <div className="text-center py-12">
-                  <MessageCircle className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-                  <p className="text-indigo-300 text-sm">
+                  <MessageCircle className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">
                     Wali post la ma sameyn. Noqo kii ugu horreeya!
                   </p>
                 </div>
@@ -2344,28 +2334,28 @@ function GroupDashboard({
                   animate={{ opacity: 1, x: 0 }}
                 >
                   <Card
-                    className={`bg-indigo-900/40 border-indigo-800/50 ${!isSelf ? 'cursor-pointer hover:border-indigo-600/50' : ''} transition-colors`}
+                    className={`bg-white border-gray-200 ${!isSelf ? 'cursor-pointer hover:border-blue-300' : ''} transition-colors`}
                     onClick={() => !isSelf && handleMemberClick(member)}
                     data-testid={`card-member-${member.id}`}
                   >
                     <CardContent className="p-3 flex items-center gap-3">
-                      <Avatar className={`w-10 h-10 border border-indigo-700 ${!isSelf ? 'hover:ring-2 hover:ring-indigo-500' : ''} transition-all`}>
+                      <Avatar className={`w-10 h-10 border border-gray-200 ${!isSelf ? 'hover:ring-2 hover:ring-blue-500' : ''} transition-all`}>
                         <AvatarImage src={member.picture || undefined} />
-                        <AvatarFallback className="bg-indigo-800 text-indigo-200 text-sm">
+                        <AvatarFallback className="bg-blue-100 text-blue-700 text-sm">
                           {getInitials(member.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-semibold truncate">
                           {member.name || "Aan la aqoon"}
-                          {isSelf && <span className="text-indigo-400 text-xs ml-1">(Adiga)</span>}
+                          {isSelf && <span className="text-gray-500 text-xs ml-1">(Adiga)</span>}
                         </p>
                       </div>
                       {!isSelf && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 text-indigo-400 hover:text-emerald-400 hover:bg-emerald-900/20"
+                          className="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenChat(member.id);
@@ -2379,7 +2369,7 @@ function GroupDashboard({
                         className={
                           member.role === "admin"
                             ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                            : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                            : "bg-blue-100 text-gray-500 border-blue-500/30"
                         }
                       >
                         {member.role === "admin" ? (
@@ -2403,11 +2393,11 @@ function GroupDashboard({
                 Array.from({ length: 3 }).map((_, i) => (
                   <Card
                     key={i}
-                    className="bg-indigo-900/40 border-indigo-800/50"
+                    className="bg-white border-gray-200"
                   >
                     <CardContent className="p-4 space-y-3">
-                      <Skeleton className="h-5 w-32 bg-indigo-800/50" />
-                      <Skeleton className="h-3 w-full bg-indigo-800/50" />
+                      <Skeleton className="h-5 w-32 bg-gray-200" />
+                      <Skeleton className="h-3 w-full bg-gray-200" />
                     </CardContent>
                   </Card>
                 ))
@@ -2421,14 +2411,14 @@ function GroupDashboard({
                   return (
                   <Card
                     key={member.userId}
-                    className="bg-indigo-900/40 border-indigo-800/50"
+                    className="bg-white border-gray-200"
                     data-testid={`card-progress-${member.userId}`}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3 mb-3">
-                        <Avatar className="w-9 h-9 border-2 border-indigo-600">
+                        <Avatar className="w-9 h-9 border-2 border-blue-600">
                           <AvatarImage src={member.picture || undefined} />
-                          <AvatarFallback className="bg-indigo-800 text-indigo-200 text-xs">
+                          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                             {getInitials(member.name)}
                           </AvatarFallback>
                         </Avatar>
@@ -2450,7 +2440,7 @@ function GroupDashboard({
                               </span>
                             )}
                             {!isContentMember && completedCourses.length > 0 && (
-                              <span className="flex items-center gap-1 text-emerald-400 text-xs">
+                              <span className="flex items-center gap-1 text-blue-500 text-xs">
                                 <GraduationCap className="w-3.5 h-3.5" />
                                 {completedCourses.length} koorso
                               </span>
@@ -2492,11 +2482,11 @@ function GroupDashboard({
                             return (
                               <div
                                 key={idx}
-                                className="flex items-center gap-1 px-2 py-1 bg-emerald-900/30 border border-emerald-700/40 rounded-full"
+                                className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-full"
                                 data-testid={`cert-${member.userId}-${idx}`}
                               >
-                                <Star className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-emerald-200 text-[11px] font-medium">
+                                <Star className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="text-blue-600 text-[11px] font-medium">
                                   Shahaado: {certCourse?.title || "Koorsada"}
                                 </span>
                               </div>
@@ -2515,18 +2505,18 @@ function GroupDashboard({
                               return (
                                 <div key={`content-${idx}`}>
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-emerald-300' : isDhambaal ? 'text-teal-300' : 'text-purple-300'}`}>
+                                    <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-blue-500' : isDhambaal ? 'text-teal-300' : 'text-purple-300'}`}>
                                       <BookOpen className="w-3 h-3" />
                                       {label}
-                                      {isComplete && <span className="text-emerald-400 text-[10px] ml-1">✓ Dhammaystay</span>}
+                                      {isComplete && <span className="text-blue-500 text-[10px] ml-1">✓ Dhammaystay</span>}
                                     </span>
-                                    <span className={`text-xs ${isComplete ? 'text-emerald-400 font-semibold' : isDhambaal ? 'text-teal-400' : 'text-purple-400'}`}>
+                                    <span className={`text-xs ${isComplete ? 'text-blue-500 font-semibold' : isDhambaal ? 'text-teal-400' : 'text-purple-400'}`}>
                                       {course.readCount}/{course.totalCount}
                                     </span>
                                   </div>
                                   <Progress
                                     value={course.percent}
-                                    className={`h-2 ${isComplete ? 'bg-emerald-900/50' : isDhambaal ? 'bg-teal-900/50' : 'bg-purple-900/50'}`}
+                                    className={`h-2 ${isComplete ? 'bg-blue-200' : isDhambaal ? 'bg-teal-200' : 'bg-purple-200'}`}
                                   />
                                 </div>
                               );
@@ -2538,26 +2528,26 @@ function GroupDashboard({
                             return (
                               <div key={course.courseId}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-emerald-300' : 'text-indigo-300'}`}>
+                                  <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-blue-500' : 'text-gray-500'}`}>
                                     {isComplete ? <GraduationCap className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
                                     {courseInfo?.title || "Koorsada"}
-                                    {isComplete && <span className="text-emerald-400 text-[10px] ml-1">✓ Dhameeyay</span>}
+                                    {isComplete && <span className="text-blue-500 text-[10px] ml-1">✓ Dhameeyay</span>}
                                   </span>
-                                  <span className={`text-xs ${isComplete ? 'text-emerald-400 font-semibold' : 'text-indigo-400'}`}>
+                                  <span className={`text-xs ${isComplete ? 'text-blue-500 font-semibold' : 'text-gray-500'}`}>
                                     {course.completedLessons}/
                                     {course.totalLessons}
                                   </span>
                                 </div>
                                 <Progress
                                   value={course.percent}
-                                  className={`h-2 ${isComplete ? 'bg-emerald-900/50' : 'bg-indigo-800/50'}`}
+                                  className={`h-2 ${isComplete ? 'bg-blue-200' : 'bg-gray-200'}`}
                                 />
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <p className="text-indigo-400 text-xs">
+                        <p className="text-gray-500 text-xs">
                           {member.contentType === 'dhambaal' ? "Wali dhambaal lama akhriyin" : member.contentType === 'sheeko' ? "Wali sheeko lama akhriyin" : "Wali koorso lama bilaabin"}
                         </p>
                       )}
@@ -2567,8 +2557,8 @@ function GroupDashboard({
                 })
               ) : (
                 <div className="text-center py-12">
-                  <BookOpen className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-                  <p className="text-indigo-300 text-sm">
+                  <BookOpen className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">
                     {group.contentType === 'dhambaal' || group.contentType === 'sheeko'
                       ? "Xogta horumarka wali lama helin"
                       : group.courseIds && group.courseIds.length > 0
@@ -2581,12 +2571,12 @@ function GroupDashboard({
           </Tabs>
         ) : (
           <div className="text-center py-12">
-            <Users className="w-12 h-12 text-indigo-500 mx-auto mb-3" />
-            <p className="text-indigo-300 mb-4">
+            <Users className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+            <p className="text-gray-500 mb-4">
               Guruubka ku biir si aad u aragto posts-ka, xubnaha iyo horumarka
             </p>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-500 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => joinMutation.mutate()}
               disabled={joinMutation.isPending}
               data-testid="button-join-group-cta"

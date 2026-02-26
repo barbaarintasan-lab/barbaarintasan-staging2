@@ -6,9 +6,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (need postinstall scripts for esbuild/vite binaries)
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -21,9 +21,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install production dependencies
+# Install production dependencies only
 COPY package*.json ./
-RUN npm ci --omit=dev && npm ls stripe 2>/dev/null || npm install stripe
+RUN npm install --omit=dev --ignore-scripts && npm ls stripe 2>/dev/null || npm install stripe
 
 # Copy built assets from builder
 # dist/ contains: index.js (bundled server) and public/ (client build)

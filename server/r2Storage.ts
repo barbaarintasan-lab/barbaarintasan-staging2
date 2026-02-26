@@ -20,7 +20,7 @@ const R2_BUCKETS = {
   }
 };
 
-export type R2BucketType = 'dhambaal' | 'sheeko' | 'sawirada';
+export type R2BucketType = 'dhambaal' | 'sheeko' | 'sawirada' | 'talo';
 
 let s3Client: S3Client | null = null;
 
@@ -59,7 +59,9 @@ export async function uploadToR2(
   bucketType: R2BucketType = 'dhambaal'
 ): Promise<{ url: string; key: string }> {
   const client = getR2Client();
-  const bucket = R2_BUCKETS[bucketType];
+  // Map 'talo' to 'dhambaal' bucket if not specifically defined, or add it
+  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  const bucket = R2_BUCKETS[actualBucketType as keyof typeof R2_BUCKETS];
   const key = `${folder}/${fileName}`;
 
   await client.send(new PutObjectCommand({

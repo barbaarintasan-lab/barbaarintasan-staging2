@@ -45,7 +45,10 @@ The platform tracks read/listened content for Dhambaalka Waalidka posts and Maaw
 Admins can schedule and manage live Google Meet sessions. Events display on the homepage with smart join logic, "Add to Calendar" functionality, and admin CRUD capabilities.
 
 ### WordPress Integration
-The platform integrates with a WordPress marketing website via a REST API for user lookup, access checking, purchase recording (including Flutterwave webhooks), and syncing course catalogs.
+-   **Plugin**: `barbaarintasan-sync.php` (WordPress side)
+-   **Endpoint**: `/api/wordpress/purchase` (App side)
+-   **Logic**: Syncs WooCommerce order status 'completed' to enroll users in courses automatically.
+-   **Auth**: Secure API key check (`WORDPRESS_API_KEY`).
 
 ## External Dependencies
 

@@ -500,17 +500,7 @@ export async function sendPasswordResetEmail(
   customerName: string,
   resetToken: string,
 ): Promise<boolean> {
-  // Use APP_BASE_URL env var, or auto-detect from Replit environment
-  let resetBaseUrl = process.env.APP_BASE_URL;
-  if (!resetBaseUrl) {
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      resetBaseUrl = `https://${process.env.REPLIT_DEV_DOMAIN}`;
-    } else if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-      resetBaseUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-    } else {
-      resetBaseUrl = "http://localhost:5000";
-    }
-  }
+  const resetBaseUrl = process.env.APP_BASE_URL || "https://appbarbaarintasan.com";
   const resetLink = `${resetBaseUrl}/reset-password/${resetToken}`;
   const subject = `🔐 Password-kaaga cusbooneysii - Barbaarintasan Academy`;
 
@@ -569,17 +559,7 @@ export async function sendAdminPromotionEmail(
   email: string,
   customerName: string,
 ): Promise<boolean> {
-  // Get the admin URL
-  let adminUrl = process.env.APP_BASE_URL;
-  if (!adminUrl) {
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      adminUrl = `https://${process.env.REPLIT_DEV_DOMAIN}`;
-    } else if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-      adminUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-    } else {
-      adminUrl = "http://localhost:5000";
-    }
-  }
+  const adminUrl = process.env.APP_BASE_URL || "https://appbarbaarintasan.com";
   const adminLink = `${adminUrl}/admin`;
   const subject = `🎉 Hambalyo! Waxaad noqotay Admin - Barbaarintasan Academy`;
 
