@@ -204,15 +204,27 @@
     "specialCourses": "Special Courses",
     "parentTestimonials": "What Parents Say About Our Courses:",
     "comingSoonMessage": "Dear parent, we are glad you are with us. Many new courses are coming soon - stay tuned!",
-    "dailyTips": "Child development stages by age",
+    "dailyTips": "Daily Parenting Tips",
     "categories": {
       "feeding": "Feeding",
       "sleep": "Sleep",
       "play": "Play",
       "health": "Health",
-      "emotional": "Emotions",
+      "emotional": "Emotional",
       "behavior": "Behavior",
       "learning": "Learning"
+    },
+    "dhambaal": {
+      "title": "Parent Message",
+      "subtitle": "Parenting tips and guidance",
+      "readMore": "Read more",
+      "noContent": "No messages posted yet."
+    },
+    "sheeko": {
+      "title": "Children's Bedtime Stories",
+      "subtitle": "Bedtime stories for children",
+      "startListening": "Start listening",
+      "noContent": "No stories posted yet."
     },
     "aiRecommendations": "Courses Recommended For You",
     "aiRecommendationsSubtitle": "These courses are based on your AI assessment",

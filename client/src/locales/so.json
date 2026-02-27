@@ -219,15 +219,27 @@
     "specialCourses": "Koorsooyin Gaar ah",
     "parentTestimonials": "Waalidiinta Casharadeena ku xiran Aragtidooda:",
     "comingSoonMessage": "Waalidka qaaliga ah, waanu kugu faraxsanahay inaad nala joogto. Koorsooyin badan oo cusub ayaa soo socda - sug oo la soco wararkooda!",
-    "dailyTips": "Maraaxisha da'da ilmaha",
+    "dailyTips": "Talooyinka Maalinlaha ah",
     "categories": {
-      "feeding": "Quudin",
-      "sleep": "Hurdo",
-      "play": "Ciyaar",
-      "health": "Caafimaad",
+      "feeding": "Quudinta",
+      "sleep": "Hurdada",
+      "play": "Ciyaarta",
+      "health": "Caafimaadka",
       "emotional": "Dareenka",
       "behavior": "Dhaqanka",
       "learning": "Barashada"
+    },
+    "dhambaal": {
+      "title": "Dhambaalka Waalidka",
+      "subtitle": "Talo iyo tilmaamo waalidnimo",
+      "readMore": "Sii akhri",
+      "noContent": "Wali wax dhambaal ah lama soo dhigin."
+    },
+    "sheeko": {
+      "title": "Maaweelada Caruurta",
+      "subtitle": "Sheekooyinka hurdada ee caruurta",
+      "startListening": "Bilow dhageysiga",
+      "noContent": "Wali wax sheeko ah lama soo dhigin."
     },
     "aiRecommendations": "Koorsoyinka Laguu Soo Jeediyay inaad Qaadato",
     "aiRecommendationsSubtitle": "Koorsoyinkaan waxay ku salaysan yihiin qiimeyntaadii AI",

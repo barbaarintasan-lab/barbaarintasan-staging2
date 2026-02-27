@@ -57,7 +57,6 @@ interface BedtimeStory {
   moralLesson: string | null;
   ageRange: string | null;
   images: string[];
-  thumbnailUrl?: string | null;
   audioUrl: string | null;
   storyDate: string;
   generatedAt: string;
@@ -445,10 +444,10 @@ export default function Maaweelo() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">
-                {t("maaweelo.title")}
+                {t("home.sheeko.title")}
               </h1>
               <p className="text-slate-400 text-sm">
-                {t("maaweelo.subtitle")}
+                {t("home.sheeko.subtitle")}
               </p>
             </div>
           </div>

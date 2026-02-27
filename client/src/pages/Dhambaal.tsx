@@ -57,7 +57,6 @@ interface ParentMessage {
   topic: string;
   keyPoints: string | null;
   images: string[];
-  thumbnailUrl?: string | null;
   audioUrl: string | null;
   messageDate: string;
   generatedAt: string;
@@ -516,10 +515,10 @@ export default function Dhambaal() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">
-                {t("dhambaal.title")}
+                {t("home.dhambaal.title")}
               </h1>
               <p className="text-slate-400 text-sm">
-                {t("dhambaal.subtitle")}
+                {t("home.dhambaal.subtitle")}
               </p>
             </div>
           </div>
