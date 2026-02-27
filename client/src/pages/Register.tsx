@@ -128,6 +128,8 @@ export default function Register() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        throw new Error("Google login-ka wuu fashilmay");
       }
     } catch (err: any) {
       console.error(err);
