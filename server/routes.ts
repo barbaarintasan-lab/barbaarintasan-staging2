@@ -2357,13 +2357,27 @@ Ka jawaab qaabkan JSON ah:
           console.error("Session save error:", err);
           return res.redirect("/register?error=session_failed");
         }
+        
+        // Debug session after save
+        console.log(`[SESSION] Saved session for parent ${parent.id}. parentId in session: ${req.session.parentId}`);
+
+        // Set a long-lived cookie for parentId to help debugging/persistence
+        res.cookie('parent_id', parent.id, { 
+          maxAge: 365 * 24 * 60 * 60 * 1000, 
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: 'lax'
+        });
+
         // Check for external return URL (WordPress redirect)
         const returnUrl = req.session.oauthReturnUrl;
         delete req.session.oauthReturnUrl; // Clear it after use
         
         if (returnUrl && (returnUrl.startsWith("https://barbaarintasan.com") || returnUrl.startsWith("https://www.barbaarintasan.com"))) {
+          console.log(`[AUTH] Redirecting to external returnUrl: ${returnUrl}`);
           res.redirect(returnUrl);
         } else {
+          console.log(`[AUTH] Redirecting to home page`);
           res.redirect("/");
         }
       });
