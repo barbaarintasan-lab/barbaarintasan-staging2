@@ -77,6 +77,19 @@ export async function serveStatic(app: Express, server: Server) {
   });
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Uncaught exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Fatal] Unhandled promise rejection:', reason);
+  process.exit(1);
+});
+
 (async () => {
   await runApp(serveStatic);
-})();
+})().catch((err) => {
+  console.error('[Fatal] Failed to start server:', err);
+  process.exit(1);
+});
