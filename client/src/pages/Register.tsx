@@ -84,7 +84,12 @@ export default function Register() {
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     try {
-      const googleUrl = returnUrl ? `/api/auth/google?returnUrl=${encodeURIComponent(returnUrl)}` : "/api/auth/google";
+      // Use window.location.origin to ensure we're calling our own API
+      const apiBase = window.location.origin;
+      const googleUrl = returnUrl 
+        ? `${apiBase}/api/auth/google?returnUrl=${encodeURIComponent(returnUrl)}` 
+        : `${apiBase}/api/auth/google`;
+        
       const response = await fetch(googleUrl);
       const data = await response.json();
       if (data.url) {
