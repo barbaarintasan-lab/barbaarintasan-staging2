@@ -16392,7 +16392,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   });
 
   // Webhook endpoint for payment providers (Flutterwave, etc.)
-  app.post("/api/wordpress/webhook/payment", async (req, res) => {
+  app.post("/api/wordpress/webhook/payment", verifyWordPressApiKey, async (req, res) => {
     try {
       const { event, data } = req.body;
       
