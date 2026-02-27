@@ -81,7 +81,8 @@ export async function uploadToR2(
 export async function getFromR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<Buffer | null> {
   try {
     const client = getR2Client();
-    const bucket = R2_BUCKETS[bucketType];
+    const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+    const bucket = R2_BUCKETS[actualBucketType];
     
     const response = await client.send(new GetObjectCommand({
       Bucket: bucket.name,
@@ -103,7 +104,8 @@ export async function getFromR2(key: string, bucketType: R2BucketType = 'dhambaa
 
 export async function deleteFromR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<void> {
   const client = getR2Client();
-  const bucket = R2_BUCKETS[bucketType];
+  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  const bucket = R2_BUCKETS[actualBucketType];
   
   await client.send(new DeleteObjectCommand({
     Bucket: bucket.name,
@@ -115,7 +117,8 @@ export async function deleteFromR2(key: string, bucketType: R2BucketType = 'dham
 export async function existsInR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<boolean> {
   try {
     const client = getR2Client();
-    const bucket = R2_BUCKETS[bucketType];
+    const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+    const bucket = R2_BUCKETS[actualBucketType];
     
     await client.send(new HeadObjectCommand({
       Bucket: bucket.name,
@@ -129,7 +132,8 @@ export async function existsInR2(key: string, bucketType: R2BucketType = 'dhamba
 }
 
 export function getR2PublicUrl(key: string, bucketType: R2BucketType = 'dhambaal'): string {
-  const bucket = R2_BUCKETS[bucketType];
+  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  const bucket = R2_BUCKETS[actualBucketType];
   return `${bucket.publicUrl}/${key}`;
 }
 
@@ -148,7 +152,8 @@ export async function listR2Files(
   maxKeys: number = 200
 ): Promise<R2FileInfo[]> {
   const client = getR2Client();
-  const bucket = R2_BUCKETS[bucketType];
+  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  const bucket = R2_BUCKETS[actualBucketType];
   const files: R2FileInfo[] = [];
   let continuationToken: string | undefined;
 

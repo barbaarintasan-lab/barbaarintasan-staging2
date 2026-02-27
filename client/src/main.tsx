@@ -100,12 +100,38 @@ const hideSplash = () => {
   }
 };
 
+// Global error handler - shows a recovery UI if React fails to mount
+window.addEventListener('error', (event) => {
+  const root = document.getElementById('root');
+  if (root && !root.children.length) {
+    hideSplash();
+    root.innerHTML = `
+      <div role="alert" aria-live="assertive" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f9fafb;padding:1rem">
+        <main style="max-width:28rem;width:100%;background:white;border-radius:0.5rem;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:1.5rem;text-align:center">
+          <h2 style="font-size:1.25rem;font-weight:700;color:#1f2937;margin-bottom:0.5rem">Wax qalad ah ayaa dhacay</h2>
+          <p style="color:#6b7280;margin-bottom:1rem">App-ka wuxuu la kulmay cilad. Fadlan dib u cusboonaysii bogga.</p>
+          <button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:0.5rem 1.5rem;border-radius:0.5rem;cursor:pointer;font-size:1rem;outline-offset:2px" onfocus="this.style.outline='2px solid #6366f1'" onblur="this.style.outline='none'">
+            Dib u cusboonaysii
+          </button>
+        </main>
+      </div>`;
+  }
+});
+
 if (isSheekoPWA()) {
   import('./SheekoApp').then(({ SheekoApp }) => {
     createRoot(document.getElementById("root")!).render(<SheekoApp />);
     hideSplash();
+  }).catch((err) => {
+    console.error('[App] Failed to load SheekoApp:', err);
+    hideSplash();
   });
 } else {
-  createRoot(document.getElementById("root")!).render(<App />);
-  hideSplash();
+  try {
+    createRoot(document.getElementById("root")!).render(<App />);
+    hideSplash();
+  } catch (err) {
+    console.error('[App] Failed to render App:', err);
+    hideSplash();
+  }
 }
