@@ -520,6 +520,7 @@ function SheekoSection() {
 }
 
 function DhambaalSection() {
+  const { t } = useTranslation();
   const { apiLanguage } = useLanguage();
   interface ParentMessage {
     id: string;
@@ -577,6 +578,7 @@ function DhambaalSection() {
 }
 
 function MaaweeloSection() {
+  const { t } = useTranslation();
   const { apiLanguage } = useLanguage();
   interface BedtimeStory {
     id: string;
