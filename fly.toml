@@ -23,7 +23,7 @@ primary_region = "fra"
   
   # Allow long-running requests for cron jobs (AI content generation)
   [http_service.http_options]
-    idle_timeout = 300  # 5 minutes for AI content generation
+    h2_backend = false
 
   [http_service.concurrency]
     type = "connections"
@@ -42,4 +42,4 @@ primary_region = "fra"
     path = "/api/health"
     interval = "30s"
     timeout = "10s"
-    grace_period = "30s"
+    grace_period = "60s"

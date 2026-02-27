@@ -25,6 +25,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev --ignore-scripts && npm ls stripe 2>/dev/null || npm install stripe
 
+# Copy bcrypt native bindings from builder (--ignore-scripts skips node-pre-gyp download)
+COPY --from=builder /app/node_modules/bcrypt ./node_modules/bcrypt
+
 # Copy built assets from builder
 # dist/ contains: index.js (bundled server) and public/ (client build)
 COPY --from=builder /app/dist ./dist
@@ -48,7 +51,7 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
 # Start the application
