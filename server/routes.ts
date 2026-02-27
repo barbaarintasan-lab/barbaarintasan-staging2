@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, paymentSubmissions, courses, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -224,14 +224,14 @@ async function applyTranslations<T extends Record<string, any>>(
     );
 
   // Apply translations to the entity
-  const translatedEntity: Record<string, any> = { ...entity };
+  const translatedEntity = { ...entity };
   for (const translation of entityTranslations) {
     if (fields.includes(translation.fieldName)) {
       translatedEntity[translation.fieldName] = translation.translatedText;
     }
   }
 
-  return translatedEntity as T;
+  return translatedEntity;
 }
 
 /**
@@ -277,7 +277,7 @@ async function applyTranslationsToArray<T extends Record<string, any> & { id: st
   // Apply translations to each entity
   return entities.map(entity => {
     const entityTranslations = translationsByEntity.get(entity.id) || [];
-    const translatedEntity: Record<string, any> = { ...entity };
+    const translatedEntity = { ...entity };
     
     for (const translation of entityTranslations) {
       if (fields.includes(translation.fieldName)) {
@@ -285,7 +285,7 @@ async function applyTranslationsToArray<T extends Record<string, any> & { id: st
       }
     }
     
-    return translatedEntity as typeof entity;
+    return translatedEntity;
   });
 }
 
@@ -2071,13 +2071,6 @@ Ka jawaab qaabkan JSON ah:
           console.error(`[REGISTRATION] Failed to send welcome email to ${parent.email}:`, emailError);
         }
 
-        // Sync new user to WordPress (non-blocking)
-        if (parent) {
-          const parentRef = parent;
-          syncUserToWordPress(parentRef.email, parentRef.name, phone || '', hashedPassword).catch(err => {
-            console.error(`[WP-SYNC] Background sync failed for ${parentRef.email}:`, err);
-          });
-        }
       }
 
       // Generate unique session token for single-session enforcement
@@ -2128,37 +2121,8 @@ Ka jawaab qaabkan JSON ah:
     }
   });
 
-  // Helper: Verify login credentials against WordPress
   async function verifyWithWordPress(email: string, password: string): Promise<{ verified: boolean; user?: { name: string; phone: string; email: string } }> {
-    const apiKey = process.env.WORDPRESS_API_KEY;
-    if (!apiKey) {
-      console.log('[WP-LOGIN] WORDPRESS_API_KEY not set - skipping WordPress verification');
-      return { verified: false };
-    }
-    
-    try {
-      const response = await fetch('https://barbaarintasan.com/wp-json/bsa/v1/verify-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      const result = await response.json() as any;
-      
-      if (result.verified) {
-        console.log(`[WP-LOGIN] WordPress verified user: ${email}`);
-        return { verified: true, user: result.user };
-      }
-      
-      console.log(`[WP-LOGIN] WordPress verification failed for: ${email} - ${result.error || 'unknown'}`);
-      return { verified: false };
-    } catch (error) {
-      console.error(`[WP-LOGIN] Error verifying with WordPress: ${email}`, error);
-      return { verified: false };
-    }
+    return { verified: false };
   }
 
   // Parent email/password login
@@ -2174,24 +2138,7 @@ Ka jawaab qaabkan JSON ah:
       let parent = await storage.getParentByEmail(normalizedEmail);
       
       if (!parent) {
-        // User not in app database - try WordPress verification
-        const wpVerified = await verifyWithWordPress(normalizedEmail, password);
-        if (!wpVerified.verified) {
-          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
-        }
-        
-        // WordPress verified! Auto-create account in app
-        const hashedPassword = await bcrypt.hash(password, 10);
-        parent = await storage.createParent({
-          email: normalizedEmail,
-          password: hashedPassword,
-          name: wpVerified.user?.name || normalizedEmail.split('@')[0],
-          phone: wpVerified.user?.phone || null,
-          country: null,
-          city: null,
-          inParentingGroup: false,
-        });
-        console.log(`[WP-LOGIN] Auto-created app account for WordPress user: ${normalizedEmail}, id: ${parent.id}`);
+        return res.status(401).json({ error: "Akoonkan lama helin. Fadlan app-ka ka iska diiwaangeli." });
       } else {
         if (!parent.password) {
           return res.status(401).json({ error: "Akoonkaan wuxuu ku sameeyay Google. Fadlan Google-ga ku gal." });
@@ -2199,16 +2146,7 @@ Ka jawaab qaabkan JSON ah:
 
         const isValid = await bcrypt.compare(password, parent.password);
         if (!isValid) {
-          // Also try WordPress as fallback (user may have changed password on WordPress)
-          const wpVerified = await verifyWithWordPress(normalizedEmail, password);
-          if (wpVerified.verified) {
-            // Update app password to match WordPress
-            const hashedPassword = await bcrypt.hash(password, 10);
-            await storage.updateParentPassword(parent.id, hashedPassword);
-            console.log(`[WP-LOGIN] Updated app password from WordPress for: ${normalizedEmail}`);
-          } else {
-            return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
-          }
+          return res.status(401).json({ error: "Email ama password-ku khalad yahay" });
         }
       }
 
@@ -2284,6 +2222,14 @@ Ka jawaab qaabkan JSON ah:
         ? `${process.env.APP_BASE_URL}/api/auth/google/callback`
         : `${protocol}://${req.get('host')}/api/auth/google/callback`;
       
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        console.error("[GOOGLE-AUTH] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
+        return res.status(500).json({ error: "Google login is not configured." });
+      }
+
       // Store returnUrl in session for external redirect after OAuth
       const returnUrl = req.query.returnUrl as string | undefined;
       if (returnUrl && (returnUrl.startsWith("https://barbaarintasan.com") || returnUrl.startsWith("https://www.barbaarintasan.com"))) {
@@ -2291,8 +2237,8 @@ Ka jawaab qaabkan JSON ah:
       }
       
       const oauth2Client = new OAuth2Client(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
+        clientId,
+        clientSecret,
         redirectUri
       );
       
@@ -2495,6 +2441,14 @@ Ka jawaab qaabkan JSON ah:
 
       // Mark token as used
       await storage.markPasswordResetTokenUsed(token);
+
+      // Sync password reset to WordPress
+      const parent = await storage.getParent(resetToken.parentId);
+      if (parent?.email) {
+        syncPasswordResetToWordPress(parent.email, hashedPassword).catch(err => {
+          console.error('[WP-SYNC] Background password sync failed:', err);
+        });
+      }
 
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
@@ -3802,25 +3756,27 @@ Ka jawaab qaabkan JSON ah:
   app.get("/api/social-posts/latest", async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 5, 10);
-      const posts = await storage.listLatestParentPosts(limit);
-      
-      const postsWithDetails = await Promise.all(
-        posts.map(async (post) => {
-          const [parent, images] = await Promise.all([
-            storage.getParent(post.parentId),
-            storage.getPostImages(post.id),
-          ]);
-          return {
-            ...post,
-            author: {
-              id: parent?.id,
-              name: parent?.name,
-              picture: parent?.picture,
-            },
-            images,
-          };
-        })
-      );
+      const cacheKey = `social-posts-latest-${limit}`;
+      const postsWithDetails = await getCached(cacheKey, 120000, async () => {
+        const posts = await storage.listLatestParentPosts(limit);
+        return Promise.all(
+          posts.map(async (post) => {
+            const [parent, images] = await Promise.all([
+              storage.getParent(post.parentId),
+              storage.getPostImages(post.id),
+            ]);
+            return {
+              ...post,
+              author: {
+                id: parent?.id,
+                name: parent?.name,
+                picture: parent?.picture,
+              },
+              images,
+            };
+          })
+        );
+      });
 
       res.json(postsWithDetails);
     } catch (error) {
@@ -4170,8 +4126,7 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Sawir ma la soo dirin" });
       }
 
-      const driveResult = await uploadToGoogleDrive(req.file.buffer, req.file.originalname, req.file.mimetype);
-      const imageUrl = driveResult.webContentLink;
+      const imageUrl = await uploadToGoogleDrive(req.file.buffer, req.file.originalname, req.file.mimetype);
       
       await storage.addCommentImage({
         commentId,
@@ -4610,7 +4565,7 @@ Ka jawaab qaabkan JSON ah:
       }
 
       if (completed === true) {
-        await storage.markLessonComplete(req.session.parentId, lesson.id, lesson.courseId);
+        await storage.markLessonComplete(req.session.parentId, lesson);
       }
 
       res.json({ success: true, synced: true });
@@ -5129,7 +5084,6 @@ Ka jawaab qaabkan JSON ah:
         }
         return c;
       });
-      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -5383,9 +5337,9 @@ Ka jawaab qaabkan JSON ah:
         },
         course: {
           id: course?.id,
-          name: course?.title,
+          name: course?.name,
           description: course?.description,
-          thumbnailUrl: course?.imageUrl
+          thumbnailUrl: course?.thumbnailUrl
         },
         assets: [] as string[]
       };
@@ -7060,7 +7014,7 @@ Return JSON:
       
       // Send email notification to admin
       const course = await storage.getCourse(submission.courseId);
-      const paymentMethod = submission.paymentMethodId ? await storage.getPaymentMethod(submission.paymentMethodId) : undefined;
+      const paymentMethod = await storage.getPaymentMethod(submission.paymentMethodId);
       const planLabels: Record<string, string> = { onetime: "Hal Mar ($70)", monthly: "Bille ($15)", yearly: "Sanad ($114)" };
       
       const adminEmail = process.env.SMTP_EMAIL;
@@ -7093,7 +7047,7 @@ Return JSON:
                     <p><strong>Reference:</strong> ${submission.referenceCode || 'Ma jirto'}</p>
                   </div>
                   <p style="text-align: center; margin-top: 20px;">
-                    <a href="https://barbaarintasan-academy.replit.app/admin" style="display: inline-block; background: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                    <a href="https://appbarbaarintasan.com/admin" style="display: inline-block; background: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
                       Gal Admin Panel
                     </a>
                   </p>
@@ -7301,7 +7255,7 @@ Return JSON:
         if (updated.customerEmail) {
           const course = await storage.getCourse(updated.courseId);
           const courseName = course?.title || "Koorsada";
-          const courseSlug = course?.courseId || undefined;
+          const courseSlug = course?.slug || undefined;
           const emailSent = await sendPurchaseConfirmationEmail(
             updated.customerEmail,
             updated.customerName,
@@ -8390,7 +8344,7 @@ Return a JSON object with:
       res.json({
         success: true,
         uploaded: results.length,
-        errorCount: errors.length,
+        errors: errors.length,
         results,
         errors: errors
       });
@@ -8822,7 +8776,7 @@ Return a JSON object with:
   app.get("/api/testimonial-reactions", async (req, res) => {
     try {
       const parentId = req.session?.parentId || null;
-      const reactions = await storage.getAllTestimonialReactions(parentId || undefined);
+      const reactions = await storage.getAllTestimonialReactions(parentId);
       res.json(reactions);
     } catch (error) {
       console.error("Error fetching testimonial reactions:", error);
@@ -9065,7 +9019,6 @@ Return a JSON object with:
         }
         return s;
       });
-      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
       res.json(sections);
     } catch (error) {
       console.error("Error fetching homepage sections:", error);
@@ -9248,11 +9201,18 @@ Return a JSON object with:
   app.get("/api/ai-tips/today", async (req, res) => {
     try {
       const lang = req.query.lang as string;
+      const cacheKey = `ai-tip-today-${lang || 'so'}`;
+      const cached = apiCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiry) {
+        return res.json(cached.data);
+      }
       let tip = await storage.getApprovedTipForToday();
       if (tip && lang) {
         tip = await applyTranslations(tip, 'ai_tip', tip.id, lang, ['title', 'content', 'correctedContent']);
       }
-      res.json(tip || null);
+      const result = tip || null;
+      apiCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching today's AI tip:", error);
       res.status(500).json({ error: "Failed to fetch today's tip" });
@@ -10110,7 +10070,6 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         const count = await storage.getParentCount();
         return { count };
       });
-      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
       res.json(data);
     } catch (error) {
       res.json({ count: 0 });
@@ -10124,7 +10083,6 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         const count = await getTelegramGroupMemberCount();
         return { count: count || 9905 };
       });
-      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
       res.json(data);
     } catch (error) {
       console.error("Error fetching Telegram member count:", error);
@@ -10474,7 +10432,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           await storage.createParentMessage({
             title: parsed.title,
             content: parsed.body,
-            messageDate: parsed.date,
+            generatedAt: new Date(parsed.date + 'T08:00:00Z'),
             audioUrl: null,
             images: [],
             topic: 'general'
@@ -10505,13 +10463,11 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           
           // Create new bedtime story
           await storage.createBedtimeStory({
-            title: parsed.title,
             titleSomali: parsed.title,
-            content: parsed.body,
+            storySomali: parsed.body,
             characterName: parsed.characterName || 'Qof aan la aqoon',
-            characterType: 'human',
             moralLesson: parsed.moralLesson || '',
-            storyDate: parsed.date,
+            generatedAt: new Date(parsed.date + 'T08:00:00Z'),
             audioUrl: null,
             images: []
           });
@@ -15598,7 +15554,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       const parent = await storage.getParentById(parentId);
       const progress = await storage.getProgressByParentId(parentId);
       const enrollments = await storage.getEnrollmentsByParentId(parentId);
-      const notifications = await storage.getParentNotifications(parentId);
+      const notifications = await storage.getNotificationsByParentId(parentId);
       const consent = await storage.getUserConsent(parentId);
 
       const exportData = {
@@ -15612,8 +15568,8 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         learningProgress: progress,
         enrollments: enrollments.map(e => ({
           courseId: e.courseId,
-          enrolledAt: e.accessStart,
-          subscriptionType: e.planType,
+          enrolledAt: e.enrolledAt,
+          subscriptionType: e.subscriptionType,
         })),
         notificationCount: notifications.length,
         consentRecord: consent,
@@ -15677,7 +15633,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       for (const parent of allParents) {
         const parentEnrollments = [];
         for (const course of allCourses) {
-          const enrollment = await storage.getEnrollmentByParentAndCourse(parent.id, course.id);
+          const enrollment = await storage.getEnrollment(parent.id, course.id);
           if (enrollment && enrollment.status === 'active') {
             parentEnrollments.push({
               courseId: course.courseId,
@@ -15720,109 +15676,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
-  // Admin: Import lost parent user data (re-creates accounts from a WP-export JSON)
-  app.post("/api/admin/import-parents", async (req, res) => {
-    try {
-      const parentId = (req.session as any)?.parentId;
-      if (parentId) {
-        const parent = await storage.getParent(parentId);
-        if (!parent?.isAdmin) {
-          return res.status(403).json({ error: "Admin only" });
-        }
-      } else if (req.session.userId) {
-        const user = await storage.getUser(req.session.userId);
-        if (!user?.isAdmin) {
-          return res.status(403).json({ error: "Admin only" });
-        }
-      } else {
-        return res.status(401).json({ error: "Admin login required" });
-      }
-
-      const { users: importedUsers } = req.body;
-      if (!importedUsers || !Array.isArray(importedUsers) || importedUsers.length === 0) {
-        return res.status(400).json({ error: "No user data provided. Expected { users: [...] }" });
-      }
-
-      console.log(`[IMPORT-PARENTS] Admin importing ${importedUsers.length} parent records`);
-
-      const allCourses = await storage.getAllCourses();
-      const coursesByExternalId = new Map(allCourses.map(c => [c.courseId, c]));
-
-      let importedCount = 0;
-      let skippedCount = 0;
-      let enrollmentsImported = 0;
-      const errors: string[] = [];
-
-      for (const u of importedUsers) {
-        if (!u.email || !u.name) {
-          errors.push(`Skipped entry without email/name`);
-          skippedCount++;
-          continue;
-        }
-
-        // Skip if already exists
-        const existing = await storage.getParentByEmail(u.email);
-        if (existing) {
-          skippedCount++;
-          continue;
-        }
-
-        try {
-          const newParent = await storage.createParent({
-            email: u.email,
-            name: u.name,
-            // passwordHash is the bcrypt hash from the app's own export – same format
-            password: u.passwordHash || null,
-            phone: u.phone || null,
-            country: u.country || null,
-            city: u.city || null,
-          });
-
-          importedCount++;
-
-          // Re-create active enrollments if present
-          if (Array.isArray(u.enrollments)) {
-            for (const enr of u.enrollments) {
-              const course = coursesByExternalId.get(enr.courseId);
-              if (!course) continue;
-              try {
-                await storage.createEnrollment({
-                  parentId: newParent.id,
-                  courseId: course.id,
-                  planType: enr.planType || "lifetime",
-                  accessEnd: enr.accessEnd ? new Date(enr.accessEnd) : null,
-                  status: "active",
-                });
-                enrollmentsImported++;
-              } catch (enrErr: any) {
-                errors.push(`Enrollment error for ${u.email} / ${enr.courseId}: ${enrErr.message}`);
-              }
-            }
-          }
-        } catch (createErr: any) {
-          errors.push(`Failed to create ${u.email}: ${createErr.message}`);
-          skippedCount++;
-        }
-      }
-
-      const MAX_IMPORT_ERRORS_RETURNED = 20;
-
-      console.log(`[IMPORT-PARENTS] Done: ${importedCount} imported, ${skippedCount} skipped, ${enrollmentsImported} enrollments`);
-
-      res.json({
-        success: true,
-        message: `${importedCount} parent(s) restored, ${skippedCount} skipped (already exist), ${enrollmentsImported} enrollment(s) restored`,
-        importedCount,
-        skippedCount,
-        enrollmentsImported,
-        errors: errors.slice(0, MAX_IMPORT_ERRORS_RETURNED),
-      });
-    } catch (error: any) {
-      console.error("[IMPORT-PARENTS] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   // ==================== WORDPRESS USER SYNC ====================
   // Sync new user registrations from App → WordPress
   const WORDPRESS_SITE_URL = 'https://barbaarintasan.com';
@@ -15853,6 +15706,35 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       }
     } catch (error) {
       console.error(`[WP-SYNC] Error syncing user to WordPress: ${email}`, error);
+    }
+  }
+
+  async function syncPasswordResetToWordPress(email: string, newPasswordHash: string) {
+    const apiKey = process.env.WORDPRESS_API_KEY;
+    if (!apiKey) {
+      console.log('[WP-SYNC] WORDPRESS_API_KEY not set - skipping password reset sync');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${WORDPRESS_SITE_URL}/wp-json/bsa/v1/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({ email, password_hash: newPasswordHash }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log(`[WP-SYNC] Password reset synced to WordPress: ${email}`);
+      } else {
+        console.error(`[WP-SYNC] Failed to sync password reset to WordPress: ${email}`, result);
+      }
+    } catch (error) {
+      console.error(`[WP-SYNC] Error syncing password reset to WordPress: ${email}`, error);
     }
   }
 
@@ -16217,6 +16099,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
               courseId: course.id,
               planType: normalizedPlan,
               status: 'active',
+              accessStart: new Date(),
               accessEnd: enrollAccessEnd,
             });
             console.log(`[WORDPRESS API] Enrolled ${email} in ${course.title} (${normalizedPlan})`);
@@ -16254,6 +16137,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
             courseId: targetCourseId,
             planType: plan_type,
             status: 'active',
+            accessStart: new Date(),
             accessEnd: accessEnd,
           });
         }
@@ -16332,7 +16216,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         return res.json({ verified: false, error: "User not found" });
       }
 
-      const isValid = parent.password ? await bcrypt.compare(password, parent.password) : false;
+      const isValid = await bcrypt.compare(password, parent.password);
       console.log(`[WP-VERIFY] Password verification for ${normalizedEmail}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
 
       res.json({ verified: isValid });
@@ -16392,24 +16276,8 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   });
 
   // Webhook endpoint for payment providers (Flutterwave, etc.)
-  // NOTE: This endpoint is called directly by Flutterwave, NOT WordPress.
-  // Authentication uses Flutterwave's verif-hash header, not the WordPress API key.
   app.post("/api/wordpress/webhook/payment", async (req, res) => {
     try {
-      // Verify Flutterwave webhook signature
-      const verifHash = req.headers['verif-hash'] as string | undefined;
-      const flutterwaveSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
-      
-      if (flutterwaveSecret && verifHash !== flutterwaveSecret) {
-        console.error('[WORDPRESS WEBHOOK] Invalid Flutterwave webhook signature');
-        res.status(401).json({ error: 'Invalid webhook signature' });
-        return;
-      }
-      
-      if (!flutterwaveSecret) {
-        console.warn('[WORDPRESS WEBHOOK] FLUTTERWAVE_WEBHOOK_SECRET not configured - processing without verification');
-      }
-
       const { event, data } = req.body;
       
       console.log(`[WORDPRESS WEBHOOK] Received: ${event}`, JSON.stringify(data).substring(0, 200));
@@ -16447,14 +16315,21 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
               );
               
               if (existingSubscription) {
-                await storage.renewEnrollment(existingSubscription.id, planType, accessEnd);
+                await storage.updateEnrollment(existingSubscription.id, {
+                  status: 'active',
+                  planType: planType,
+                  accessEnd: accessEnd,
+                });
               } else {
                 const enrollment = await storage.createEnrollment({
                   parentId: parent.id,
                   courseId: allAccessCourseId,
                   planType: planType,
                 });
-                await storage.renewEnrollment(enrollment.id, planType, accessEnd);
+                await storage.updateEnrollment(enrollment.id, {
+                  status: 'active',
+                  accessEnd: accessEnd,
+                });
               }
               
               console.log(`[WORDPRESS WEBHOOK] Subscription activated for ${phone}: ${planType}`);
@@ -16861,7 +16736,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         mediaTitle: mediaTitle || null,
         driveFileId: driveFileId || null,
       });
-      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error creating meet event:", error);
@@ -16876,7 +16750,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       if (!event) {
         return res.status(404).json({ error: "Event not found" });
       }
-      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error updating meet event:", error);
@@ -16943,20 +16816,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
-  app.get("/api/meet-events/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const event = await storage.getGoogleMeetEvent(id);
-      if (!event) {
-        return res.status(404).json({ error: "Event not found" });
-      }
-      res.json(event);
-    } catch (error) {
-      console.error("Error fetching meet event:", error);
-      res.status(500).json({ error: "Failed to fetch meet event" });
-    }
-  });
-
   app.post("/api/admin/meet-events/:id/archive", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
@@ -16964,7 +16823,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       if (!event) {
         return res.status(404).json({ error: "Event not found" });
       }
-      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error archiving meet event:", error);
@@ -16976,7 +16834,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     try {
       const { id } = req.params;
       await storage.deleteGoogleMeetEvent(id);
-      apiCache.delete('meet-events');
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting meet event:", error);
@@ -17002,7 +16859,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
 
       await db.insert(ssoTokens).values({
         token,
-        userId: 0,
+        userId: parent.id,
         email: parent.email,
         name: parent.name,
         expiresAt,
@@ -17127,12 +16984,24 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { email, plan_type, course_id, amount, payment_method, transaction_id, name: userName } = req.body;
+    const { email, plan_type: raw_plan_type, course_id, amount, payment_method, transaction_id, name: userName, sku } = req.body;
     if (!email) {
       return res.status(400).json({ error: "Email required" });
     }
 
     try {
+      const skuOrPlan = sku || raw_plan_type || '';
+      const planTypeMap: Record<string, string> = {
+        'subscription-monthly': 'monthly',
+        'subscription-yearly': 'yearly',
+        'monthly': 'monthly',
+        'yearly': 'yearly',
+        'onetime': 'onetime',
+        'lifetime': 'lifetime',
+      };
+      const plan_type = planTypeMap[skuOrPlan.toLowerCase()] || raw_plan_type || 'monthly';
+      console.log(`[WP-WEBHOOK] SKU/plan mapping: raw="${raw_plan_type}", sku="${sku}", resolved="${plan_type}"`);
+
       const normalizedEmail = email.toLowerCase().trim();
       let [parent] = await db.select().from(parents)
         .where(eq(parents.email, normalizedEmail))
@@ -17161,7 +17030,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
 
       const now = new Date();
       
-      // Find the latest active accessEnd across all enrollments (for additive renewal)
       const existingParentEnrollments = await db.select().from(enrollments)
         .where(and(
           eq(enrollments.parentId, parent.id),

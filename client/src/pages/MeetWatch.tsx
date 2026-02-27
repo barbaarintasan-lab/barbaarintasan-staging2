@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Video, Volume2, Calendar, Clock, Loader2, Play, RefreshCw } from "lucide-react";
-import tarbiyaddaLogo from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
+import { ArrowLeft, Video, Volume2, Calendar, Clock, Loader2, Play, RefreshCw, ExternalLink } from "lucide-react";
+import tarbiyaddaLogo from "@assets/logo_1770622897660.png";
 
 export default function MeetWatch() {
   const { id } = useParams<{ id: string }>();
@@ -21,16 +21,29 @@ export default function MeetWatch() {
     };
   }, []);
 
-  const { data: meetEvent, isLoading } = useQuery<any>({
+  const { data: event, isLoading } = useQuery<any>({
     queryKey: ["/api/meet-events", id],
     queryFn: async () => {
-      const res = await fetch(`/api/meet-events/${id}`);
-      if (res.status === 404) return null;
+      const res = await fetch(`/api/meet-events`);
       if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
+      const events = await res.json();
+      return events.find((e: any) => e.id === id) || null;
     },
     enabled: !!id,
   });
+
+  const { data: archivedEvent } = useQuery<any>({
+    queryKey: ["/api/meet-events/archived", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/meet-events/archived`);
+      if (!res.ok) return null;
+      const events = await res.json();
+      return events.find((e: any) => e.id === id) || null;
+    },
+    enabled: !!id && !event,
+  });
+
+  const meetEvent = event || archivedEvent;
 
   const formatSomaliDate = (dateStr: string) => {
     const months = ["Janaayo", "Febraayo", "Maarso", "Abriil", "May", "Juun", "Luuliyo", "Ogost", "Sebtembar", "Oktoobar", "Nofembar", "Desembar"];
@@ -114,6 +127,11 @@ export default function MeetWatch() {
   const isVideo = meetEvent.mediaType !== "audio";
   const streamUrl = `/api/meet-events/${meetEvent.id}/stream`;
   const displayTitle = meetEvent.mediaTitle || meetEvent.title;
+  const driveFileId = meetEvent.driveFileId;
+  
+  // Use Google Drive embed as primary for better reliability, or fallback if stream fails
+  const driveEmbedUrl = driveFileId ? `https://drive.google.com/file/d/${driveFileId}/preview` : null;
+  const driveViewUrl = driveFileId ? `https://drive.google.com/file/d/${driveFileId}/view` : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -141,55 +159,37 @@ export default function MeetWatch() {
                 </span>
               </div>
 
-              {videoError ? (
-                <div className="relative rounded-none sm:rounded-xl overflow-hidden shadow-lg bg-gray-900 aspect-video flex flex-col items-center justify-center p-6 text-center">
-                  <div className="text-red-400 mb-4">
-                    <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+              <div className="relative rounded-none sm:rounded-xl overflow-hidden shadow-lg bg-black">
+                {driveEmbedUrl ? (
+                  <div className="relative w-full aspect-video">
+                    <iframe
+                      src={driveEmbedUrl}
+                      className="absolute top-0 left-0 w-full h-full border-0"
+                      allow="autoplay; encrypted-media"
+                      allowFullScreen
+                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                    />
                   </div>
-                  <p className="text-white font-medium mb-2">{videoError}</p>
-                  <p className="text-gray-400 text-sm mb-4">
-                    Haddii dhibaatadu sii jirto, fadlan refresh garee bogga ama soo laabo mar dambe
-                  </p>
-                  <button
-                    onClick={handleRetry}
-                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                    data-testid="button-retry-video"
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-12 text-center text-white bg-gray-900 aspect-video">
+                    <Video className="w-12 h-12 text-gray-500 mb-4" />
+                    <p className="font-medium text-lg">Muuqaalka lama helin</p>
+                    <p className="text-gray-400 text-sm mt-2">Ma jiro File ID Google Drive ah oo lala xiriiriyay kulankan.</p>
+                  </div>
+                )}
+              </div>
+
+              {driveViewUrl && (
+                <div className="mt-4 px-3 pb-3 sm:px-0">
+                  <a
+                    href={driveViewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg"
                   >
-                    <RefreshCw className="w-4 h-4" /> Isku day mar kale
-                  </button>
-                </div>
-              ) : (
-                <div className="relative rounded-none sm:rounded-xl overflow-hidden shadow-lg bg-black">
-                  {videoLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="w-10 h-10 animate-spin text-white" />
-                        <p className="text-white/70 text-sm">Muuqaalka waa la soo dejinayaa...</p>
-                      </div>
-                    </div>
-                  )}
-                  <video
-                    key={streamUrl}
-                    ref={videoRef}
-                    controls
-                    controlsList="nodownload noremoteplayback"
-                    disablePictureInPicture
-                    className="w-full aspect-video bg-black"
-                    data-testid="meet-video-player"
-                    playsInline
-                    preload="auto"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onError={handleVideoError}
-                    onLoadedMetadata={handleVideoLoaded}
-                    onLoadedData={handleVideoLoaded}
-                    onCanPlay={handleVideoLoaded}
-                    onPlaying={handleVideoLoaded}
-                  >
-                    <source src={streamUrl} type="video/mp4" />
-                    Browser-kaagu ma taageero video-ga HTML5
-                  </video>
+                    <ExternalLink className="w-5 h-5" />
+                    Ku Daawo Google Drive (Hadii uu sare ka shaqayn waayo)
+                  </a>
                 </div>
               )}
 

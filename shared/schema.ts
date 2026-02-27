@@ -305,7 +305,6 @@ export const enrollments = pgTable("enrollments", {
   accessEnd: timestamp("access_end"), // null = lifetime access
   status: text("status").notNull().default("active"), // active, expired, past_due, cancelled
   paymentSubmissionId: varchar("payment_submission_id").references(() => paymentSubmissions.id),
-  paypalOrderId: text("paypal_order_id"), // PayPal order ID for PayPal payments
   amountPaid: text("amount_paid"), // Amount paid for this enrollment
   reminder7DaySent: timestamp("reminder_7_day_sent"),
   reminder3DaySent: timestamp("reminder_3_day_sent"),
