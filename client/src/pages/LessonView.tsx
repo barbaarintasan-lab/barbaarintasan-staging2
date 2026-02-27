@@ -940,17 +940,36 @@ export default function LessonView() {
       const fileId = getGoogleDriveId(lesson.videoUrl);
       
       if (useEmbedFallback && fileId) {
-        const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        const driveViewUrl = `https://drive.google.com/file/d/${fileId}/view`;
         return (
-          <div className="relative w-full aspect-video rounded-xl shadow-lg overflow-hidden bg-black">
-            <iframe
-              className="absolute top-0 left-0 w-full h-full"
-              src={embedUrl}
-              allow="autoplay; fullscreen"
-              allowFullScreen
-              data-testid="video-player-gdrive-embed"
-            />
-            <div className="absolute top-0 right-0 w-12 h-12 bg-black/80 rounded-bl-xl pointer-events-none z-10" />
+          <div className="relative w-full aspect-video rounded-xl shadow-lg overflow-hidden bg-gradient-to-b from-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
+            <div className="text-blue-300 mb-4">
+              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-white font-semibold text-lg mb-2">Muuqaalka diyaar maaha</p>
+            <p className="text-blue-200 text-sm mb-5">Muuqaalkan hadda lama ciyaari karo app-ka gudihiisa. Fadlan ka daawo Google Drive.</p>
+            <a
+              href={driveViewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors flex items-center gap-2"
+              data-testid="button-open-gdrive"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Ku Daawo Google Drive
+            </a>
+            <button
+              onClick={() => { setUseEmbedFallback(false); setVideoLoading(true); }}
+              className="mt-3 text-blue-300 hover:text-white text-sm underline transition-colors"
+              data-testid="button-retry-proxy"
+            >
+              Dib u tijaabi
+            </button>
           </div>
         );
       }
@@ -958,7 +977,7 @@ export default function LessonView() {
       const proxyUrl = `/api/video/stream/${lesson.id}`;
       
       const handleProxyError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-        console.log("[Video] Proxy failed, switching to embed fallback");
+        console.log("[Video] Proxy failed, switching to fallback UI");
         setUseEmbedFallback(true);
         setVideoLoading(false);
       };
