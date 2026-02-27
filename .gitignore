@@ -58,3 +58,8 @@ client/public/google-play-header.png
 # WordPress plugin archives
 wordpress-plugin/*.zip
 wordpress-plugin/course-images.zip
+
+# Android signing keystore (secrets - never commit)
+*.keystore
+android.keystore
+android/

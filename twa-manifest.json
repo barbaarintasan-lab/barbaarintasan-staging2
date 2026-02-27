@@ -1,0 +1,77 @@
+{
+  "packageId": "com.barbaarintasan.academy",
+  "host": "appbarbaarintasan.com",
+  "name": "BSA & Sheeko - Barbaarintasan Academy",
+  "launcherName": "BSA",
+  "display": "standalone",
+  "themeColor": "#1e40af",
+  "themeColorDark": "#1e3a8a",
+  "navigationColor": "#1e40af",
+  "navigationColorDark": "#1e3a8a",
+  "navigationDividerColor": "#1e40af",
+  "navigationDividerColorDark": "#1e3a8a",
+  "backgroundColor": "#1e40af",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://appbarbaarintasan.com/icon-512.png",
+  "maskableIconUrl": "https://appbarbaarintasan.com/icon-maskable-512.png",
+  "monochromeIconUrl": "https://appbarbaarintasan.com/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "barbaarintasan"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "orientation": "portrait",
+  "fingerprints": [
+    {
+      "name": "Production",
+      "value": "01:EE:60:F0:E1:0D:8D:C4:B5:EE:C2:B1:F5:50:33:B1:D0:6B:A0:C5:95:E4:36:E4:80:7C:BB:EB:E8:AF:DD:C5"
+    }
+  ],
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullyImmersiveMode": false,
+  "minSdkVersion": 24,
+  "targetSdkVersion": 34,
+  "generatorApp": "bubblewrap/cli",
+  "webManifestUrl": "https://appbarbaarintasan.com/manifest.json",
+  "fallbackType": "customtabs",
+  "shareTarget": null,
+  "shortcuts": [
+    {
+      "name": "Koorsooyin",
+      "shortName": "Courses",
+      "url": "/courses",
+      "description": "Eeg koorsoyinka waxbarashada",
+      "chooseIconFromWebManifest": true
+    },
+    {
+      "name": "Sheeko Live",
+      "shortName": "Sheeko",
+      "url": "/sheeko",
+      "description": "Ku biir sheeko voice chat",
+      "chooseIconFromWebManifest": true
+    },
+    {
+      "name": "Maktabada",
+      "shortName": "Library",
+      "url": "/library",
+      "description": "Akhri buugaagta iyo maqaallada",
+      "chooseIconFromWebManifest": true
+    }
+  ]
+}

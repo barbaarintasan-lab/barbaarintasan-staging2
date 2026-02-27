@@ -50,6 +50,14 @@ Admins can schedule and manage live Google Meet sessions. Events display on the 
 -   **Logic**: Syncs WooCommerce order status 'completed' to enroll users in courses automatically.
 -   **Auth**: Secure API key check (`WORDPRESS_API_KEY`).
 
+### Mobile App Platform (PWA + Android TWA)
+The app is **not** built with Flutter or React Native. It is a **React + TypeScript PWA (Progressive Web App)** that runs on all platforms from a single codebase:
+- **Android**: Packaged as a Trusted Web Activity (TWA) using Bubblewrap CLI (`com.barbaarintasan.academy`), distributed via Google Play Store. Configuration is in `twa-manifest.json`. Digital Asset Links are served at `/.well-known/assetlinks.json`.
+- **iOS**: Installed via Safari "Add to Home Screen" (PWA install).
+- **Web**: Works on all modern browsers.
+
+This approach keeps a single React codebase while allowing native-like installation on Android (Play Store) and iOS. See `docs/MOBILE_APP.md` for full details.
+
 ## External Dependencies
 
 -   **Frontend Libraries**: React 18, Vite, Wouter, TanStack Query, Radix UI, shadcn/ui, Tailwind CSS, Lucide React
