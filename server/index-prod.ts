@@ -83,8 +83,9 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[Fatal] Unhandled promise rejection:', reason);
-  process.exit(1);
+  // Log but do NOT exit - unhandled rejections from third-party libraries
+  // (e.g. stripe-replit-sync, NeonDB pool reconnects) should not crash the server
+  console.error('[Warning] Unhandled promise rejection:', reason);
 });
 
 (async () => {

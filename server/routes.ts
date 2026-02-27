@@ -15776,7 +15776,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
             phone: u.phone || null,
             country: u.country || null,
             city: u.city || null,
-            createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
           });
 
           importedCount++;
@@ -15791,7 +15790,6 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
                   parentId: newParent.id,
                   courseId: course.id,
                   planType: enr.planType || "lifetime",
-                  accessStart: enr.accessStart ? new Date(enr.accessStart) : new Date(),
                   accessEnd: enr.accessEnd ? new Date(enr.accessEnd) : null,
                   status: "active",
                 });
