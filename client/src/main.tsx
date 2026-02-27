@@ -19,7 +19,6 @@ const lockOrientation = async () => {
 };
 
 // Minimum height threshold for showing landscape warning on small screens
-// Below this height in landscape mode, the app becomes difficult to use
 const MIN_PORTRAIT_HEIGHT = 600;
 
 // Create accessible landscape warning overlay
@@ -91,7 +90,8 @@ const isSheekoPWA = () => {
   const displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
   const iosStandalone = (window.navigator as any).standalone === true;
   
-  return isSheekoPath || standaloneParam || displayModeStandalone || iosStandalone;
+  // Only load SheekoApp if explicitly on /sheeko path
+  return isSheekoPath && (standaloneParam || displayModeStandalone || iosStandalone);
 };
 
 const hideSplash = () => {
@@ -103,6 +103,11 @@ const hideSplash = () => {
 if (isSheekoPWA()) {
   import('./SheekoApp').then(({ SheekoApp }) => {
     createRoot(document.getElementById("root")!).render(<SheekoApp />);
+    hideSplash();
+  }).catch(err => {
+    console.error("Failed to load SheekoApp:", err);
+    // Fallback to main App if Sheeko fails
+    createRoot(document.getElementById("root")!).render(<App />);
     hideSplash();
   });
 } else {
