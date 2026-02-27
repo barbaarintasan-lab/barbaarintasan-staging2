@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
 const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';

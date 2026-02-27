@@ -2071,6 +2071,11 @@ Ka jawaab qaabkan JSON ah:
           console.error(`[REGISTRATION] Failed to send welcome email to ${parent.email}:`, emailError);
         }
 
+        // Sync new user to WordPress so they can log into barbaarintasan.com
+        syncUserToWordPress(parent.email, parent.name, parent.phone || '', hashedPassword).catch(err => {
+          console.error('[WP-SYNC] Background user sync failed:', err);
+        });
+
       }
 
       // Generate unique session token for single-session enforcement
@@ -2327,6 +2332,11 @@ Ka jawaab qaabkan JSON ah:
             googleId: googleId!,
             picture: picture || null,
             password: null // No password for Google-only accounts
+          });
+
+          // Sync new Google user to WordPress
+          syncUserToWordPress(parent.email, parent.name, parent.phone || '', '').catch(err => {
+            console.error('[WP-SYNC] Background Google user sync failed:', err);
           });
         }
       }
