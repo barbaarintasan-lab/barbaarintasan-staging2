@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages } from "lucide-react";
+import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages, Copy } from "lucide-react";
 import AIModerationPanel from "@/components/AIModerationPanel";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -14661,9 +14661,9 @@ function MeetEventsAdmin() {
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const { data: events = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/meet-events"],
+    queryKey: ["/api/admin/meet-events"],
     queryFn: async () => {
-      const res = await fetch("/api/meet-events", { credentials: "include" });
+      const res = await fetch("/api/admin/meet-events", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch events");
       return res.json();
     },
@@ -14753,7 +14753,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to save event");
       toast.success(editingEvent ? "Kulanka waa la cusbooneysiiyay" : "Kulanka cusub waa la abuuray");
-      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
       resetForm();
     } catch (err: any) {
       toast.error(err.message || "Khalad ayaa dhacay");
@@ -14771,7 +14771,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to delete");
       toast.success("Kulanka waa la tiray");
-      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
     } catch {
       toast.error("Khalad ayaa dhacay");
     }
@@ -14786,7 +14786,7 @@ function MeetEventsAdmin() {
         body: JSON.stringify({ isActive: !event.isActive }),
       });
       if (!res.ok) throw new Error("Failed to toggle");
-      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
       toast.success(event.isActive ? "Kulanka waa la damiyay" : "Kulanka waa la shaqeeyay");
     } catch {
       toast.error("Khalad ayaa dhacay");
@@ -14802,7 +14802,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to archive");
       toast.success("Kulanka Maktabada ayuu u wareegay");
-      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
     } catch {
       toast.error("Khalad ayaa dhacay");
     }
@@ -15020,6 +15020,28 @@ function MeetEventsAdmin() {
                               </span>
                             </div>
                             <p className="text-[9px] text-gray-500 mt-1 truncate">ID: {event.driveFileId}</p>
+                            <div className="flex items-center gap-1 mt-1.5">
+                              <a
+                                href={`/meet-watch/${event.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-blue-600 hover:underline truncate flex-1"
+                                data-testid={`watch-link-${event.id}`}
+                              >
+                                /meet-watch/{event.id}
+                              </a>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/meet-watch/${event.id}`);
+                                  toast.success("Link-ga waa la koobiyeeyay");
+                                }}
+                                className="p-0.5 rounded hover:bg-purple-100 text-purple-600 shrink-0"
+                                title="Koobiyee link-ga"
+                                data-testid={`copy-watch-link-${event.id}`}
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

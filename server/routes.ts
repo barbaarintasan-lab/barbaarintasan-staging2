@@ -16847,6 +16847,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         mediaTitle: mediaTitle || null,
         driveFileId: driveFileId || null,
       });
+      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error creating meet event:", error);
@@ -16861,6 +16862,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       if (!event) {
         return res.status(404).json({ error: "Event not found" });
       }
+      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error updating meet event:", error);
@@ -16927,6 +16929,20 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
+  app.get("/api/meet-events/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.getGoogleMeetEvent(id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error fetching meet event:", error);
+      res.status(500).json({ error: "Failed to fetch meet event" });
+    }
+  });
+
   app.post("/api/admin/meet-events/:id/archive", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
@@ -16934,6 +16950,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       if (!event) {
         return res.status(404).json({ error: "Event not found" });
       }
+      apiCache.delete('meet-events');
       res.json(event);
     } catch (error) {
       console.error("Error archiving meet event:", error);
@@ -16945,6 +16962,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     try {
       const { id } = req.params;
       await storage.deleteGoogleMeetEvent(id);
+      apiCache.delete('meet-events');
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting meet event:", error);
