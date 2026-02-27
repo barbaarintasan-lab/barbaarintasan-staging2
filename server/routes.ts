@@ -2024,6 +2024,9 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Wadanka waa khasab" });
       }
 
+      // Normalize email to lowercase (matches login endpoint behavior)
+      const normalizedEmail = email.toLowerCase().trim();
+
       // Normalize country and city names (capitalize first letter of each word)
       const normalizeText = (text: string) => text ? text.trim().split(' ')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -2033,7 +2036,7 @@ Ka jawaab qaabkan JSON ah:
       const normalizedCity = city ? normalizeText(city) : '';
 
       // Check if email already exists
-      const existingParent = await storage.getParentByEmail(email);
+      const existingParent = await storage.getParentByEmail(normalizedEmail);
       
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -2053,7 +2056,7 @@ Ka jawaab qaabkan JSON ah:
       } else {
         // Create new parent
         parent = await storage.createParent({
-          email,
+          email: normalizedEmail,
           password: hashedPassword,
           name,
           phone: phone || null,
