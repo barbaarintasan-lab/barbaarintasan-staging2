@@ -2264,11 +2264,12 @@ Ka jawaab qaabkan JSON ah:
       const { code, error } = req.query;
       
       if (error) {
-        console.error("Google OAuth error:", error);
+        console.error("[GOOGLE-AUTH] OAuth error from Google:", error);
         return res.redirect("/register?error=google_auth_failed");
       }
       
       if (!code || typeof code !== 'string') {
+        console.error("[GOOGLE-AUTH] Missing code in callback query");
         return res.redirect("/register?error=missing_code");
       }
       
@@ -2277,6 +2278,8 @@ Ka jawaab qaabkan JSON ah:
         ? `${process.env.APP_BASE_URL}/api/auth/google/callback`
         : `${protocol}://${req.get('host')}/api/auth/google/callback`;
       
+      console.log(`[GOOGLE-AUTH] Callback redirect URI: ${redirectUri}`);
+      
       const oauth2Client = new OAuth2Client(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -2284,7 +2287,9 @@ Ka jawaab qaabkan JSON ah:
       );
       
       // Exchange code for tokens
+      console.log("[GOOGLE-AUTH] Exchanging code for tokens...");
       const { tokens } = await oauth2Client.getToken(code);
+      console.log("[GOOGLE-AUTH] Token exchange successful");
       oauth2Client.setCredentials(tokens);
       
       // Get user info from Google
@@ -2381,8 +2386,11 @@ Ka jawaab qaabkan JSON ah:
           res.redirect("/");
         }
       });
-    } catch (error) {
-      console.error("Google OAuth callback error:", error);
+    } catch (error: any) {
+      console.error("[GOOGLE-AUTH] Callback error:", error?.message || error);
+      if (error?.response?.data) {
+        console.error("[GOOGLE-AUTH] Error details:", JSON.stringify(error.response.data));
+      }
       res.redirect("/register?error=google_auth_failed");
     }
   });
