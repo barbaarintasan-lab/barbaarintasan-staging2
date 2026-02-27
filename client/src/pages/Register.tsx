@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
@@ -54,7 +54,6 @@ const COUNTRIES = [
   { value: "other", label: "🌍 Wadan Kale" },
 ];
 
-const WORDPRESS_REGISTER_URL = "https://barbaarintasan.com/my-account/";
 
 export default function Register() {
   const { t } = useTranslation();
@@ -118,10 +117,6 @@ export default function Register() {
     }
   };
 
-  const handleWordPressRegister = () => {
-    window.open(WORDPRESS_REGISTER_URL, "_blank");
-  };
-
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     try {
@@ -149,21 +144,6 @@ export default function Register() {
             <img src={logoImage} alt="Barbaarintasan" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900">{isLogin ? "Soo Gal" : "Sameyso Akoon"}</h1>
           </div>
-
-          {!isLogin && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-              <p className="text-gray-700 text-sm leading-relaxed mb-4">
-                Si aad akoon u sameyso, fadlan booqo websaydkeena barbaarintasan.com oo halkaas iska diiwaangeli. Ka dib marka aad is diiwaangeliso, soo noqo halkan oo ku gal email-kaaga iyo password-kaaga.
-              </p>
-              <Button
-                onClick={handleWordPressRegister}
-                className="w-full h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2"
-              >
-                <ExternalLink className="w-5 h-5" />
-                Iska Diiwaangeli barbaarintasan.com
-              </Button>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
