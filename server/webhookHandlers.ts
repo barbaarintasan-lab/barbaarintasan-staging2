@@ -35,27 +35,18 @@ export class WebhookHandlers {
     console.log('[STRIPE WEBHOOK] Webhook secret available:', webhookSecret ? 'YES (length: ' + webhookSecret.length + ')' : 'NO');
     console.log('[STRIPE WEBHOOK] Signature header:', signature.substring(0, 50) + '...');
     
+    if (!webhookSecret) {
+      console.error('[STRIPE WEBHOOK] No webhook secret configured - rejecting webhook');
+      throw new Error('Webhook secret not configured. Set STRIPE_WEBHOOK_SECRET environment variable.');
+    }
+
     try {
-      if (webhookSecret) {
-        console.log('[STRIPE WEBHOOK] Verifying signature with secret...');
-        event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-        console.log('[STRIPE WEBHOOK] Signature verified successfully!');
-      } else {
-        console.warn('[STRIPE WEBHOOK] No webhook secret - parsing event without verification');
-        event = JSON.parse(payload.toString()) as Stripe.Event;
-      }
+      console.log('[STRIPE WEBHOOK] Verifying signature with secret...');
+      event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      console.log('[STRIPE WEBHOOK] Signature verified successfully!');
     } catch (err: any) {
       console.error('[STRIPE WEBHOOK] Signature verification failed:', err.message);
-      console.warn('[STRIPE WEBHOOK] Falling back to parsing without verification (TEMPORARY)');
-      // Fallback: process without verification for debugging
-      // TODO: Fix the webhook secret configuration and remove this fallback
-      try {
-        event = JSON.parse(payload.toString()) as Stripe.Event;
-        console.log('[STRIPE WEBHOOK] Parsed event without verification (INSECURE MODE)');
-      } catch (parseErr: any) {
-        console.error('[STRIPE WEBHOOK] Failed to parse event:', parseErr.message);
-        throw new Error('Webhook processing failed: ' + err.message);
-      }
+      throw new Error('Webhook signature verification failed: ' + err.message);
     }
 
     console.log(`[STRIPE WEBHOOK] Received event: ${event.type}`);
