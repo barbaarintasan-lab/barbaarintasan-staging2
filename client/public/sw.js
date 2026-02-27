@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
 const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -196,14 +196,6 @@ async function cacheFirst(request) {
     }
     return networkResponse;
   } catch (error) {
-    // For JS/CSS module assets, propagate the error so the browser can handle
-    // module load failure correctly (retry, error page, etc.) rather than
-    // silently receiving an empty response that causes a white page.
-    const url = new URL(request.url);
-    if (url.pathname.match(/\.(js|css)$/) && url.pathname.includes('/assets/')) {
-      throw error;
-    }
-    // For non-critical assets (images, fonts), return a graceful empty response
     return new Response('', { status: 503 });
   }
 }
