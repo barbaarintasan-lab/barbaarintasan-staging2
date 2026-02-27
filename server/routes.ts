@@ -2222,13 +2222,15 @@ Ka jawaab qaabkan JSON ah:
         ? `${process.env.APP_BASE_URL}/api/auth/google/callback`
         : `${protocol}://${req.get('host')}/api/auth/google/callback`;
       
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
 
       if (!clientId || !clientSecret) {
         console.error("[GOOGLE-AUTH] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
         return res.status(500).json({ error: "Google login is not configured." });
       }
+      
+      console.log(`[GOOGLE-AUTH] Using client ID: ${clientId.substring(0, 15)}...`);
 
       // Store returnUrl in session for external redirect after OAuth
       const returnUrl = req.query.returnUrl as string | undefined;
@@ -2281,8 +2283,8 @@ Ka jawaab qaabkan JSON ah:
       console.log(`[GOOGLE-AUTH] Callback redirect URI: ${redirectUri}`);
       
       const oauth2Client = new OAuth2Client(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
         redirectUri
       );
       
@@ -2295,7 +2297,7 @@ Ka jawaab qaabkan JSON ah:
       // Get user info from Google
       const ticket = await oauth2Client.verifyIdToken({
         idToken: tokens.id_token!,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID
       });
       
       const payload = ticket.getPayload();
