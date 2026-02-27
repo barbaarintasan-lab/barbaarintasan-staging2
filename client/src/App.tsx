@@ -12,9 +12,11 @@ import { OfflineProvider } from "@/contexts/OfflineContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RefreshCw, Loader2 } from "lucide-react";
-import Home from "@/pages/Home";
+import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 import { Analytics } from "@/components/Analytics";
 import { useLocation, useParams } from "wouter";
+
+const Home = lazy(() => import("@/pages/Home"));
 
 const Courses = lazy(() => import("@/pages/Courses"));
 const CourseDetail = lazy(() => import("@/pages/CourseDetail"));
@@ -72,10 +74,11 @@ const VoiceSpaces = lazy(() => import("@/components/VoiceSpaces").then(m => ({ d
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex items-center justify-center min-h-screen bg-white">
       <div className="text-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Waa la soo rariyayaa...</p>
+        <img src={logoImage} alt="Barbaarintasan Academy" className="w-20 h-20 mx-auto mb-4 animate-pulse" />
+        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+        <p className="text-sm text-gray-500">Sug wax yar waa la dajinayaa...</p>
       </div>
     </div>
   );
@@ -93,15 +96,15 @@ function SheekoRoom() {
 }
 
 const pageVariants = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -10 }
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 }
 };
 
 const pageTransition = {
   type: "tween" as const,
-  ease: "easeInOut" as const,
-  duration: 0.2
+  ease: "easeOut" as const,
+  duration: 0.15
 };
 
 function PullToRefresh() {

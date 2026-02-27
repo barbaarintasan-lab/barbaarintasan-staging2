@@ -16,30 +16,13 @@ export async function serveStatic(app: Express, server: Server) {
     );
   }
 
-  // Security headers for all responses
-  app.use((_req, res, next) => {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    res.setHeader("X-Frame-Options", "SAMEORIGIN");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    res.setHeader(
-      "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        // unsafe-inline required for Vite-built SPA inline scripts; unsafe-eval required by framer-motion/livekit
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        // https: wildcard needed for dynamic user content images from various CDNs
-        "img-src 'self' data: blob: https:",
-        "connect-src 'self' https://api.stripe.com https://api.openai.com wss://*.livekit.cloud wss:",
-        "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://drive.google.com",
-        "media-src 'self' blob: https:",
-        "worker-src 'self' blob:",
-      ].join("; "),
-    );
-    next();
-  });
+  app.use("/.well-known", express.static(path.join(distPath, ".well-known"), {
+    dotfiles: "allow",
+    maxAge: 0,
+    setHeaders: (res) => {
+      res.setHeader("Content-Type", "application/json");
+    },
+  }));
 
   app.use("/assets", express.static(path.join(distPath, "assets"), {
     maxAge: "1y",
@@ -47,50 +30,50 @@ export async function serveStatic(app: Express, server: Server) {
   }));
 
   app.use(express.static(distPath, {
-    maxAge: 0,
+    maxAge: "1d",
     setHeaders: (res, filePath) => {
       if (filePath.endsWith(".html")) {
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
       }
+      if (filePath.endsWith(".json")) {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      }
+      if (filePath.match(/\.(png|jpg|jpeg|webp|svg|ico|woff2?)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+      }
     },
   }));
 
+  let indexHtmlCache: string | null = null;
+  let sheekoHtmlCache: string | null = null;
+
   app.get("*", (req, res) => {
     if (req.path.startsWith('/sheeko')) {
-      const sheekoHtml = getSheekoHtml(distPath);
+      if (!sheekoHtmlCache) {
+        sheekoHtmlCache = getSheekoHtml(distPath);
+      }
       res.set({
         "Content-Type": "text/html",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0"
-      }).send(sheekoHtml);
+      }).send(sheekoHtmlCache);
     } else {
+      if (!indexHtmlCache) {
+        indexHtmlCache = fs.readFileSync(path.resolve(distPath, "index.html"), "utf-8");
+      }
       res.set({
+        "Content-Control": "text/html",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0"
-      });
-      res.sendFile(path.resolve(distPath, "index.html"));
+      }).send(indexHtmlCache);
     }
   });
 }
 
-process.on('uncaughtException', (err) => {
-  console.error('[Fatal] Uncaught exception:', err);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  // Log but do NOT exit - unhandled rejections from third-party libraries
-  // (e.g. stripe-replit-sync, NeonDB pool reconnects) should not crash the server
-  console.error('[Warning] Unhandled promise rejection:', reason);
-});
-
 (async () => {
   await runApp(serveStatic);
-})().catch((err) => {
-  console.error('[Fatal] Failed to start server:', err);
-  process.exit(1);
-});
+})();

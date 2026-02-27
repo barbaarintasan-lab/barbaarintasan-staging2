@@ -31,30 +31,6 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
-// Serve attached_assets folder for static images (flashcards, etc.)
-app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets'), {
-  setHeaders: (res, filePath) => {
-    if (/\.(png|jpg|jpeg|webp|gif|svg|ico|avif)$/i.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
-    }
-  },
-}));
-
-// Serve course images from the built public folder (for Fly.io production)
-// In production, dist/public/course-images contains the images
-// In development, client/public/course-images contains them
-const courseImagesPath = process.env.NODE_ENV === 'production'
-  ? path.join(process.cwd(), 'dist', 'public', 'course-images')
-  : path.join(process.cwd(), 'client', 'public', 'course-images');
-app.use('/course-images', express.static(courseImagesPath, {
-  setHeaders: (res, filePath) => {
-    if (/\.(png|jpg|jpeg|webp|gif|svg|ico|avif)$/i.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
-    }
-  },
-}));
-
-// Register health check endpoint first (before any middleware that might slow it down)
 registerHealthCheck(app);
 
 app.use(compression({
@@ -65,6 +41,20 @@ app.use(compression({
     return compression.filter(req, res);
   }
 }));
+
+const staticCacheOptions = { maxAge: '7d', immutable: false };
+const hashedAssetCache = { maxAge: '1y', immutable: true };
+
+app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets'), staticCacheOptions));
+
+const courseImagesPath = process.env.NODE_ENV === 'production'
+  ? path.join(process.cwd(), 'dist', 'public', 'course-images')
+  : path.join(process.cwd(), 'client', 'public', 'course-images');
+app.use('/course-images', express.static(courseImagesPath, staticCacheOptions));
+
+if (process.env.NODE_ENV === 'production') {
+  app.use('/assets', express.static(path.join(process.cwd(), 'dist', 'public', 'assets'), hashedAssetCache));
+}
 
 // Initialize Stripe schema and sync data
 async function initStripe() {
@@ -212,8 +202,9 @@ export default async function runApp(
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    console.error(`[Error] ${status} ${message}`, err.stack || '');
+
     res.status(status).json({ message });
+    throw err;
   });
 
   // importantly run the final setup after setting up all the other routes so
