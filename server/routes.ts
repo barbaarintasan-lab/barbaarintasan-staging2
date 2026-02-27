@@ -16392,8 +16392,24 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   });
 
   // Webhook endpoint for payment providers (Flutterwave, etc.)
-  app.post("/api/wordpress/webhook/payment", verifyWordPressApiKey, async (req, res) => {
+  // NOTE: This endpoint is called directly by Flutterwave, NOT WordPress.
+  // Authentication uses Flutterwave's verif-hash header, not the WordPress API key.
+  app.post("/api/wordpress/webhook/payment", async (req, res) => {
     try {
+      // Verify Flutterwave webhook signature
+      const verifHash = req.headers['verif-hash'] as string | undefined;
+      const flutterwaveSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+      
+      if (flutterwaveSecret && verifHash !== flutterwaveSecret) {
+        console.error('[WORDPRESS WEBHOOK] Invalid Flutterwave webhook signature');
+        res.status(401).json({ error: 'Invalid webhook signature' });
+        return;
+      }
+      
+      if (!flutterwaveSecret) {
+        console.warn('[WORDPRESS WEBHOOK] FLUTTERWAVE_WEBHOOK_SECRET not configured - processing without verification');
+      }
+
       const { event, data } = req.body;
       
       console.log(`[WORDPRESS WEBHOOK] Received: ${event}`, JSON.stringify(data).substring(0, 200));
