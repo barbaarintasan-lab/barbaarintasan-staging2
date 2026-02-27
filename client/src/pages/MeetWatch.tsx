@@ -21,29 +21,16 @@ export default function MeetWatch() {
     };
   }, []);
 
-  const { data: event, isLoading } = useQuery<any>({
+  const { data: meetEvent, isLoading } = useQuery<any>({
     queryKey: ["/api/meet-events", id],
     queryFn: async () => {
-      const res = await fetch(`/api/meet-events`);
+      const res = await fetch(`/api/meet-events/${id}`);
+      if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch");
-      const events = await res.json();
-      return events.find((e: any) => e.id === id) || null;
+      return res.json();
     },
     enabled: !!id,
   });
-
-  const { data: archivedEvent } = useQuery<any>({
-    queryKey: ["/api/meet-events/archived", id],
-    queryFn: async () => {
-      const res = await fetch(`/api/meet-events/archived`);
-      if (!res.ok) return null;
-      const events = await res.json();
-      return events.find((e: any) => e.id === id) || null;
-    },
-    enabled: !!id && !event,
-  });
-
-  const meetEvent = event || archivedEvent;
 
   const formatSomaliDate = (dateStr: string) => {
     const months = ["Janaayo", "Febraayo", "Maarso", "Abriil", "May", "Juun", "Luuliyo", "Ogost", "Sebtembar", "Oktoobar", "Nofembar", "Desembar"];
