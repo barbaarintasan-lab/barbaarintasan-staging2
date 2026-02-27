@@ -90,7 +90,8 @@ const isSheekoPWA = () => {
   const displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
   const iosStandalone = (window.navigator as any).standalone === true;
   
-  // Only load SheekoApp if explicitly on /sheeko path
+  // We only load SheekoApp if we are on the /sheeko path AND in standalone mode.
+  // This prevents the white screen on the main app.
   return isSheekoPath && (standaloneParam || displayModeStandalone || iosStandalone);
 };
 
@@ -100,17 +101,24 @@ const hideSplash = () => {
   }
 };
 
-if (isSheekoPWA()) {
-  import('./SheekoApp').then(({ SheekoApp }) => {
-    createRoot(document.getElementById("root")!).render(<SheekoApp />);
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  const root = createRoot(rootElement);
+  
+  if (isSheekoPWA()) {
+    import('./SheekoApp').then(({ SheekoApp }) => {
+      root.render(<SheekoApp />);
+      hideSplash();
+    }).catch(err => {
+      console.error("Failed to load SheekoApp:", err);
+      // Fallback to main App if Sheeko fails
+      root.render(<App />);
+      hideSplash();
+    });
+  } else {
+    root.render(<App />);
     hideSplash();
-  }).catch(err => {
-    console.error("Failed to load SheekoApp:", err);
-    // Fallback to main App if Sheeko fails
-    createRoot(document.getElementById("root")!).render(<App />);
-    hideSplash();
-  });
+  }
 } else {
-  createRoot(document.getElementById("root")!).render(<App />);
-  hideSplash();
+  console.error("Root element not found!");
 }
