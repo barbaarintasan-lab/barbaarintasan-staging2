@@ -236,7 +236,6 @@ export default function Dhambaal() {
             }
           }).catch(err => {
             // Autoplay might be blocked by browser, silently fail
-            console.log("Autoplay prevented by browser:", err);
           });
         }
         autoPlayTimeoutRef.current = null;
@@ -877,99 +876,32 @@ export default function Dhambaal() {
                   contentId={selectedMessage.id}
                 />
 
-                {/* Content Card - below share/comments, users can scroll down */}
-                <div className="bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl p-6 md:p-8 backdrop-blur-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      {isEditing ? (
-                        <Input
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          className="text-2xl font-bold bg-slate-700 border-slate-600 text-white mb-2"
-                          data-testid="input-edit-title"
-                        />
-                      ) : (
-                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                          {selectedMessage.title}
-                        </h2>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-slate-400">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {formatDate(selectedMessage.messageDate)}
-                        </div>
-                        <Badge className="bg-teal-600 text-white">
-                          {selectedMessage.topic}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    {isAdmin && (
-                      <div className="flex gap-2">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={cancelEditing}
-                              className="border-slate-600 text-slate-300"
-                              data-testid="button-cancel-edit"
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              {t("dhambaal.cancel")}
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={saveChanges}
-                              disabled={updateMutation.isPending}
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              data-testid="button-save-edit"
-                            >
-                              {updateMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  {t("dhambaal.save")}
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={startEditing}
-                              className="border-slate-600 text-slate-300"
-                              data-testid="button-start-edit"
-                            >
-                              <Pencil className="w-4 h-4 mr-1" />
-                              {t("dhambaal.edit")}
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => selectedMessage && generateAudioMutation.mutate(selectedMessage.id)}
-                              disabled={generateAudioMutation.isPending}
-                              className="bg-purple-600 hover:bg-purple-700"
-                              data-testid="button-generate-audio"
-                            >
-                              {generateAudioMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Mic className="w-4 h-4 mr-1" />
-                                  {selectedMessage?.audioUrl ? t("dhambaal.regenerateAudio") : t("dhambaal.generateAudio")}
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                {/* Content Card - below share/comments */}
+                <div className={`bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl p-6 md:p-8 backdrop-blur-sm ${isAdmin && !isEditing ? 'pb-32' : ''}`}>
+                  <div className="flex-1 mb-4">
+                    {isEditing ? (
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="text-2xl font-bold bg-slate-700 border-slate-600 text-white mb-2"
+                        data-testid="input-edit-title"
+                      />
+                    ) : (
+                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                        {selectedMessage.title}
+                      </h2>
                     )}
+                    <div className="flex items-center gap-4 text-sm text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(selectedMessage.messageDate)}
+                      </div>
+                      <Badge className="bg-teal-600 text-white">
+                        {selectedMessage.topic}
+                      </Badge>
+                    </div>
                   </div>
 
-                  {/* Hide message content when audio is playing - use CSS to avoid scroll issues */}
                   <div className={isPlaying ? 'hidden' : ''}>
                     <div className="flex items-center gap-2 mb-6 p-3 bg-slate-700/50 rounded-lg">
                       <User className="w-5 h-5 text-emerald-400" />
@@ -1019,8 +951,67 @@ export default function Dhambaal() {
                         )}
                       </div>
                     )}
+
+                    {isAdmin && isEditing && (
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEditing}
+                          className="border-slate-600 text-slate-300"
+                          data-testid="button-cancel-edit"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          {t("dhambaal.cancel")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={saveChanges}
+                          disabled={updateMutation.isPending}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          data-testid="button-save-edit"
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-1" />
+                              {t("dhambaal.save")}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {isAdmin && !isEditing && (
+                  <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 via-slate-900 to-transparent p-4 pb-6 z-50">
+                    <div className="max-w-3xl mx-auto flex flex-col gap-2">
+                      <Button
+                        onClick={startEditing}
+                        className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3"
+                        data-testid="button-start-edit"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        {t("dhambaal.edit")}
+                      </Button>
+                      <Button
+                        onClick={() => selectedMessage && generateAudioMutation.mutate(selectedMessage.id)}
+                        disabled={generateAudioMutation.isPending}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
+                        data-testid="button-generate-audio"
+                      >
+                        {generateAudioMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4 mr-2" />
+                        )}
+                        {generateAudioMutation.isPending ? t("dhambaal.generatingAudio") : (selectedMessage?.audioUrl ? t("dhambaal.regenerateAudio") : t("dhambaal.generateAudio"))}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
