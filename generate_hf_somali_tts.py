@@ -1,56 +1,20 @@
-import os
-from huggingface_hub import InferenceClient
 from pathlib import Path
+import torch
+from TTS.api import TTS  # TTS library
 
-# =========================
-# Hugging Face API Token
-# =========================
-hf_token = os.getenv("HF_TOKEN")  # Ka soo qaado GitHub Secrets
-client = InferenceClient(token=hf_token)
+# Folder model-kaaga local
+MODEL_PATH = "./Hussein_tts"
+OUTPUT_FOLDER = "./output_audio"
+Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
-# =========================
-# Folder lagu kaydinayo audio
-# =========================
-AUDIO_FOLDER = Path("daily_audio")
-AUDIO_FOLDER.mkdir(exist_ok=True)
+# Load model
+tts = TTS(model_path=MODEL_PATH, progress_bar=True, gpu=False)  # GPU haddii available
 
-# =========================
-# Qoraalka Af-Soomaali
-# =========================
-text_somali = (
-    "Subax wanaagsan waalidiin, sheekadan maanta waa sheeko caruurta ah "
-    "oo ku saabsan xayawaanka iyo saaxiibtinimada."
-)
+# Qoraalka Somali
+somali_text = "Asalaamu calaykum, tani waa tijaabo cod Somali ah."
 
-# =========================
-# Reference audio (6-sec codkaaga)
-# =========================
-reference_audio = "my_voice.mp3"  # Ku bedel path sax ah
+# Output
+output_file = f"{OUTPUT_FOLDER}/output.wav"
+tts.tts_to_file(text=somali_text, file_path=output_file)
 
-# =========================
-# Output file
-# =========================
-output_file = AUDIO_FOLDER / "output.wav"
-
-# =========================
-# Model TTS cross-lingual
-# =========================
-model_id = "coqui/XTTS-v2"  # Multilingual / cross-lingual
-
-# =========================
-# Abuur audio
-# =========================
-audio_bytes = client.text_to_speech(
-    model=model_id,
-    text=text_somali,
-    speaker_wav=reference_audio,
-    language="so"  # Af-Soomaali
-)
-
-# =========================
-# Kaydi audio
-# =========================
-with open(output_file, "wb") as f:
-    f.write(audio_bytes)
-
-print(f"[INFO] Audio saved: {output_file}")
+print(f"Audio saved to {output_file}")
