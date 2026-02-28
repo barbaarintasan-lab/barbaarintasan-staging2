@@ -918,7 +918,6 @@ export default function LessonView() {
         }
       }
       
-      console.error("Video playback error:", error, errorMessage);
       setVideoError(errorMessage);
       setVideoLoading(false);
     };
@@ -940,24 +939,16 @@ export default function LessonView() {
       const fileId = getGoogleDriveId(lesson.videoUrl);
       
       if (useEmbedFallback && fileId) {
-        const driveViewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+        const driveEmbedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
         return (
-          <div className="relative w-full aspect-video rounded-xl shadow-lg overflow-hidden bg-gradient-to-b from-blue-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center">
-            <div className="text-blue-300 mb-4">
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-white font-semibold text-lg mb-2">Muuqaalka diyaar maaha</p>
-            <p className="text-blue-200 text-sm mb-5">Muuqaalkan hadda lama ciyaari karo. Fadlan dib u tijaabi.</p>
-            <button
-              onClick={() => { setUseEmbedFallback(false); setVideoLoading(true); }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
-              data-testid="button-retry-proxy"
-            >
-              Dib u tijaabi
-            </button>
+          <div className="relative rounded-xl overflow-hidden shadow-lg bg-black">
+            <iframe
+              src={driveEmbedUrl}
+              className="w-full aspect-video rounded-xl"
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              data-testid="video-player-embed"
+            />
           </div>
         );
       }
@@ -965,7 +956,6 @@ export default function LessonView() {
       const proxyUrl = `/api/video/stream/${lesson.id}`;
       
       const handleProxyError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-        console.log("[Video] Proxy failed, switching to fallback UI");
         setUseEmbedFallback(true);
         setVideoLoading(false);
       };
