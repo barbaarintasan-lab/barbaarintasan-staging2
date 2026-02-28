@@ -81,7 +81,7 @@ export default function Install() {
     <div className="min-h-screen bg-gradient-to-b from-amber-50 via-orange-50 to-white pb-24">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
         <Link href="/">
-          <button className="p-2 hover:bg-gray-100 rounded-full" data-testid="back-button">
+          <button className="p-2 hover:bg-gray-100 rounded-full" data-testid="back-button" aria-label="Dib ku laabo">
             <ArrowLeft className="w-5 h-5" />
           </button>
         </Link>

@@ -666,38 +666,38 @@ export function VoiceSpaces({ initialRoomId, fromAdmin = false }: VoiceSpacesPro
   const scheduledRooms = rooms.filter((r) => r.status === "scheduled");
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between mb-2">
+    <div className="p-4 space-y-5">
+      <div className="flex items-center justify-between mb-1">
         <Link href="/" className="flex flex-col items-center" data-testid="link-bsa-app-sheeko">
-          <img src={bsaAppIcon} alt="BSA" className="w-10 h-10 rounded-xl shadow-lg border-2 border-gray-200" />
-          <span className="text-gray-700 text-[10px] font-bold mt-0.5">BSA</span>
+          <img src={bsaAppIcon} alt="BSA" className="w-10 h-10 rounded-xl shadow-md border border-gray-100" />
+          <span className="text-gray-500 text-[10px] font-semibold mt-0.5">BSA</span>
         </Link>
         
         <div className="flex items-center gap-2">
           <a 
             href="/"
-            className="p-2 rounded-full hover:bg-muted transition-colors"
+            className="p-2 rounded-full hover:bg-blue-50 transition-colors"
             data-testid="close-sheeko-button"
           >
-            <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+            <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
           </a>
           {!isInstalled && (
             <Button 
               onClick={handleInstallClick}
               size="sm"
               variant="outline"
-              className="border-purple-500/30 text-purple-600 hover:bg-purple-500/10"
+              className="border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full"
               data-testid="install-sheeko-button"
             >
               <Download className="w-4 h-4 mr-1" />
-              Install Sheeko
+              Install
             </Button>
           )}
           {canHost && (
             <Button 
               onClick={() => setShowCreateDialog(true)} 
               size="sm"
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full"
               data-testid="create-sheeko-button"
             >
               <Plus className="w-4 h-4 mr-1" />
@@ -707,8 +707,8 @@ export function VoiceSpaces({ initialRoomId, fromAdmin = false }: VoiceSpacesPro
         </div>
         
         <Link href="/sheeko" className="flex flex-col items-center" data-testid="link-sheeko-app-sheeko">
-          <img src={sheekoAppIcon} alt="Sheeko" className="w-10 h-10 rounded-xl shadow-lg border-2 border-gray-200" />
-          <span className="text-gray-700 text-[10px] font-bold mt-0.5">Sheeko</span>
+          <img src={sheekoAppIcon} alt="Sheeko" className="w-10 h-10 rounded-xl shadow-md border border-gray-100" />
+          <span className="text-gray-500 text-[10px] font-semibold mt-0.5">Sheeko</span>
         </Link>
       </div>
       
@@ -1894,7 +1894,6 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
     const previousRole = previousRoleRef.current;
     
     if (previousRole !== undefined && previousRole !== currentRole) {
-      console.log(`[Sheeko] Role changed from ${previousRole} to ${currentRole}, reconnecting...`);
       reconnect().catch(err => {
         console.error("[Sheeko] Failed to reconnect after role change:", err);
       });
@@ -1928,7 +1927,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
     });
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-gradient-to-b from-purple-900 via-purple-800 to-indigo-900 h-[100dvh] overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-white h-[100dvh] overflow-hidden">
       {/* Connection Error Banner */}
       {connectionError && (
         <div className="bg-red-500/90 text-white px-4 py-2 text-center text-sm flex items-center justify-center gap-2">
@@ -1947,13 +1946,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
       )}
       
       {/* Header */}
-      <div className="p-4 bg-black/20 backdrop-blur-sm safe-area-top">
+      <div className="p-4 bg-blue-50 border-b border-blue-100 safe-area-top">
         <div className="flex items-center gap-3">
           {/* Back button */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+            className="h-10 w-10 rounded-full bg-white hover:bg-blue-100 text-gray-700 border border-blue-100 shrink-0"
             onClick={handleLeave}
             data-testid="back-button"
           >
@@ -1962,13 +1961,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-lg text-white truncate">{room.title}</h2>
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm rounded-full px-2.5 py-1">
-                <Users className="w-3.5 h-3.5 text-white/80" />
-                <span className="text-xs font-medium text-white">
+              <h2 className="font-bold text-lg text-gray-900 truncate">{room.title}</h2>
+              <div className="flex items-center gap-1.5 bg-blue-100 rounded-full px-2.5 py-1">
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                <span className="text-xs font-medium text-blue-700">
                   {allParticipants.length}
                   {allParticipants.filter((p: any) => p.isHidden).length > 0 && (
-                    <span className="text-white/60 ml-1">
+                    <span className="text-blue-400 ml-1">
                       (+{allParticipants.filter((p: any) => p.isHidden).length} qarsoon)
                     </span>
                   )}
@@ -1976,21 +1975,21 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
               </div>
             </div>
             {room.description && (
-              <p className="text-sm text-white/70 truncate">{room.description}</p>
+              <p className="text-sm text-gray-500 truncate">{room.description}</p>
             )}
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
             {isJoined && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-green-500/20 rounded-full" title="Screen-ka ma dami doono">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-[10px] text-green-300 font-medium">ON</span>
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded-full" title="Screen-ka ma dami doono">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] text-green-600 font-medium">ON</span>
               </div>
             )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+              className="h-8 w-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100"
               onClick={() => {
                 const shareUrl = `${window.location.origin}/sheeko/${room.id}`;
                 if (navigator.share) {
@@ -2032,12 +2031,12 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
       <ScrollArea className="flex-1 p-4 pb-28">
         {/* Screen Lock Warning for iOS/Browser limitations */}
         {isJoined && (
-          <div className="mb-4 p-3 bg-amber-500/20 backdrop-blur-sm rounded-xl border border-amber-400/30" data-testid="screen-lock-warning">
+          <div className="mb-4 p-3 bg-amber-50 rounded-xl border border-amber-200" data-testid="screen-lock-warning">
             <div className="flex items-start gap-2">
-              <span className="text-amber-400 text-lg shrink-0">⚠️</span>
-              <div className="text-xs text-amber-200/90">
+              <span className="text-amber-500 text-lg shrink-0">⚠️</span>
+              <div className="text-xs text-amber-700">
                 <p className="font-medium mb-1">Screen-ku wuu dami karaa (xaddidaad browser)</p>
-                <p className="text-amber-200/70">
+                <p className="text-amber-600">
                   iOS: Settings → Display → Auto-Lock → Never (ku laab kadib)
                 </p>
               </div>
@@ -2046,22 +2045,22 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
         )}
 
         {isModerator && handRaisedParticipants.length > 0 && (
-          <div className="mb-6 p-4 bg-yellow-500/20 backdrop-blur-sm rounded-2xl border border-yellow-400/30">
-            <h3 className="text-sm font-semibold text-yellow-300 mb-3 flex items-center gap-2">
+          <div className="mb-6 p-4 bg-yellow-50 rounded-2xl border border-yellow-200">
+            <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
               <Hand className="w-4 h-4" />
               Gacanta Taagayaasha ({handRaisedParticipants.length})
             </h3>
             <div className="space-y-2">
               {handRaisedParticipants.map((p) => (
-                <div key={p.id} className="flex items-center justify-between bg-white/10 backdrop-blur-sm rounded-xl p-3">
+                <div key={p.id} className="flex items-center justify-between bg-white rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-2">
-                    <Avatar className="w-10 h-10 ring-2 ring-yellow-400/50">
+                    <Avatar className="w-10 h-10 ring-2 ring-yellow-300">
                       <AvatarImage src={p.parent.picture || undefined} />
                       <AvatarFallback className="text-sm bg-gradient-to-br from-yellow-400 to-orange-500 text-white">
                         {p.parent.name?.charAt(0).toUpperCase() || "?"}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium text-white flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-800 flex items-center gap-1">
                       {p.parent.isYearlySubscriber && <span title="Xubin Dahabi">👑</span>}
                       {p.parent.name}
                     </span>
@@ -2069,7 +2068,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      className="h-9 w-9 p-0 rounded-full bg-green-500/20 hover:bg-green-500/40 text-green-400"
+                      className="h-9 w-9 p-0 rounded-full bg-green-50 hover:bg-green-100 text-green-600 border border-green-200"
                       onClick={() => handleAcceptHand(p.parentId)}
                       data-testid={`accept-hand-${p.parentId}`}
                     >
@@ -2077,7 +2076,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                     </Button>
                     <Button
                       size="sm"
-                      className="h-9 w-9 p-0 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400"
+                      className="h-9 w-9 p-0 rounded-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
                       onClick={() => handleRejectHand(p.parentId)}
                       data-testid={`reject-hand-${p.parentId}`}
                     >
@@ -2094,11 +2093,11 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
         {speakers.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 bg-gradient-to-br from-green-500/30 to-emerald-500/30 rounded-xl backdrop-blur-sm">
-                <Volume2 className="w-5 h-5 text-green-400" />
+              <div className="p-2 bg-green-50 rounded-xl border border-green-100">
+                <Volume2 className="w-5 h-5 text-green-600" />
               </div>
-              <h3 className="text-base font-bold text-white">Hadlayaasha</h3>
-              <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+              <h3 className="text-base font-bold text-gray-900">Hadlayaasha</h3>
+              <Badge className="bg-green-50 text-green-700 border-green-200">
                 {speakers.length}
               </Badge>
             </div>
@@ -2128,15 +2127,15 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
         {listeners.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-xl backdrop-blur-sm">
-                <Headphones className="w-5 h-5 text-purple-400" />
+              <div className="p-2 bg-blue-50 rounded-xl border border-blue-100">
+                <Headphones className="w-5 h-5 text-blue-600" />
               </div>
-              <h3 className="text-base font-bold text-white">Dhagaystayaasha</h3>
-              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+              <h3 className="text-base font-bold text-gray-900">Dhagaystayaasha</h3>
+              <Badge className="bg-blue-50 text-blue-700 border-blue-200">
                 {listeners.length}
               </Badge>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+            <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100">
               <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
                 {listeners.map((p) => (
                   <ParticipantAvatar 
@@ -2158,13 +2157,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
         )}
 
         {/* Live Chat Section */}
-        <div className="mt-6 bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+        <div className="mt-6 bg-blue-50/50 rounded-2xl p-4 border border-blue-100">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-gradient-to-br from-blue-500/30 to-cyan-500/30 rounded-xl backdrop-blur-sm">
-              <MessageCircle className="w-4 h-4 text-blue-400" />
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <MessageCircle className="w-4 h-4 text-blue-600" />
             </div>
-            <h3 className="text-sm font-bold text-white">Qoraalada</h3>
-            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">
+            <h3 className="text-sm font-bold text-gray-900">Qoraalada</h3>
+            <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
               {chatMessages.length}
             </Badge>
           </div>
@@ -2174,18 +2173,18 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-3 p-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/30 rounded-xl"
+              className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Pin className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="text-xs font-semibold text-amber-300">{pinnedMessage.displayName}:</span>
-                  <span className="text-sm text-white truncate">{pinnedMessage.message}</span>
+                  <Pin className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-semibold text-amber-700">{pinnedMessage.displayName}:</span>
+                  <span className="text-sm text-gray-800 truncate">{pinnedMessage.message}</span>
                 </div>
                 {isModerator && (
                   <button
                     onClick={() => unpinMessageMutation.mutate()}
-                    className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-amber-300 shrink-0"
+                    className="p-1.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 shrink-0"
                     title="Ka saar dhajinta"
                     data-testid="unpin-message-button"
                   >
@@ -2198,10 +2197,10 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
 
           <div 
             ref={chatContainerRef}
-            className="h-44 overflow-y-auto space-y-2 mb-3 scrollbar-thin scrollbar-thumb-white/20"
+            className="h-44 overflow-y-auto space-y-2 mb-3 scrollbar-thin scrollbar-thumb-gray-300"
           >
             {chatMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-white/50">
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                 <MessageCircle className="w-8 h-8 mb-2 opacity-50" />
                 <p className="text-xs">Weli qof fariin ma soo qorin</p>
               </div>
@@ -2244,13 +2243,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                     )}
                     <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl transition-all ${
                       isPinned
-                        ? 'bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-white rounded-bl-md border border-amber-400/30'
+                        ? 'bg-amber-50 text-gray-800 rounded-bl-md border border-amber-200'
                         : isOwnMessage 
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-br-md shadow-lg shadow-purple-500/20' 
-                          : 'bg-white/15 backdrop-blur-sm text-white rounded-bl-md border border-white/10 hover:bg-white/20'
+                          ? 'bg-blue-600 text-white rounded-br-md shadow-lg shadow-blue-500/20' 
+                          : 'bg-white text-gray-800 rounded-bl-md border border-gray-200 hover:bg-gray-50'
                     }`}>
                       {!isOwnMessage && (
-                        <span className="text-xs font-semibold text-purple-300 block mb-0.5">
+                        <span className="text-xs font-semibold text-blue-600 block mb-0.5">
                           {msg.displayName}
                         </span>
                       )}
@@ -2266,13 +2265,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
           
           {/* Chat input with emoji picker */}
           <div className="relative">
-            <form onSubmit={handleSendMessage} className="flex gap-2 p-2 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+            <form onSubmit={handleSendMessage} className="flex gap-2 p-2 bg-white rounded-2xl border border-gray-200 shadow-sm">
               {isGuest && !guestDisplayName && (
                 <Input
                   placeholder="Magacaaga..."
                   value={guestDisplayName}
                   onChange={(e) => setGuestDisplayName(e.target.value)}
-                  className="w-24 text-xs border-0 bg-transparent text-white placeholder:text-white/50 focus-visible:ring-0"
+                  className="w-24 text-xs border-0 bg-transparent text-gray-800 placeholder:text-gray-400 focus-visible:ring-0"
                   data-testid="guest-name-input"
                 />
               )}
@@ -2280,7 +2279,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 placeholder="Fariin qor..."
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                className="flex-1 text-sm border-0 bg-transparent text-white placeholder:text-white/50 focus-visible:ring-0"
+                className="flex-1 text-sm border-0 bg-transparent text-gray-800 placeholder:text-gray-400 focus-visible:ring-0"
                 maxLength={500}
                 data-testid="chat-message-input"
               />
@@ -2288,7 +2287,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl h-10 w-10"
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl h-10 w-10"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 data-testid="emoji-picker-button"
               >
@@ -2297,7 +2296,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
               <Button 
                 type="submit" 
                 size="icon"
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl h-10 w-10 shadow-lg shadow-purple-500/30"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 w-10 shadow-lg shadow-blue-500/30"
                 disabled={!chatMessage.trim() || sendMessageMutation.isPending}
                 data-testid="send-message-button"
               >
@@ -2312,14 +2311,14 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute bottom-full right-0 mb-2 p-3 bg-gray-900/95 backdrop-blur-md rounded-2xl border border-white/20 shadow-2xl"
+                  className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl border border-gray-200 shadow-2xl"
                 >
                   <div className="grid grid-cols-4 gap-2">
                     {CHAT_EMOJIS.map((emoji) => (
                       <button
                         key={emoji}
                         type="button"
-                        className="text-2xl p-2 hover:bg-white/10 rounded-xl transition-all hover:scale-110"
+                        className="text-2xl p-2 hover:bg-gray-100 rounded-xl transition-all hover:scale-110"
                         onClick={() => insertEmoji(emoji)}
                         data-testid={`emoji-${emoji}`}
                       >
@@ -2343,7 +2342,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                   key={emoji}
                   whileTap={{ scale: 0.8 }}
                   whileHover={{ scale: 1.2 }}
-                  className="text-2xl p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                  className="text-2xl p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
                   onClick={() => handleAddReaction(emoji)}
                   data-testid={`reaction-${emoji}`}
                 >
@@ -2369,13 +2368,13 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
       </AnimatePresence>
 
       {/* Fixed Bottom Controls - Compact for better viewport fit */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-3 pb-5 bg-gradient-to-t from-black/90 via-black/70 to-transparent backdrop-blur-md safe-area-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-3 pb-5 bg-white/95 backdrop-blur-md border-t border-gray-200 safe-area-bottom">
         {isGuest ? (
           <div className="space-y-3 max-w-md mx-auto">
             <div className="flex gap-3">
               <Link href="/login" className="flex-1">
                 <Button 
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/30 h-14 rounded-2xl text-base font-semibold" 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 h-14 rounded-2xl text-base font-semibold" 
                   size="lg"
                   data-testid="guest-login-button"
                 >
@@ -2386,7 +2385,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
               <Button
                 variant="outline"
                 size="lg"
-                className="h-14 w-14 rounded-2xl border-white/30 bg-white/10 hover:bg-white/20 text-white"
+                className="h-14 w-14 rounded-2xl border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700"
                 onClick={() => {
                   const url = `${window.location.origin}/sheeko/${room.id}`;
                   navigator.clipboard.writeText(url);
@@ -2397,11 +2396,11 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 <Share2 className="w-5 h-5" />
               </Button>
             </div>
-            <p className="text-center text-xs text-white/70">
+            <p className="text-center text-xs text-gray-500">
               Si aad codka u maqlid iyo aad uga hadashid, fadlan{" "}
-              <Link href="/login" className="text-purple-300 underline">gal</Link>
+              <Link href="/login" className="text-blue-600 underline">gal</Link>
               {" "}ama{" "}
-              <Link href="/register" className="text-purple-300 underline">isdiiwaangeli</Link>
+              <Link href="/register" className="text-blue-600 underline">isdiiwaangeli</Link>
             </p>
           </div>
         ) : !isJoined ? (
@@ -2409,7 +2408,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
             {!showJoinDialog ? (
               <div className="flex gap-3">
                 <Button 
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/30 h-14 rounded-2xl text-base font-semibold" 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 h-14 rounded-2xl text-base font-semibold" 
                   size="lg"
                   onClick={() => setShowJoinDialog(true)}
                   data-testid="join-room-button"
@@ -2420,7 +2419,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-14 w-14 rounded-2xl border-white/30 bg-white/10 hover:bg-white/20 text-white"
+                  className="h-14 w-14 rounded-2xl border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700"
                   onClick={() => {
                     const url = `${window.location.origin}/sheeko/${room.id}`;
                     navigator.clipboard.writeText(url);
@@ -2432,11 +2431,11 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 </Button>
               </div>
             ) : (
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 space-y-3 border border-white/20">
-                <p className="text-sm font-medium text-center text-white mb-3">Sidee ayaad u biiri lahayd?</p>
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3 border border-gray-200">
+                <p className="text-sm font-medium text-center text-gray-800 mb-3">Sidee ayaad u biiri lahayd?</p>
                 <div className="flex gap-3">
                   <Button 
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white h-12 rounded-xl" 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl" 
                     size="lg"
                     onClick={() => {
                       setShowJoinDialog(false);
@@ -2450,7 +2449,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                   </Button>
                   <Button 
                     variant="outline"
-                    className="flex-1 border-white/30 bg-white/10 hover:bg-white/20 text-white h-12 rounded-xl" 
+                    className="flex-1 border-gray-200 bg-white hover:bg-gray-50 text-gray-800 h-12 rounded-xl" 
                     size="lg"
                     onClick={() => {
                       setShowJoinDialog(false);
@@ -2466,7 +2465,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="w-full text-white/70 hover:text-white hover:bg-white/10"
+                  className="w-full text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   onClick={() => setShowJoinDialog(false)}
                 >
                   Dib u laabo
@@ -2479,7 +2478,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
             {amIHidden && (
               <Button
                 size="icon"
-                className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
+                className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30"
                 onClick={() => revealMutation.mutate()}
                 disabled={revealMutation.isPending}
                 data-testid="reveal-button"
@@ -2495,7 +2494,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 className={`h-14 w-14 rounded-full shadow-lg transition-all ${
                   handRaised 
                     ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-yellow-500/30' 
-                    : 'bg-white/10 border border-white/30 text-white hover:bg-white/20'
+                    : 'bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200'
                 }`}
                 onClick={handleRaiseHand}
                 data-testid="raise-hand-button"
@@ -2509,8 +2508,8 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 size="icon"
                 className={`h-16 w-16 rounded-full shadow-lg transition-all ${
                   isMuted 
-                    ? 'bg-white/10 border-2 border-red-500/50 text-red-400' 
-                    : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-green-500/30'
+                    ? 'bg-white border-2 border-red-300 text-red-500' 
+                    : 'bg-green-600 text-white shadow-green-500/30'
                 }`}
                 onClick={handleToggleMute}
                 data-testid="mute-button"
@@ -2528,10 +2527,10 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
                 size="icon"
                 className={`h-14 w-14 rounded-full shadow-lg transition-all ${
                   isRecording 
-                    ? 'bg-gradient-to-br from-red-600 to-rose-700 text-white animate-pulse shadow-red-500/50' 
+                    ? 'bg-red-600 text-white animate-pulse shadow-red-500/50' 
                     : isUploading
-                      ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
-                      : 'bg-white/10 border border-white/30 text-white hover:bg-white/20'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200'
                 }`}
                 onClick={() => {
                   if (isRecording) {
@@ -2556,7 +2555,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
             
             <Button
               size="icon"
-              className="h-14 w-14 rounded-full bg-white/10 border border-white/30 text-white hover:bg-white/20 shadow-lg"
+              className="h-14 w-14 rounded-full bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 shadow-lg"
               onClick={() => {
                 const url = `${window.location.origin}/sheeko/${room.id}`;
                 navigator.clipboard.writeText(url);
@@ -2569,7 +2568,7 @@ function ActiveVoiceRoom({ room, onLeave, fromAdmin = false }: { room: VoiceRoom
             
             <Button
               size="icon"
-              className="h-14 w-14 rounded-full bg-gradient-to-br from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white shadow-lg shadow-red-500/40"
+              className="h-14 w-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/40"
               onClick={handleLeave}
               disabled={leaveMutation.isPending}
               data-testid="leave-room-button"
@@ -2621,39 +2620,39 @@ function ParticipantAvatar({
   const getRoleBadge = () => {
     if (isParticipantHost) {
       return (
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 rounded-full">
-          <Crown className="w-3 h-3 text-yellow-400" />
-          <span className="text-[10px] font-semibold text-yellow-300">Host</span>
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-50 border border-yellow-200 rounded-full">
+          <Crown className="w-3 h-3 text-yellow-600" />
+          <span className="text-[10px] font-semibold text-yellow-700">Host</span>
         </div>
       );
     }
     if (isParticipantCoHost) {
       return (
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 rounded-full">
-          <Star className="w-3 h-3 text-blue-400" />
-          <span className="text-[10px] font-semibold text-blue-300">Co-host</span>
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-full">
+          <Star className="w-3 h-3 text-blue-600" />
+          <span className="text-[10px] font-semibold text-blue-700">Co-host</span>
         </div>
       );
     }
     if (isParticipantSpeaker) {
       return (
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/20 rounded-full">
-          <Mic className="w-3 h-3 text-green-400" />
-          <span className="text-[10px] font-semibold text-green-300">Speaker</span>
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-50 border border-green-200 rounded-full">
+          <Mic className="w-3 h-3 text-green-600" />
+          <span className="text-[10px] font-semibold text-green-700">Speaker</span>
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 rounded-full">
-        <Headphones className="w-3 h-3 text-purple-400" />
-        <span className="text-[10px] font-semibold text-purple-300">Listening</span>
+      <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 border border-gray-200 rounded-full">
+        <Headphones className="w-3 h-3 text-gray-500" />
+        <span className="text-[10px] font-semibold text-gray-600">Listening</span>
       </div>
     );
   };
 
   const avatarContent = (
     <motion.div 
-      className={`flex flex-col items-center gap-1 ${isSpeaker ? 'p-2 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10' : ''}`}
+      className={`flex flex-col items-center gap-1 ${isSpeaker ? 'p-2 bg-white rounded-xl border border-gray-100 shadow-sm' : ''}`}
       whileHover={{ scale: 1.02 }}
       transition={{ type: "spring", stiffness: 400 }}
     >
@@ -2682,15 +2681,15 @@ function ParticipantAvatar({
               ? 'border-blue-400 shadow-xl shadow-blue-400/40'
               : isActivelySpeaking 
                 ? 'border-green-400 shadow-xl shadow-green-400/40' 
-                : 'border-white/40'
-        } ${canModerate ? "cursor-pointer hover:border-purple-400 hover:shadow-purple-400/30 transition-all" : ""}`}>
+                : 'border-gray-200'
+        } ${canModerate ? "cursor-pointer hover:border-blue-400 hover:shadow-blue-400/30 transition-all" : ""}`}>
           <AvatarImage src={participant.parent.picture || undefined} className="object-cover" />
           <AvatarFallback className={`text-lg font-bold ${
             isParticipantHost 
               ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
               : isParticipantCoHost
                 ? 'bg-gradient-to-br from-blue-400 to-cyan-500 text-white'
-                : 'bg-gradient-to-br from-purple-500 to-pink-500 text-white'
+                : 'bg-blue-600 text-white'
           }`}>
             {participant.parent.name?.charAt(0).toUpperCase() || "?"}
           </AvatarFallback>
@@ -2707,7 +2706,7 @@ function ParticipantAvatar({
         )}
         
         {isSpeaker && participant.isMuted && (
-          <div className="absolute -bottom-1 -right-1 bg-gradient-to-br from-red-500 to-rose-600 rounded-full p-1.5 shadow-lg ring-2 ring-black/20">
+          <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1.5 shadow-lg ring-2 ring-white">
             <MicOff className="w-3 h-3 text-white" />
           </div>
         )}
@@ -2717,7 +2716,7 @@ function ParticipantAvatar({
         <a 
           href={`/parent/${participant.parentId}`}
           onClick={(e) => e.stopPropagation()}
-          className={`text-center truncate max-w-full text-white font-medium flex items-center gap-0.5 hover:text-indigo-300 transition-colors ${isSpeaker ? 'text-xs' : 'text-[10px]'}`}
+          className={`text-center truncate max-w-full text-gray-800 font-medium flex items-center gap-0.5 hover:text-blue-600 transition-colors ${isSpeaker ? 'text-xs' : 'text-[10px]'}`}
           data-testid={`participant-profile-link-${participant.parentId}`}
         >
           {participant.parent.isYearlySubscriber && <span title="Xubin Dahabi">👑</span>}
@@ -2730,14 +2729,14 @@ function ParticipantAvatar({
           <div className="flex items-center gap-2 mt-1">
             {appreciationCount > 0 && (
               <motion.div 
-                className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-pink-500/30 to-purple-500/30 rounded-full border border-pink-400/30"
+                className="flex items-center gap-1 px-2 py-0.5 bg-pink-50 rounded-full border border-pink-200"
                 key={appreciationCount}
                 initial={{ scale: 1.3 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 500 }}
               >
                 <span className="text-xs">💎</span>
-                <span className="text-xs font-bold text-pink-300">{appreciationCount}</span>
+                <span className="text-xs font-bold text-pink-600">{appreciationCount}</span>
               </motion.div>
             )}
             
@@ -2747,19 +2746,19 @@ function ParticipantAvatar({
                 <motion.button
                   whileTap={{ scale: 0.85 }}
                   whileHover={{ scale: 1.15 }}
-                  className="p-1.5 bg-pink-500/20 hover:bg-pink-500/40 rounded-full transition-colors"
+                  className="p-1.5 bg-pink-50 hover:bg-pink-100 rounded-full transition-colors border border-pink-200"
                   onClick={(e) => {
                     e.stopPropagation();
                     onAppreciate('heart');
                   }}
                   data-testid={`appreciate-heart-${participant.parentId}`}
                 >
-                  <Heart className="w-3 h-3 text-pink-400" />
+                  <Heart className="w-3 h-3 text-pink-500" />
                 </motion.button>
                 <motion.button
                   whileTap={{ scale: 0.85 }}
                   whileHover={{ scale: 1.15 }}
-                  className="p-1.5 bg-yellow-500/20 hover:bg-yellow-500/40 rounded-full transition-colors"
+                  className="p-1.5 bg-yellow-50 hover:bg-yellow-100 rounded-full transition-colors border border-yellow-200"
                   onClick={(e) => {
                     e.stopPropagation();
                     onAppreciate('clap');

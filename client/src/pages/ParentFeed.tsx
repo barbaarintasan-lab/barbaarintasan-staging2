@@ -268,7 +268,7 @@ export default function ParentFeed() {
       const data = await res.json();
       return data.posts;
     },
-    refetchInterval: 5000, // Real-time: refresh posts every 5 seconds
+    refetchInterval: 30000,
   });
 
   const { data: communitySettings } = useQuery<Record<string, string | null>>({
@@ -1925,13 +1925,13 @@ function MessengerDropdown({ onClose }: { onClose: () => void }) {
   const { data: conversations } = useQuery<Conversation[]>({
     queryKey: ["/api/messages/conversations"],
     enabled: !!parent,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const { data: messages, refetch: refetchMessages } = useQuery<DirectMessage[]>({
     queryKey: [`/api/messages/${activeChat?.partnerId}`],
     enabled: !!parent && !!activeChat,
-    refetchInterval: 3000,
+    refetchInterval: 10000,
   });
 
   const sendMutation = useMutation({
@@ -2377,7 +2377,7 @@ function PostCommentsSection({ postId, currentParentId, showExpanded = false, on
 
   const { data: comments, isLoading } = useQuery<PostComment[]>({
     queryKey: [`/api/social-posts/${postId}/comments`],
-    refetchInterval: 5000, // Real-time: refresh comments every 5 seconds
+    refetchInterval: 30000,
   });
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

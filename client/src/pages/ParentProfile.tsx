@@ -157,14 +157,31 @@ export default function ParentProfile() {
       <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 text-white p-4">
         <div className="max-w-lg mx-auto text-center py-12">
           <Users className="w-16 h-16 text-slate-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-300">Waalidka lama helin</h2>
-          <p className="text-slate-500 mt-2">Profile-ka aad raadinaysay ma jiro</p>
-          <Link href="/">
-            <Button className="mt-4" variant="outline">
+          <h2 className="text-xl font-semibold text-slate-300">Laguma Helin</h2>
+          <p className="text-slate-500 mt-2 leading-relaxed max-w-sm mx-auto">
+            Haddii aad horay isu diiwaangelisay Soo gal riix
+          </p>
+          <p className="text-slate-500 mt-1 leading-relaxed max-w-sm mx-auto">
+            Haddii aadan diiwaangashanayna iska diiwaangeli halkaan
+          </p>
+          <div className="flex flex-col items-center gap-3 mt-5">
+            <Button
+              variant="outline"
+              data-testid="btn-login-redirect"
+              onClick={() => window.location.assign("/login?redirect=" + encodeURIComponent("/calendar"))}
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Bogga Hore
+              Soo Gal
             </Button>
-          </Link>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-register-redirect"
+              onClick={() => window.location.assign("/register?redirect=" + encodeURIComponent("/calendar"))}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Iska Diiwaangeli
+            </Button>
+          </div>
         </div>
       </div>
     );

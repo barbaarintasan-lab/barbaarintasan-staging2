@@ -1,6 +1,6 @@
-import { users, courses, lessons, quizzes, quizQuestions, paymentMethods, paymentSubmissions, enrollments, parents, testimonials, testimonialReactions, assignmentSubmissions, supportMessages, lessonProgress, assignments, modules, dailyTips, dailyTipSchedules, milestones, milestoneProgress, badges, badgeAwards, certificates, resources, communityThreads, communityPosts, communityLikes, liveEvents, eventRsvps, courseReviews, pushSubscriptions, assessmentQuestions, parentAssessments, assessmentResponses, aiAssessmentInsights, learningPathRecommendations, passwordResetTokens, homeworkConversations, homeworkMessages, homeworkUsage, parentingConversations, parentingMessages, parentingUsage, telegramReferrals, aiGeneratedTips, appointments, availabilitySlots, calendarAvailability, announcements, homepageSections, parentCommunitySettings, lessonImages, flashcardCategories, flashcards, flashcardProgress, expenses, receiptFingerprints, receiptAttempts, lessonBookmarks, lessonExercises, exerciseProgress, conversations, messages, userPresence, bankTransfers, quranReciters, hadiths, parentNotifications, parentPrayerSettings, voiceRooms, voiceParticipants, voiceRoomMessages, voiceRoomRsvps, voiceRecordings, voiceRoomBans, hostFollows, sheekoFollows, sheekoAppreciations, contentReports, moderationActions, userConsent, aiModerationReports, bedtimeStories, parentMessages, contentReactions, contentComments, commentReactions, parentFollows, directMessages, socialNotifications, parentPosts, parentPostImages, coursePromotions, parentPostReactions, parentPostComments, parentPostCommentImages, parentPostCommentReactions, userBlocks, googleMeetEvents, type User, type InsertUser, type VoiceRoom, type InsertVoiceRoom, type VoiceParticipant, type InsertVoiceParticipant, type VoiceRoomMessage, type InsertVoiceRoomMessage, type VoiceRoomRsvp, type InsertVoiceRoomRsvp, type VoiceRecording, type InsertVoiceRecording, type VoiceRoomBan, type InsertVoiceRoomBan, type HostFollow, type InsertHostFollow, type SheekoFollow, type InsertSheekoFollow, type SheekoAppreciation, type InsertSheekoAppreciation, type ContentReport, type InsertContentReport, type ModerationAction, type InsertModerationAction, type UserConsent, type InsertUserConsent, type CoursePromotion, type InsertCoursePromotion, type ParentPostReaction, type InsertParentPostReaction, type ParentPostComment, type InsertParentPostComment, type AiModerationReport, type InsertAiModerationReport, type BedtimeStory, type InsertBedtimeStory, type ParentMessage, type InsertParentMessage, type ContentReaction, type InsertContentReaction, type ContentComment, type InsertContentComment, type CommentReaction, type InsertCommentReaction, type ParentFollow, type InsertParentFollow, type DirectMessage, type InsertDirectMessage, type SocialNotification, type InsertSocialNotification, type ParentPost, type InsertParentPost, type ParentPostImage, type InsertParentPostImage, type Course, type InsertCourse, type Lesson, type InsertLesson, type Quiz, type InsertQuiz, type QuizQuestion, type InsertQuizQuestion, type PaymentMethod, type InsertPaymentMethod, type PaymentSubmission, type InsertPaymentSubmission, type Enrollment, type InsertEnrollment, type Parent, type InsertParent, type Testimonial, type InsertTestimonial, type AssignmentSubmission, type InsertAssignmentSubmission, type SupportMessage, type InsertSupportMessage, type LessonProgress, type InsertLessonProgress, type Assignment, type InsertAssignment, type Module, type InsertModule, type DailyTip, type InsertDailyTip, type DailyTipSchedule, type InsertDailyTipSchedule, type Milestone, type InsertMilestone, type MilestoneProgress, type InsertMilestoneProgress, type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward, type Certificate, type InsertCertificate, type Resource, type InsertResource, type CommunityThread, type InsertCommunityThread, type CommunityPost, type InsertCommunityPost, type QuranReciter, type InsertQuranReciter, type Hadith, type InsertHadith, type ParentNotification, type InsertParentNotification, type ParentPrayerSettings, type InsertParentPrayerSettings, type CommunityLike, type InsertCommunityLike, type BankTransfer, type InsertBankTransfer, type LiveEvent, type InsertLiveEvent, type EventRsvp, type InsertEventRsvp, type CourseReview, type InsertCourseReview, type Expense, type InsertExpense, type PushSubscription, type InsertPushSubscription, type FlashcardCategory, type InsertFlashcardCategory, type Flashcard, type InsertFlashcard, type FlashcardProgress, type InsertFlashcardProgress, type AssessmentQuestion, type InsertAssessmentQuestion, type ParentAssessment, type InsertParentAssessment, type AssessmentResponse, type InsertAssessmentResponse, type AiAssessmentInsight, type InsertAiAssessmentInsight, type LearningPathRecommendation, type InsertLearningPathRecommendation, type HomeworkConversation, type InsertHomeworkConversation, type HomeworkMessage, type InsertHomeworkMessage, type HomeworkUsage, type InsertHomeworkUsage, type ParentingConversation, type InsertParentingConversation, type ParentingMessage, type InsertParentingMessage, type ParentingUsage, type InsertParentingUsage, type TelegramReferral, type InsertTelegramReferral, type AiGeneratedTip, type InsertAiGeneratedTip, type Appointment, type InsertAppointment, type AvailabilitySlot, type InsertAvailabilitySlot, type CalendarAvailability, type InsertCalendarAvailability, type Announcement, type InsertAnnouncement, type HomepageSection, type InsertHomepageSection, type ParentCommunitySetting, type InsertParentCommunitySetting, type LessonImage, type InsertLessonImage, type ReceiptFingerprint, type InsertReceiptFingerprint, type ReceiptAttempt, type InsertReceiptAttempt, type LessonBookmark, type InsertLessonBookmark, type LessonExercise, type InsertLessonExercise, type ExerciseProgress, type InsertExerciseProgress, type ParentPostCommentImage, type InsertParentPostCommentImage, pricingPlans, type PricingPlan, type InsertPricingPlan, contentProgress, type ContentProgress, type GoogleMeetEvent, type InsertGoogleMeetEvent } from "@shared/schema";
+import { users, courses, lessons, quizzes, quizQuestions, paymentMethods, paymentSubmissions, enrollments, parents, testimonials, testimonialReactions, assignmentSubmissions, supportMessages, lessonProgress, assignments, modules, dailyTips, dailyTipSchedules, milestones, milestoneProgress, badges, badgeAwards, certificates, resources, communityThreads, communityPosts, communityLikes, liveEvents, eventRsvps, courseReviews, pushSubscriptions, assessmentQuestions, parentAssessments, assessmentResponses, aiAssessmentInsights, learningPathRecommendations, passwordResetTokens, homeworkConversations, homeworkMessages, homeworkUsage, parentingConversations, parentingMessages, parentingUsage, telegramReferrals, aiGeneratedTips, appointments, availabilitySlots, calendarAvailability, announcements, homepageSections, parentCommunitySettings, lessonImages, flashcardCategories, flashcards, flashcardProgress, expenses, receiptFingerprints, receiptAttempts, lessonBookmarks, lessonExercises, exerciseProgress, conversations, messages, userPresence, bankTransfers, quranReciters, hadiths, parentNotifications, parentPrayerSettings, voiceRooms, voiceParticipants, voiceRoomMessages, voiceRoomRsvps, voiceRecordings, voiceRoomBans, hostFollows, sheekoFollows, sheekoAppreciations, contentReports, moderationActions, userConsent, aiModerationReports, bedtimeStories, parentMessages, contentReactions, contentComments, commentReactions, parentFollows, directMessages, socialNotifications, parentPosts, parentPostImages, coursePromotions, parentPostReactions, parentPostComments, parentPostCommentImages, parentPostCommentReactions, userBlocks, googleMeetEvents, type User, type InsertUser, type VoiceRoom, type InsertVoiceRoom, type VoiceParticipant, type InsertVoiceParticipant, type VoiceRoomMessage, type InsertVoiceRoomMessage, type VoiceRoomRsvp, type InsertVoiceRoomRsvp, type VoiceRecording, type InsertVoiceRecording, type VoiceRoomBan, type InsertVoiceRoomBan, type HostFollow, type InsertHostFollow, type SheekoFollow, type InsertSheekoFollow, type SheekoAppreciation, type InsertSheekoAppreciation, type ContentReport, type InsertContentReport, type ModerationAction, type InsertModerationAction, type UserConsent, type InsertUserConsent, type CoursePromotion, type InsertCoursePromotion, type ParentPostReaction, type InsertParentPostReaction, type ParentPostComment, type InsertParentPostComment, type AiModerationReport, type InsertAiModerationReport, type BedtimeStory, type InsertBedtimeStory, type ParentMessage, type InsertParentMessage, type ContentReaction, type InsertContentReaction, type ContentComment, type InsertContentComment, type CommentReaction, type InsertCommentReaction, type ParentFollow, type InsertParentFollow, type DirectMessage, type InsertDirectMessage, type SocialNotification, type InsertSocialNotification, type ParentPost, type InsertParentPost, type ParentPostImage, type InsertParentPostImage, type Course, type InsertCourse, type Lesson, type InsertLesson, type Quiz, type InsertQuiz, type QuizQuestion, type InsertQuizQuestion, type PaymentMethod, type InsertPaymentMethod, type PaymentSubmission, type InsertPaymentSubmission, type Enrollment, type InsertEnrollment, type Parent, type InsertParent, type Testimonial, type InsertTestimonial, type AssignmentSubmission, type InsertAssignmentSubmission, type SupportMessage, type InsertSupportMessage, type LessonProgress, type InsertLessonProgress, type Assignment, type InsertAssignment, type Module, type InsertModule, type DailyTip, type InsertDailyTip, type DailyTipSchedule, type InsertDailyTipSchedule, type Milestone, type InsertMilestone, type MilestoneProgress, type InsertMilestoneProgress, type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward, type Certificate, type InsertCertificate, type Resource, type InsertResource, type CommunityThread, type InsertCommunityThread, type CommunityPost, type InsertCommunityPost, type QuranReciter, type InsertQuranReciter, type Hadith, type InsertHadith, type ParentNotification, type InsertParentNotification, type ParentPrayerSettings, type InsertParentPrayerSettings, type CommunityLike, type InsertCommunityLike, type BankTransfer, type InsertBankTransfer, type LiveEvent, type InsertLiveEvent, type EventRsvp, type InsertEventRsvp, type CourseReview, type InsertCourseReview, type Expense, type InsertExpense, type PushSubscription, type InsertPushSubscription, type FlashcardCategory, type InsertFlashcardCategory, type Flashcard, type InsertFlashcard, type FlashcardProgress, type InsertFlashcardProgress, type AssessmentQuestion, type InsertAssessmentQuestion, type ParentAssessment, type InsertParentAssessment, type AssessmentResponse, type InsertAssessmentResponse, type AiAssessmentInsight, type InsertAiAssessmentInsight, type LearningPathRecommendation, type InsertLearningPathRecommendation, type HomeworkConversation, type InsertHomeworkConversation, type HomeworkMessage, type InsertHomeworkMessage, type HomeworkUsage, type InsertHomeworkUsage, type ParentingConversation, type InsertParentingConversation, type ParentingMessage, type InsertParentingMessage, type ParentingUsage, type InsertParentingUsage, type TelegramReferral, type InsertTelegramReferral, type AiGeneratedTip, type InsertAiGeneratedTip, type Appointment, type InsertAppointment, type AvailabilitySlot, type InsertAvailabilitySlot, type CalendarAvailability, type InsertCalendarAvailability, type Announcement, type InsertAnnouncement, type HomepageSection, type InsertHomepageSection, type ParentCommunitySetting, type InsertParentCommunitySetting, type LessonImage, type InsertLessonImage, type ReceiptFingerprint, type InsertReceiptFingerprint, type ReceiptAttempt, type InsertReceiptAttempt, type LessonBookmark, type InsertLessonBookmark, type LessonExercise, type InsertLessonExercise, type ExerciseProgress, type InsertExerciseProgress, type ParentPostCommentImage, type InsertParentPostCommentImage, pricingPlans, type PricingPlan, type InsertPricingPlan, contentProgress, type ContentProgress, type GoogleMeetEvent, type InsertGoogleMeetEvent, parentTips, type ParentTip, type InsertParentTip } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, lte, gte, sql, asc, ilike, or, not, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, lte, gte, gt, sql, asc, ilike, or, not, isNull, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -45,7 +45,7 @@ export interface IStorage {
   // Payment Submission operations
   getAllPaymentSubmissions(): Promise<PaymentSubmission[]>;
   getPaymentSubmission(id: string): Promise<PaymentSubmission | undefined>;
-  createPaymentSubmission(submission: InsertPaymentSubmission): Promise<PaymentSubmission>;
+  createPaymentSubmission(submission: InsertPaymentSubmission & { status?: string }): Promise<PaymentSubmission>;
   updatePaymentSubmissionStatus(id: string, status: string, reviewedBy: string): Promise<PaymentSubmission | undefined>;
   updatePaymentSubmission(id: string, data: { status?: string; notes?: string; reviewedBy?: string }): Promise<PaymentSubmission | undefined>;
 
@@ -61,7 +61,6 @@ export interface IStorage {
   createEnrollment(enrollment: InsertEnrollment): Promise<Enrollment>;
   getAllEnrollments(): Promise<Enrollment[]>;
   getEnrollment(id: string): Promise<Enrollment | undefined>;
-  getEnrollmentByPaypalOrderId(paypalOrderId: string): Promise<Enrollment | undefined>;
   deleteEnrollment(id: string): Promise<void>;
   getUpgradeBannerStatus(enrollmentId: string): Promise<{ shouldShow: boolean; expiresAt?: Date }>;
   markUpgradeBannerShown(enrollmentId: string): Promise<void>;
@@ -478,6 +477,15 @@ export interface IStorage {
   updateParentMessageWithTimestamp(id: string, data: Partial<InsertParentMessage>): Promise<ParentMessage | undefined>;
   deleteParentMessage(id: string): Promise<void>;
 
+  // Parent Tips (Talooyinka Waalidka)
+  createParentTip(tip: InsertParentTip): Promise<ParentTip>;
+  getParentTipsByStage(stage: string, limit?: number): Promise<ParentTip[]>;
+  getAllParentTips(limit?: number): Promise<ParentTip[]>;
+  getParentTip(id: string): Promise<ParentTip | undefined>;
+  getParentTipsByDate(date: string): Promise<ParentTip[]>;
+  getRecentParentTips(hoursAgo: number): Promise<ParentTip[]>;
+  updateParentTip(id: string, data: Partial<InsertParentTip>): Promise<ParentTip | undefined>;
+
   // Content Reactions & Comments (Engagement)
   getContentReactions(contentType: string, contentId: string, parentId?: string): Promise<{ counts: Record<string, number>; userReaction: string | null }>;
   upsertContentReaction(parentId: string, contentType: string, contentId: string, reactionType: string): Promise<ContentReaction>;
@@ -579,9 +587,11 @@ export interface IStorage {
   // Google Meet Events
   getGoogleMeetEvents(): Promise<GoogleMeetEvent[]>;
   getActiveGoogleMeetEvents(): Promise<GoogleMeetEvent[]>;
+  getArchivedGoogleMeetEvents(): Promise<GoogleMeetEvent[]>;
   getGoogleMeetEvent(id: string): Promise<GoogleMeetEvent | undefined>;
   createGoogleMeetEvent(event: InsertGoogleMeetEvent): Promise<GoogleMeetEvent>;
   updateGoogleMeetEvent(id: string, data: Partial<InsertGoogleMeetEvent>): Promise<GoogleMeetEvent | undefined>;
+  archiveGoogleMeetEvent(id: string): Promise<GoogleMeetEvent | undefined>;
   deleteGoogleMeetEvent(id: string): Promise<void>;
 }
 
@@ -755,8 +765,11 @@ export class DatabaseStorage implements IStorage {
     return submission || undefined;
   }
 
-  async createPaymentSubmission(submission: InsertPaymentSubmission): Promise<PaymentSubmission> {
-    const [paymentSubmission] = await db.insert(paymentSubmissions).values(submission).returning();
+  async createPaymentSubmission(submission: InsertPaymentSubmission & { status?: string }): Promise<PaymentSubmission> {
+    const [paymentSubmission] = await db.insert(paymentSubmissions).values({
+      ...submission,
+      ...(submission.status ? { status: submission.status } : {}),
+    } as any).returning();
     return paymentSubmission;
   }
 
@@ -812,11 +825,6 @@ export class DatabaseStorage implements IStorage {
 
   async getEnrollment(id: string): Promise<Enrollment | undefined> {
     const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, id));
-    return enrollment || undefined;
-  }
-
-  async getEnrollmentByPaypalOrderId(paypalOrderId: string): Promise<Enrollment | undefined> {
-    const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.paypalOrderId, paypalOrderId));
     return enrollment || undefined;
   }
 
@@ -1443,13 +1451,7 @@ export class DatabaseStorage implements IStorage {
       return { error: 'Casharkan lama helin' };
     }
     
-    if (lesson.videoWatchRequired && lesson.lessonType === 'video') {
-      const existing = await this.getLessonProgress(parentId, lessonId);
-      const watchedPercent = existing?.videoWatchedPercent || 0;
-      if (watchedPercent < 80) {
-        return { error: 'Waa inaad daawadasho ugu yaraan 80% video-ga' };
-      }
-    }
+    // Video watch requirement removed - parents can now complete lessons without viewing 80% of the video
     
     const existing = await this.getLessonProgress(parentId, lessonId);
     
@@ -1967,7 +1969,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async markMessagesAsRead(parentId?: string, sessionId?: string): Promise<void> {
+  async markSupportMessagesAsRead(parentId?: string, sessionId?: string): Promise<void> {
     if (parentId) {
       await db.update(supportMessages).set({ isRead: true }).where(eq(supportMessages.parentId, parentId));
     } else if (sessionId) {
@@ -2536,6 +2538,9 @@ export class DatabaseStorage implements IStorage {
       unlockDate: lessons.unlockDate,
       unlockDaysAfter: lessons.unlockDaysAfter,
       videoWatchRequired: lessons.videoWatchRequired,
+      isFree: lessons.isFree,
+      audioUrl: lessons.audioUrl,
+      voiceName: lessons.voiceName,
       courseName: courses.title,
     }).from(lessons)
       .innerJoin(courses, eq(lessons.courseId, courses.id))
@@ -3090,7 +3095,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApprovedTipForToday(): Promise<AiGeneratedTip | undefined> {
-    // Get all approved tips for rotation
     const approvedTips = await db.select().from(aiGeneratedTips)
       .where(eq(aiGeneratedTips.status, 'approved'))
       .orderBy(asc(aiGeneratedTips.generatedAt));
@@ -3099,17 +3103,21 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
     
-    // Calculate rotation index based on day of year and 2-hour slots
-    // This gives 12 different tips per day (24 hours / 2 = 12 slots)
+    const tipsWithAudio = approvedTips.filter(t => t.audioUrl);
+    
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 0);
     const diff = now.getTime() - startOfYear.getTime();
     const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const twoHourSlot = Math.floor(now.getHours() / 2); // 0-11 (12 slots per day)
+    const twoHourSlot = Math.floor(now.getHours() / 2);
+    const slotIndex = dayOfYear * 12 + twoHourSlot;
     
-    // Combine day and slot for unique rotation index
-    const rotationIndex = (dayOfYear * 12 + twoHourSlot) % approvedTips.length;
+    if (tipsWithAudio.length > 0) {
+      const rotationIndex = slotIndex % tipsWithAudio.length;
+      return tipsWithAudio[rotationIndex];
+    }
     
+    const rotationIndex = slotIndex % approvedTips.length;
     return approvedTips[rotationIndex];
   }
 
@@ -3947,7 +3955,7 @@ export class DatabaseStorage implements IStorage {
       );
   }
 
-  async getUnreadMessageCount(userId: string): Promise<number> {
+  async getUnreadConversationMessageCount(userId: string): Promise<number> {
     const userConversations = await db
       .select({ id: conversations.id })
       .from(conversations)
@@ -4884,7 +4892,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTodayBedtimeStory(): Promise<BedtimeStory | undefined> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
     const [story] = await db.select()
       .from(bedtimeStories)
       .where(and(
@@ -4970,7 +4978,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTodayParentMessage(): Promise<ParentMessage | undefined> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
     const [message] = await db.select()
       .from(parentMessages)
       .where(and(
@@ -5007,6 +5015,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteParentMessage(id: string): Promise<void> {
     await db.delete(parentMessages).where(eq(parentMessages.id, id));
+  }
+
+  // Parent Tips implementations
+  async createParentTip(tip: InsertParentTip): Promise<ParentTip> {
+    const [created] = await db.insert(parentTips).values(tip).returning();
+    return created;
+  }
+
+  async getParentTipsByStage(stage: string, limit: number = 50): Promise<ParentTip[]> {
+    return await db.select().from(parentTips)
+      .where(and(eq(parentTips.stage, stage), eq(parentTips.isPublished, true)))
+      .orderBy(desc(parentTips.tipDate))
+      .limit(limit);
+  }
+
+  async getAllParentTips(limit: number = 100): Promise<ParentTip[]> {
+    return await db.select().from(parentTips)
+      .where(eq(parentTips.isPublished, true))
+      .orderBy(desc(parentTips.tipDate))
+      .limit(limit);
+  }
+
+  async getParentTip(id: string): Promise<ParentTip | undefined> {
+    const [tip] = await db.select().from(parentTips).where(eq(parentTips.id, id));
+    return tip || undefined;
+  }
+
+  async getParentTipsByDate(date: string): Promise<ParentTip[]> {
+    return await db.select().from(parentTips).where(eq(parentTips.tipDate, date));
+  }
+
+  async getRecentParentTips(hoursAgo: number): Promise<ParentTip[]> {
+    const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    return await db.select().from(parentTips)
+      .where(and(
+        eq(parentTips.isPublished, true),
+        gt(parentTips.generatedAt, cutoff)
+      ))
+      .orderBy(desc(parentTips.generatedAt));
+  }
+
+  async updateParentTip(id: string, data: Partial<InsertParentTip>): Promise<ParentTip | undefined> {
+    const [updated] = await db.update(parentTips).set(data).where(eq(parentTips.id, id)).returning();
+    return updated || undefined;
   }
 
   // Content Reactions & Comments implementations
@@ -5737,7 +5789,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getCommentReactions(commentId: string, parentId?: string): Promise<{ counts: Record<string, number>; userReaction: string | null }> {
+  async getParentPostCommentReactions(commentId: string, parentId?: string): Promise<{ counts: Record<string, number>; userReaction: string | null }> {
     const reactions = await db.select().from(parentPostCommentReactions).where(eq(parentPostCommentReactions.commentId, commentId));
     const counts: Record<string, number> = {};
     let userReaction: string | null = null;
@@ -5869,8 +5921,22 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveGoogleMeetEvents(): Promise<GoogleMeetEvent[]> {
     return await db.select().from(googleMeetEvents)
-      .where(eq(googleMeetEvents.isActive, true))
+      .where(and(eq(googleMeetEvents.isActive, true), eq(googleMeetEvents.isArchived, false)))
       .orderBy(desc(googleMeetEvents.createdAt));
+  }
+
+  async getArchivedGoogleMeetEvents(): Promise<GoogleMeetEvent[]> {
+    return await db.select().from(googleMeetEvents)
+      .where(eq(googleMeetEvents.isArchived, true))
+      .orderBy(desc(googleMeetEvents.createdAt));
+  }
+
+  async archiveGoogleMeetEvent(id: string): Promise<GoogleMeetEvent | undefined> {
+    const [updated] = await db.update(googleMeetEvents)
+      .set({ isArchived: true, isActive: false })
+      .where(eq(googleMeetEvents.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async getGoogleMeetEvent(id: string): Promise<GoogleMeetEvent | undefined> {

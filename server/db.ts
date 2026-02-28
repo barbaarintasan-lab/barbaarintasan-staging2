@@ -1,6 +1,6 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import ws from 'ws';
 import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
@@ -11,41 +11,68 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+function validateDatabaseUrl(url: string): void {
+  try {
+    if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
+      throw new Error('DATABASE_URL must start with postgres:// or postgresql://');
+    }
+    
+    const urlObj = new URL(url);
+    
+    if (!urlObj.hostname || urlObj.hostname.trim() === '') {
+      throw new Error('DATABASE_URL must contain a valid hostname');
+    }
+    
+    if (!urlObj.pathname || urlObj.pathname === '/') {
+      throw new Error('DATABASE_URL must contain a database name in the path');
+    }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DB] Using database host: ${urlObj.hostname}`);
+    }
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new Error(`DATABASE_URL is not a valid URL: ${err.message}`);
+    }
+    throw err;
+  }
+}
+
+validateDatabaseUrl(process.env.DATABASE_URL);
+
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  max: 20,
-  min: 2,
-  idleTimeoutMillis: 60000,
-  connectionTimeoutMillis: 30000,
+  max: isProduction ? 10 : 5,
+  min: 1,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
-// Handle pool errors gracefully to prevent app crashes
 pool.on('error', (err) => {
   console.error('[DB Pool] Unexpected error on idle client:', err.message);
 });
 
-// Pre-warm the database connection pool on startup
 async function warmupPool() {
   try {
     const client = await pool.connect();
     await client.query('SELECT 1');
     client.release();
     console.log('[DB Pool] Connection warmed up successfully');
-  } catch (err) {
-    console.error('[DB Pool] Warmup failed:', err);
+  } catch (err: unknown) {
+    console.error('[DB Pool] Warmup failed (non-fatal):', err);
   }
 }
 warmupPool();
 
-// Keep connection alive with periodic pings (every 30 seconds)
 setInterval(async () => {
   try {
     const client = await pool.connect();
     await client.query('SELECT 1');
     client.release();
   } catch (err) {
-    // Silent fail - pool will recover
   }
-}, 30000);
+}, 300000);
 
-export const db = drizzle({ client: pool, schema });
+export const db = drizzle(pool, { schema });

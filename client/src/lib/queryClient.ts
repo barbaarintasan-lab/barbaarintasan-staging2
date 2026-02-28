@@ -7,12 +7,27 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function getCurrentLang(): string {
+  if (typeof window === 'undefined') return 'so';
+  return localStorage.getItem('barbaarintasan-lang') || 'so';
+}
+
+function appendLangParam(url: string): string {
+  const lang = getCurrentLang();
+  if (lang === 'so') return url;
+  if (!url.startsWith('/api/')) return url;
+  if (url.includes('lang=')) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}lang=${lang}`;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const finalUrl = method === 'GET' ? appendLangParam(url) : url;
+  const res = await fetch(finalUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -29,7 +44,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const rawUrl = queryKey.join("/") as string;
+    const url = appendLangParam(rawUrl);
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -47,8 +64,10 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 10 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      retry: 1,
+      retryDelay: 1000,
     },
     mutations: {
       retry: false,

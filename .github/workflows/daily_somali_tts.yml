@@ -1,0 +1,39 @@
+name: Daily Somali TTS
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 8:00 AM East Africa Time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  generate-tts:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Setup Python
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch TTS soundfile
+
+      # Step 4: Run Somali TTS script
+      - name: Run Somali TTS
+        run: |
+          python generate_hf_somali_tts.py
+
+      # Step 5: Upload generated audio as artifact
+      - name: Upload audio artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: daily-somali-audio
+          path: daily_audio/

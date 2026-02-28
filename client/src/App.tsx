@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Switch, Route, Link, Router as WouterRouter } from "wouter";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { useBrowserLocation } from "@/hooks/useBrowserLocation";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,83 +9,91 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ParentAuthProvider } from "@/contexts/ParentAuthContext";
 import { NotificationModalProvider } from "@/contexts/NotificationModalContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
-import { motion, AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { RefreshCw } from "lucide-react";
-import Home from "@/pages/Home";
-import Courses from "@/pages/Courses";
-import CourseDetail from "@/pages/CourseDetail";
-import LessonView from "@/pages/LessonView";
-import Quiz from "@/pages/Quiz";
-import Profile from "@/pages/Profile";
-import Admin from "@/pages/Admin";
-import QuizCreator from "@/pages/QuizCreator";
-import QuizPlayer from "@/pages/QuizPlayer";
-import AssignmentView from "@/pages/AssignmentView";
-import Testimonials from "@/pages/Testimonials";
-import SubmitTestimonial from "@/pages/SubmitTestimonial";
-import Calendar from "@/pages/Calendar";
-import Milestones from "@/pages/Milestones";
-import Badges from "@/pages/Badges";
-import Resources from "@/pages/Resources";
-import Community from "@/pages/Community";
-import Events from "@/pages/Events";
-import Assessment from "@/pages/Assessment";
-import LearningPath from "@/pages/LearningPath";
-import HomeworkHelper from "@/pages/HomeworkHelper";
-import AiCaawiye from "@/pages/AiCaawiye";
-import TarbiyaHelper from "@/pages/TarbiyaHelper";
-import Register from "@/pages/Register";
-import ForgotPassword from "@/pages/ForgotPassword";
-import ResetPassword from "@/pages/ResetPassword";
-import Appointments from "@/pages/Appointments";
-import Subscription from "@/pages/Subscription";
-import Bookmarks from "@/pages/Bookmarks";
-import Notifications from "@/pages/Notifications";
-import GoldenMembership from "@/pages/GoldenMembership";
-import Downloads from "@/pages/Downloads";
-import MessengerPage from "@/pages/MessengerPage";
-import TermsConditions from "@/pages/TermsConditions";
-import PrivacyPolicy from "@/pages/PrivacyPolicy";
-import CommunityGuidelines from "@/pages/CommunityGuidelines";
-import Legal from "@/pages/Legal";
-import Sheeko from "@/pages/Sheeko";
-import ShareInfo from "@/pages/ShareInfo";
-import Install from "@/pages/Install";
-import Maaweelo from "@/pages/Maaweelo";
-import Dhambaal from "@/pages/Dhambaal";
-import ParentProfile from "@/pages/ParentProfile";
-import Messages from "@/pages/Messages";
-import ParentFeed from "@/pages/ParentFeed";
-import ParentCommunityTerms from "@/pages/ParentCommunityTerms";
-import LearningGroups from "@/pages/LearningGroups";
-import BottomNav from "@/components/BottomNav";
-import ChatSupport from "@/components/ChatSupport";
-import NotFound from "@/pages/not-found";
+import { RefreshCw, Loader2 } from "lucide-react";
+import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 import { Analytics } from "@/components/Analytics";
 import { useLocation, useParams } from "wouter";
-import { VoiceSpaces } from "@/components/VoiceSpaces";
+
+const Home = lazy(() => import("@/pages/Home"));
+
+const Courses = lazy(() => import("@/pages/Courses"));
+const CourseDetail = lazy(() => import("@/pages/CourseDetail"));
+const LessonView = lazy(() => import("@/pages/LessonView"));
+const Quiz = lazy(() => import("@/pages/Quiz"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Admin = lazy(() => import("@/pages/Admin"));
+const QuizCreator = lazy(() => import("@/pages/QuizCreator"));
+const QuizPlayer = lazy(() => import("@/pages/QuizPlayer"));
+const AssignmentView = lazy(() => import("@/pages/AssignmentView"));
+const Testimonials = lazy(() => import("@/pages/Testimonials"));
+const SubmitTestimonial = lazy(() => import("@/pages/SubmitTestimonial"));
+const Calendar = lazy(() => import("@/pages/Calendar"));
+const Milestones = lazy(() => import("@/pages/Milestones"));
+const Badges = lazy(() => import("@/pages/Badges"));
+const Resources = lazy(() => import("@/pages/Resources"));
+const Community = lazy(() => import("@/pages/Community"));
+const Events = lazy(() => import("@/pages/Events"));
+const Assessment = lazy(() => import("@/pages/Assessment"));
+const LearningPath = lazy(() => import("@/pages/LearningPath"));
+const HomeworkHelper = lazy(() => import("@/pages/HomeworkHelper"));
+const AiCaawiye = lazy(() => import("@/pages/AiCaawiye"));
+const TarbiyaHelper = lazy(() => import("@/pages/TarbiyaHelper"));
+const Register = lazy(() => import("@/pages/Register"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const Appointments = lazy(() => import("@/pages/Appointments"));
+const Subscription = lazy(() => import("@/pages/Subscription"));
+const Bookmarks = lazy(() => import("@/pages/Bookmarks"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const GoldenMembership = lazy(() => import("@/pages/GoldenMembership"));
+const Downloads = lazy(() => import("@/pages/Downloads"));
+const MessengerPage = lazy(() => import("@/pages/MessengerPage"));
+const TermsConditions = lazy(() => import("@/pages/TermsConditions"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const CommunityGuidelines = lazy(() => import("@/pages/CommunityGuidelines"));
+const Legal = lazy(() => import("@/pages/Legal"));
+const Sheeko = lazy(() => import("@/pages/Sheeko"));
+const ShareInfo = lazy(() => import("@/pages/ShareInfo"));
+const Install = lazy(() => import("@/pages/Install"));
+const Maaweelo = lazy(() => import("@/pages/Maaweelo"));
+const Dhambaal = lazy(() => import("@/pages/Dhambaal"));
+const ParentProfile = lazy(() => import("@/pages/ParentProfile"));
+const Messages = lazy(() => import("@/pages/Messages"));
+const ParentFeed = lazy(() => import("@/pages/ParentFeed"));
+const ParentCommunityTerms = lazy(() => import("@/pages/ParentCommunityTerms"));
+const LearningGroups = lazy(() => import("@/pages/LearningGroups"));
+const LearningHub = lazy(() => import("@/pages/LearningHub"));
+const ParentTips = lazy(() => import("@/pages/ParentTips"));
+const MeetWatch = lazy(() => import("@/pages/MeetWatch"));
+const BottomNav = lazy(() => import("@/components/BottomNav"));
+const ChatSupport = lazy(() => import("@/components/ChatSupport"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const VoiceSpaces = lazy(() => import("@/components/VoiceSpaces").then(m => ({ default: m.VoiceSpaces })));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="text-center">
+        <img src={logoImage} alt="Barbaarintasan Academy" className="w-20 h-20 mx-auto mb-4 animate-pulse" />
+        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+        <p className="text-sm text-gray-500">Sug wax yar waa la dajinayaa...</p>
+      </div>
+    </div>
+  );
+}
 
 function SheekoRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-background">
-      <VoiceSpaces initialRoomId={roomId} />
+      <Suspense fallback={<PageLoader />}>
+        <VoiceSpaces initialRoomId={roomId} />
+      </Suspense>
     </div>
   );
 }
 
-const pageVariants = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -10 }
-};
-
-const pageTransition = {
-  type: "tween" as const,
-  ease: "easeInOut" as const,
-  duration: 0.2
-};
 
 function PullToRefresh() {
   const [pullDistance, setPullDistance] = useState(0);
@@ -177,79 +185,99 @@ function Router() {
   const [location] = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   
-  const showBottomNav = !location.includes("/lesson/") && !location.includes("/admin") && !location.includes("/assessment") && !location.includes("/share-info") && !location.includes("/maaweelo") && !location.includes("/dhambaal") && !location.includes("/waalid/feed") && !location.includes("/baraha");
+  const hiddenNavPaths = [
+    "/lesson/",
+    "/admin",
+    "/assessment",
+    "/share-info",
+    "/maaweelo",
+    "/dhambaal",
+    "/waalid/feed",
+    "/baraha",
+    "/reset-password",
+  ];
+  
+  const hiddenNavExactPaths = [
+    "/register",
+    "/login",
+    "/forgot-password",
+  ];
+  
+  const showBottomNav = 
+    !hiddenNavPaths.some(path => location.includes(path)) &&
+    !hiddenNavExactPaths.includes(location);
 
   return (
     <div className="bg-gradient-to-b from-blue-100 via-blue-50 to-blue-100 min-h-screen flex flex-col lg:items-center font-semibold">
       <div className="flex-1 w-full lg:max-w-[672px] lg:mx-auto bg-gradient-to-b from-blue-50 via-blue-50 to-blue-100 lg:shadow-xl min-h-screen">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={pageVariants}
-            transition={pageTransition}
-          >
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/courses" component={Courses} />
-              <Route path="/course/:id" component={CourseDetail} />
-              <Route path="/lesson/:id" component={LessonView} />
-              <Route path="/quiz" component={Quiz} />
-              <Route path="/quiz/:quizId" component={QuizPlayer} />
-              <Route path="/assignment/:id" component={AssignmentView} />
-              <Route path="/testimonials" component={Testimonials} />
-              <Route path="/submit-testimonial" component={SubmitTestimonial} />
-              <Route path="/calendar" component={Calendar} />
-              <Route path="/milestones" component={Milestones} />
-              <Route path="/badges" component={Badges} />
-              <Route path="/resources" component={Resources} />
-              <Route path="/community" component={Community} />
-              <Route path="/events" component={Events} />
-              <Route path="/assessment" component={Assessment} />
-              <Route path="/learning-path" component={LearningPath} />
-              <Route path="/homework-helper" component={HomeworkHelper} />
-              <Route path="/ai-caawiye" component={AiCaawiye} />
-              <Route path="/tarbiya-helper" component={TarbiyaHelper} />
-              <Route path="/register" component={Register} />
-              <Route path="/login" component={Register} />
-              <Route path="/forgot-password" component={ForgotPassword} />
-              <Route path="/reset-password/:token" component={ResetPassword} />
-              <Route path="/profile" component={Profile} />
-              <Route path="/admin" component={Admin} />
-              <Route path="/admin/quiz/:lessonId" component={QuizCreator} />
-              <Route path="/appointments" component={Appointments} />
-              <Route path="/subscription" component={Subscription} />
-              <Route path="/bookmarks" component={Bookmarks} />
-              <Route path="/notifications" component={Notifications} />
-              <Route path="/downloads" component={Downloads} />
-              <Route path="/golden-membership" component={GoldenMembership} />
-              <Route path="/messenger" component={MessengerPage} />
-              <Route path="/sheeko" component={Sheeko} />
-              <Route path="/sheeko/:roomId" component={SheekoRoom} />
-              <Route path="/maaweelo" component={Maaweelo} />
-              <Route path="/dhambaal" component={Dhambaal} />
-              <Route path="/parent/:id" component={ParentProfile} />
-              <Route path="/messages" component={Messages} />
-              <Route path="/messages/:partnerId" component={Messages} />
-              <Route path="/waalid/feed" component={ParentFeed} />
-              <Route path="/baraha" component={ParentFeed} />
-              <Route path="/groups" component={LearningGroups} />
-              <Route path="/parent-community-terms" component={ParentCommunityTerms} />
-              <Route path="/terms" component={TermsConditions} />
-              <Route path="/privacy-policy" component={PrivacyPolicy} />
-              <Route path="/community-guidelines" component={CommunityGuidelines} />
-              <Route path="/legal" component={Legal} />
-              <Route path="/share-info" component={ShareInfo} />
-              <Route path="/install" component={Install} />
-              <Route component={NotFound} />
-            </Switch>
-          </motion.div>
-        </AnimatePresence>
+        <Suspense fallback={<PageLoader />}>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/courses" component={Courses} />
+            <Route path="/course/:id" component={CourseDetail} />
+            <Route path="/lesson/:id" component={LessonView} />
+            <Route path="/quiz" component={Quiz} />
+            <Route path="/quiz/:quizId" component={QuizPlayer} />
+            <Route path="/assignment/:id" component={AssignmentView} />
+            <Route path="/testimonials" component={Testimonials} />
+            <Route path="/submit-testimonial" component={SubmitTestimonial} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/milestones" component={Milestones} />
+            <Route path="/badges" component={Badges} />
+            <Route path="/resources" component={Resources} />
+            <Route path="/community" component={Community} />
+            <Route path="/events" component={Events} />
+            <Route path="/assessment" component={Assessment} />
+            <Route path="/learning-path" component={LearningPath} />
+            <Route path="/homework-helper" component={HomeworkHelper} />
+            <Route path="/ai-caawiye" component={AiCaawiye} />
+            <Route path="/tarbiya-helper" component={TarbiyaHelper} />
+            <Route path="/register" component={Register} />
+            <Route path="/login" component={Register} />
+            <Route path="/forgot-password" component={ForgotPassword} />
+            <Route path="/reset-password/:token" component={ResetPassword} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/admin" component={Admin} />
+            <Route path="/admin/quiz/:lessonId" component={QuizCreator} />
+            <Route path="/appointments" component={Appointments} />
+            <Route path="/subscription" component={Subscription} />
+            <Route path="/bookmarks" component={Bookmarks} />
+            <Route path="/notifications" component={Notifications} />
+            <Route path="/downloads" component={Downloads} />
+            <Route path="/golden-membership" component={GoldenMembership} />
+            <Route path="/learning-hub" component={LearningHub} />
+            <Route path="/parent-tips" component={ParentTips} />
+            <Route path="/messenger" component={MessengerPage} />
+            <Route path="/sheeko" component={Sheeko} />
+            <Route path="/sheeko/:roomId" component={SheekoRoom} />
+            <Route path="/maaweelo" component={Maaweelo} />
+            <Route path="/dhambaal" component={Dhambaal} />
+            <Route path="/parent/:id" component={ParentProfile} />
+            <Route path="/messages" component={Messages} />
+            <Route path="/messages/:partnerId" component={Messages} />
+            <Route path="/waalid/feed" component={ParentFeed} />
+            <Route path="/baraha" component={ParentFeed} />
+            <Route path="/groups" component={LearningGroups} />
+            <Route path="/meet-watch/:id" component={MeetWatch} />
+            <Route path="/parent-community-terms" component={ParentCommunityTerms} />
+            <Route path="/terms" component={TermsConditions} />
+            <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/community-guidelines" component={CommunityGuidelines} />
+            <Route path="/legal" component={Legal} />
+            <Route path="/share-info" component={ShareInfo} />
+            <Route path="/install" component={Install} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
       </div>
-      {showBottomNav && <BottomNav />}
-      <ChatSupport isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
+      {showBottomNav && (
+        <Suspense fallback={null}>
+          <BottomNav />
+        </Suspense>
+      )}
+      <Suspense fallback={null}>
+        <ChatSupport isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
+      </Suspense>
     </div>
   );
 }

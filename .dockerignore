@@ -11,3 +11,14 @@ flyio-secrets.txt
 .local
 .upm
 .config
+android-twa
+download
+docs
+tts-audio
+*.md
+*.zip
+*.aab
+postcss.config.js
+ai-tip-settings.json
+vite-plugin-meta-images-DOWNLOAD.ts
+components.json

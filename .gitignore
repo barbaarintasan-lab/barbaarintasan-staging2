@@ -21,11 +21,13 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+test-db-validation.js
 
 # Archive / backup files
 *.tar.gz
 *.zip
 barbaarintasan-part-*
+barbaarintasan-app-*.zip
 
 # TTS audio temp files
 tts-audio/
@@ -43,13 +45,16 @@ vite.config.ts.*
 # Flyctl binary
 flyctl
 
-# Attached assets - exclude large/temporary files
-# Keep only: course-images/, logo files, and essential assets
-attached_assets/generated_images/
-attached_assets/stock_images/
-attached_assets/Pasted-*
-attached_assets/parentMessages_*
-attached_assets/Dockerfile_*
-attached_assets/manifest_*
-attached_assets/google*
-attached_assets/client_secret_*
+# github-update folder (old backup)
+github-update/
+
+# Attached assets - not needed in repo
+attached_assets/
+
+# Large public assets (served from CDN/R2 in production)
+client/public/course-images/
+client/public/google-play-header.png
+
+# WordPress plugin archives
+wordpress-plugin/*.zip
+wordpress-plugin/course-images.zip

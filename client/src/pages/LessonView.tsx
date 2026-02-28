@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { openSSOLink } from "@/lib/api";
 import { ChevronLeft, ChevronRight, Play, FileText, Lock, Volume2, LogIn, CheckCircle, Video, Calendar, ExternalLink, ClipboardList, Send, Loader2, Award, X, HelpCircle, Bookmark, BookmarkCheck, Download, Wifi, WifiOff, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useRoute, useLocation } from "wouter";
@@ -17,6 +18,7 @@ import { useOffline } from "@/contexts/OfflineContext";
 import LessonDiscussionGroup from "@/components/LessonDiscussionGroup";
 import { useOfflineDownloads } from "@/hooks/useOfflineDownloads";
 import { getOfflineLesson } from "@/lib/offlineStorage";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function getYouTubeId(url: string): string {
   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
@@ -132,6 +134,7 @@ function generateGoogleCalendarLink(title: string, date: string, meetUrl: string
 
 export default function LessonView() {
   const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const [, params] = useRoute("/lesson/:id");
   const lessonId = params?.id;
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -172,6 +175,7 @@ export default function LessonView() {
   const [quizShowResults, setQuizShowResults] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(true);
+  const [useEmbedFallback, setUseEmbedFallback] = useState(false);
   
   // Scheduling limit popup state
   const [showLimitPopup, setShowLimitPopup] = useState<{
@@ -191,6 +195,7 @@ export default function LessonView() {
     setQuizShowResults(false);
     setVideoError(null);
     setVideoLoading(true);
+    setUseEmbedFallback(false);
     setPrerequisiteBlocked({ blocked: false }); // Reset prerequisite check for new lesson
     setScheduleLockedSlug(null); // Reset schedule lock slug for new lesson
     setAccessDeniedCourseSlug(null);
@@ -226,7 +231,7 @@ export default function LessonView() {
   const { data: lesson, isLoading, error, isError } = useQuery({
     queryKey: ["lesson", lessonId],
     queryFn: async () => {
-      const res = await fetch(`/api/lessons/${lessonId}`, { credentials: "include" });
+      const res = await fetch(`/api/lessons/${lessonId}?lang=${apiLanguage}`, { credentials: "include" });
       if (res.status === 401) {
         window.location.href = "/login";
         throw new Error("Unauthorized");
@@ -284,7 +289,8 @@ export default function LessonView() {
     const isIframeVideo = lesson?.videoUrl && (
       lesson.videoUrl.includes("youtube.com") || 
       lesson.videoUrl.includes("youtu.be") ||
-      lesson.videoUrl.includes("vimeo.com")
+      lesson.videoUrl.includes("vimeo.com") ||
+      (isGoogleDriveUrl(lesson.videoUrl) && useEmbedFallback)
     );
 
     if (!isIframeVideo || !lessonId || !lesson) {
@@ -336,7 +342,7 @@ export default function LessonView() {
         iframeProgressIntervalRef.current = null;
       }
     };
-  }, [lesson?.videoUrl, lessonId, lesson?.duration, lesson]);
+  }, [lesson?.videoUrl, lessonId, lesson?.duration, lesson, useEmbedFallback]);
 
   // Fetch AI-generated images for this lesson
   const { data: lessonImages = [] } = useQuery({
@@ -806,22 +812,25 @@ export default function LessonView() {
     );
   }
 
-  // Access denied - course not purchased
+  // Access denied - course not purchased - redirect to website
   if (isError && error?.message === "AccessDenied") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-2 border-orange-200">
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-2 border-blue-200">
           <CardContent className="p-6 text-center">
-            <div className="w-20 h-20 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
-              <Lock className="w-10 h-10 text-orange-600" />
+            <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+              <Lock className="w-10 h-10 text-blue-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Koorsadani way kaa xiran tahay</h2>
-            <p className="text-gray-600 mb-6">
-              Si aad u aragto cashirada koorsadan, fadlan marka hore iibso koorsada.
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Casharkani waa kuwa xubinta</h2>
+            <p className="text-gray-600 mb-4">
+              Shanta cashar ee ugu horreeya waa bilaash. Casharada kale si aad u aragto, booqo websaydhkeena.
             </p>
+            <Button onClick={openSSOLink} className="w-full h-14 text-lg font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 mb-3" data-testid="button-visit-website">
+              🌐 Booqo barbaarintasan.com
+            </Button>
             <Link href={accessDeniedCourseSlug ? `/course/${accessDeniedCourseSlug}` : "/courses"}>
-              <Button className="w-full h-14 text-lg font-bold bg-orange-500 hover:bg-orange-600" data-testid="button-buy-course">
-                🛒 Iibso Koorsada
+              <Button variant="outline" className="w-full" data-testid="button-back-to-course">
+                ← Ku noqo Koorsada
               </Button>
             </Link>
           </CardContent>
@@ -909,7 +918,6 @@ export default function LessonView() {
         }
       }
       
-      console.error("Video playback error:", error, errorMessage);
       setVideoError(errorMessage);
       setVideoLoading(false);
     };
@@ -927,9 +935,31 @@ export default function LessonView() {
       }
     };
 
-    // Google Drive video - use server proxy to hide file ID and prevent downloads
     if (isGoogleDriveUrl(lesson.videoUrl)) {
+      const fileId = getGoogleDriveId(lesson.videoUrl);
+      
+      if (useEmbedFallback && fileId) {
+        const driveEmbedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        return (
+          <div className="relative rounded-xl overflow-hidden shadow-lg bg-black">
+            <iframe
+              src={driveEmbedUrl}
+              className="w-full aspect-video rounded-xl"
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              data-testid="video-player-embed"
+            />
+          </div>
+        );
+      }
+
       const proxyUrl = `/api/video/stream/${lesson.id}`;
+      
+      const handleProxyError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+        setUseEmbedFallback(true);
+        setVideoLoading(false);
+      };
+
       return (
         <div className="relative rounded-xl overflow-hidden shadow-lg bg-black">
           <video
@@ -945,7 +975,7 @@ export default function LessonView() {
             preload="metadata"
             onContextMenu={(e) => e.preventDefault()}
             onTimeUpdate={handleVideoTimeUpdate}
-            onError={handleVideoError}
+            onError={handleProxyError}
             onLoadedData={handleVideoLoaded}
             onCanPlay={handleVideoLoaded}
           >
@@ -1349,13 +1379,11 @@ export default function LessonView() {
             ) : (
               <>
                 <p className="text-gray-600 mb-6 text-lg">
-                  {t("lessonView.buyToContinue")}
+                  {t("lessonView.visitWebsiteForAccess")}
                 </p>
-                <Link href={`/course/${courseSlug}`}>
-                  <Button className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 h-12 px-8 text-base font-bold shadow-lg">
-                    {t("lessonView.buyCourse")}
-                  </Button>
-                </Link>
+                <Button onClick={openSSOLink} className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 h-12 px-8 text-base font-bold shadow-lg">
+                  {t("lessonView.visitWebsite")}
+                </Button>
               </>
             )}
             

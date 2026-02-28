@@ -20,7 +20,7 @@ interface ParentAuthContextType {
   parent: Parent | null;
   isLoading: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
-  registerWithEmail: (email: string, password: string, name: string, phone: string, country: string, city: string, inParentingGroup?: boolean) => Promise<void>;
+  registerWithEmail: (email: string, password: string, name: string, phone: string, country: string, city?: string, inParentingGroup?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshParent: () => Promise<void>;
 }
@@ -48,7 +48,6 @@ export function ParentAuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json().catch(() => ({}));
         if (data.code === "SESSION_SUPERSEDED") {
           setParent(null);
-          console.log("[AUTH] Session superseded - another device logged in");
         }
       }
     } catch (error) {
@@ -76,7 +75,7 @@ export function ParentAuthProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ["enrollments"] });
   }, [queryClient]);
 
-  const registerWithEmail = useCallback(async (email: string, password: string, name: string, phone: string, country: string, city: string, inParentingGroup?: boolean) => {
+  const registerWithEmail = useCallback(async (email: string, password: string, name: string, phone: string, country: string, city?: string, inParentingGroup?: boolean) => {
     const res = await fetch("/api/auth/parent/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -115,7 +114,6 @@ export function ParentAuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json().catch(() => ({}));
         if (data.code === "SESSION_SUPERSEDED") {
           setParent(null);
-          console.log("[AUTH] Session superseded - another device logged in");
         }
       }
     } catch (error) {

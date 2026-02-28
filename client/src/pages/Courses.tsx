@@ -1,20 +1,27 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, BookOpen, Baby, Brain, Sparkles, Crown, Gift, Clock } from "lucide-react";
+import { ChevronLeft, BookOpen, Baby, Brain, Sparkles, Gift, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const courseImages: Record<string, string> = {
-  "0-6": "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&h=300&fit=crop",
-  "6-12": "https://images.unsplash.com/photo-1544126592-807ade215a0b?w=400&h=300&fit=crop",
-  "1-2": "https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=400&h=300&fit=crop",
-  "2-4": "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=300&fit=crop",
-  "4-7": "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=400&h=300&fit=crop",
-  "discipline": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=300&fit=crop",
-  "speech": "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=300&fit=crop",
-  "intellect": "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400&h=300&fit=crop",
-  "fatherhood": "https://images.unsplash.com/photo-1476703993599-0035a21b17a9?w=400&h=300&fit=crop",
-  "safety": "https://images.unsplash.com/photo-1544776193-352d25ca82cd?w=400&h=300&fit=crop",
+  "0-6":          "/course-images/0-6-bilood.png",
+  "6-12":         "/course-images/6-12-bilood.png",
+  "1-2":          "/course-images/1-2-sano.png",
+  "2-4":          "/course-images/2-4-sano.png",
+  "4-7":          "/course-images/4-7-sano.png",
+  "intellect":    "/course-images/caqli-sare.png",
+  "independence": "/course-images/ilmo-is-dabira.png",
+  "father":       "/course-images/aabe-baraarugay.png",
+  "autism":       "/course-images/hadalka-daaho.png",
+  "family":       "/course-images/badqabka-qoyska.png",
+  "discipline":   "/course-images/badqabka-qoyska.png",
+  "speech":       "/course-images/hadalka-daaho.png",
+  "fatherhood":   "/course-images/aabe-baraarugay.png",
+  "safety":       "/course-images/ilmo-is-dabira.png",
+  "free-trial":   "/course-images/0-6-bilood.png",
+  "free-general": "/course-images/4-7-sano.png",
 };
 
 const courseColors: Record<string, { bg: string; border: string; text: string; gradient: string }> = {
@@ -32,10 +39,11 @@ const courseColors: Record<string, { bg: string; border: string; text: string; g
 
 export default function Courses() {
   const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
     queryFn: async () => {
-      const res = await fetch("/api/courses");
+      const res = await fetch(`/api/courses?lang=${apiLanguage}`);
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
@@ -91,12 +99,8 @@ export default function Courses() {
 
       <div className="max-w-6xl mx-auto px-4 pt-8 pb-6 lg:px-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-yellow-100 px-4 py-2 rounded-full mb-4">
-            <Crown className="w-5 h-5 text-amber-600" />
-            <span className="text-sm font-semibold text-amber-700">Xubin Dahabi - $114/sanad</span>
-          </div>
           <p className="text-gray-600 max-w-xl mx-auto">
-            Dhammaan koorsooyinka waxaad ku heli kartaa qiimaha $30/bil ama $114/sanad (dhammaan koorsooyinka)
+            Dooro koorsada aad jeclaan lahayd inaad barato. 5-da cashar ee ugu horreeya waa bilaash!
           </p>
         </div>
       </div>
@@ -122,6 +126,12 @@ export default function Courses() {
                         src={getImage(course)} 
                         alt={course.title}
                         className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${!course.contentReady ? 'grayscale opacity-70' : ''}`}
+                        onError={(e) => {
+                          const fallback = courseImages[course.courseId] || courseImages["0-6"];
+                          if ((e.currentTarget as HTMLImageElement).src !== new URL(fallback, window.location.origin).href) {
+                            (e.currentTarget as HTMLImageElement).src = fallback;
+                          }
+                        }}
                       />
                       <div className={`absolute inset-0 bg-gradient-to-t ${colors.gradient} opacity-10`} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
@@ -183,6 +193,12 @@ export default function Courses() {
                         src={getImage(course)} 
                         alt={course.title}
                         className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${!course.contentReady ? 'grayscale opacity-70' : ''}`}
+                        onError={(e) => {
+                          const fallback = courseImages[course.courseId] || courseImages["0-6"];
+                          if ((e.currentTarget as HTMLImageElement).src !== new URL(fallback, window.location.origin).href) {
+                            (e.currentTarget as HTMLImageElement).src = fallback;
+                          }
+                        }}
                       />
                       <div className={`absolute inset-0 bg-gradient-to-t ${colors.gradient} opacity-10`} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />

@@ -1,5 +1,6 @@
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v14';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
+const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 const STATIC_ASSETS = [
@@ -14,7 +15,7 @@ const STATIC_ASSETS = [
 const SYNC_QUEUE_KEY = 'pending-sync-requests';
 
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing new service worker...');
+  // [SW] Installing new service worker...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -24,14 +25,14 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating new service worker...');
+  // [SW] Activating new service worker...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => name.startsWith('barbaarintasan-') && name !== CACHE_NAME)
           .map((name) => {
-            console.log('[SW] Deleting old cache:', name);
+            // [SW] Deleting old cache:', name);
             return caches.delete(name);
           })
       );
@@ -53,7 +54,12 @@ self.addEventListener('fetch', (event) => {
   }
   
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(event.request));
+    const cachableApis = ['/api/courses', '/api/homepage-sections', '/api/testimonials', '/api/quran-reciters'];
+    if (cachableApis.some(p => url.pathname === p)) {
+      event.respondWith(staleWhileRevalidate(event.request));
+    } else {
+      event.respondWith(networkFirst(event.request));
+    }
     return;
   }
 
@@ -85,7 +91,7 @@ async function offlineVideoFirst(request) {
     const cache = await caches.open(cacheName);
     const cachedResponse = await cache.match(request);
     if (cachedResponse) {
-      console.log('[SW] Serving video from offline cache:', request.url);
+      // [SW] Serving video from offline cache:', request.url);
       return cachedResponse;
     }
   }
@@ -106,7 +112,7 @@ async function offlineVideoFirst(request) {
     }
     return networkResponse;
   } catch (error) {
-    console.log('[SW] Video fetch failed, no offline version available:', request.url);
+    // [SW] Video fetch failed, no offline version available:', request.url);
     return new Response('Video not available offline', {
       status: 503,
       headers: { 'Content-Type': 'text/plain' }
@@ -119,7 +125,7 @@ async function networkFirstNavigation(request) {
     const networkResponse = await fetch(request, { cache: 'no-store' });
     return networkResponse;
   } catch (error) {
-    console.log('[SW] Network failed for navigation, trying cache...');
+    // [SW] Network failed for navigation, trying cache...');
     const cachedResponse = await caches.match('/offline.html');
     if (cachedResponse) {
       return cachedResponse;
@@ -149,6 +155,31 @@ async function networkFirst(request) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(API_CACHE_NAME);
+  const cachedResponse = await cache.match(request);
+  
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  }).catch(() => null);
+
+  if (cachedResponse) {
+    fetchPromise;
+    return cachedResponse;
+  }
+  
+  const networkResponse = await fetchPromise;
+  if (networkResponse) return networkResponse;
+  
+  return new Response(JSON.stringify({ error: 'Offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 async function cacheFirst(request) {
@@ -235,7 +266,7 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Skip waiting and activate immediately');
+    // [SW] Skip waiting and activate immediately');
     self.skipWaiting();
   }
   
@@ -247,7 +278,7 @@ self.addEventListener('message', (event) => {
 // Background sync handler - retry failed requests when back online
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-messages') {
-    console.log('[SW] Background sync triggered for messages');
+    // [SW] Background sync triggered for messages');
     event.waitUntil(processPendingSyncRequests());
   }
 });
@@ -269,23 +300,23 @@ async function processPendingSyncRequests() {
           headers: req.headers,
           body: req.body,
         });
-        console.log('[SW] Synced pending request:', req.url);
+        // [SW] Synced pending request:', req.url);
       } catch (error) {
-        console.log('[SW] Failed to sync request:', req.url, error);
+        // [SW] Failed to sync request:', req.url, error);
       }
     }
     
     // Clear the pending requests
     await cache.delete('/pending-sync');
   } catch (error) {
-    console.log('[SW] Error processing pending sync requests:', error);
+    // [SW] Error processing pending sync requests:', error);
   }
 }
 
 // Periodic background sync for keeping data fresh
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'refresh-courses') {
-    console.log('[SW] Periodic sync triggered for courses');
+    // [SW] Periodic sync triggered for courses');
     event.waitUntil(refreshCourseData());
   }
 });
@@ -296,9 +327,9 @@ async function refreshCourseData() {
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
       await cache.put('/api/courses', response.clone());
-      console.log('[SW] Refreshed course data in background');
+      // [SW] Refreshed course data in background');
     }
   } catch (error) {
-    console.log('[SW] Background course refresh failed:', error);
+    // [SW] Background course refresh failed:', error);
   }
 }

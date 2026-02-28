@@ -1,13 +1,22 @@
 // Google Drive Integration for Maktabada (Library)
 // Supports: Replit connector (dev), OAuth refresh token, and Service Account (Fly.io production)
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
 
 const MAKTABADA_FOLDER_NAME = "Barbaarintasan Maktabada";
 
 let cachedOAuthToken: { token: string; expiresAt: number } | null = null;
 let cachedServiceAccountClient: any = null;
+let cachedReplitToken: { token: string; expiresAt: number } | null = null;
+
+const videoMetadataCache = new Map<string, { name: string; mimeType: string; size: number; cachedAt: number }>();
+const METADATA_CACHE_TTL = 30 * 60 * 1000;
+const REPLIT_TOKEN_CACHE_TTL = 45 * 60 * 1000;
 
 async function getAccessTokenViaReplit(): Promise<string> {
+  if (cachedReplitToken && Date.now() < cachedReplitToken.expiresAt) {
+    return cachedReplitToken.token;
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -39,6 +48,12 @@ async function getAccessTokenViaReplit(): Promise<string> {
   if (!connectionSettings || !accessToken) {
     throw new Error('Google Drive not connected via Replit');
   }
+
+  cachedReplitToken = {
+    token: accessToken,
+    expiresAt: Date.now() + REPLIT_TOKEN_CACHE_TTL
+  };
+  console.log('[Google Drive] Cached Replit access token for 45 minutes');
   
   return accessToken;
 }
@@ -255,7 +270,7 @@ export async function listMaktabadaFiles(): Promise<DriveFile[]> {
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} files in Maktabada`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',
@@ -336,7 +351,7 @@ export async function listFilesInFolder(folderUrl: string): Promise<DriveFile[]>
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} audio files in folder`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',
@@ -381,17 +396,28 @@ export async function getVideoFileMetadata(fileId: string): Promise<{ name: stri
   }
 }
 
+async function getCachedVideoMetadata(fileId: string): Promise<{ name: string; mimeType: string; size: number }> {
+  const cached = videoMetadataCache.get(fileId);
+  if (cached && Date.now() - cached.cachedAt < METADATA_CACHE_TTL) {
+    return { name: cached.name, mimeType: cached.mimeType, size: cached.size };
+  }
+
+  const drive = await getDriveClient();
+  const fileInfo = await drive.files.get({ fileId, fields: 'name, mimeType, size' });
+  const metadata = {
+    name: fileInfo.data.name || 'video.mp4',
+    mimeType: fileInfo.data.mimeType || 'video/mp4',
+    size: parseInt(fileInfo.data.size || '0', 10),
+    cachedAt: Date.now()
+  };
+  videoMetadataCache.set(fileId, metadata);
+  console.log('[Google Drive] Video file:', metadata.name, 'size:', metadata.size, 'mime:', metadata.mimeType);
+  return metadata;
+}
+
 export async function streamVideoFile(fileId: string, rangeHeader?: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string; size: number; start?: number; end?: number; isPartial: boolean } | null> {
   try {
-    const drive = await getDriveClient();
-
-    const fileInfo = await drive.files.get({
-      fileId,
-      fields: 'name, mimeType, size'
-    });
-    const fileSize = parseInt(fileInfo.data.size || '0', 10);
-    const mimeType = fileInfo.data.mimeType || 'video/mp4';
-    console.log('[Google Drive] Video file:', fileInfo.data.name, 'size:', fileSize, 'mime:', mimeType);
+    const { mimeType, size: fileSize } = await getCachedVideoMetadata(fileId);
 
     if (rangeHeader && fileSize > 0) {
       const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
@@ -405,15 +431,19 @@ export async function streamVideoFile(fileId: string, rangeHeader?: string): Pro
           end = fileSize - 1;
         } else {
           start = parseInt(rangeMatch[1], 10);
-          end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : Math.min(start + 5 * 1024 * 1024 - 1, fileSize - 1);
+          end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : Math.min(start + 10 * 1024 * 1024 - 1, fileSize - 1);
         }
 
-        const maxChunk = 5 * 1024 * 1024;
+        const maxChunk = 10 * 1024 * 1024;
         if (end - start + 1 > maxChunk) {
           end = start + maxChunk - 1;
         }
 
-        if (start >= fileSize || end >= fileSize || start > end) {
+        if (end >= fileSize) {
+          end = fileSize - 1;
+        }
+
+        if (start >= fileSize || start > end) {
           return null;
         }
 
@@ -429,6 +459,9 @@ export async function streamVideoFile(fileId: string, rangeHeader?: string): Pro
 
         if (!response.ok && response.status !== 206) {
           console.error('[Google Drive] Range request failed:', response.status, response.statusText);
+          if (response.status === 401 || response.status === 403) {
+            cachedReplitToken = null;
+          }
           return null;
         }
 
@@ -448,13 +481,24 @@ export async function streamVideoFile(fileId: string, rangeHeader?: string): Pro
       }
     }
 
-    const response = await drive.files.get(
-      { fileId, alt: 'media' },
-      { responseType: 'stream' }
-    );
+    const accessToken = await getAccessToken();
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+
+    if (!response.ok) {
+      console.error('[Google Drive] Full file request failed:', response.status);
+      return null;
+    }
+
+    const webStream = response.body;
+    if (!webStream) return null;
+    const { Readable } = await import('stream');
+    const nodeStream = Readable.fromWeb(webStream as any);
 
     return {
-      stream: response.data as unknown as NodeJS.ReadableStream,
+      stream: nodeStream,
       mimeType,
       size: fileSize,
       isPartial: false
@@ -534,7 +578,7 @@ export async function listMaktabadaSubfolderFiles(subfolderName: string): Promis
     const files = response.data.files || [];
     console.log(`[Google Drive] Found ${files.length} files in subfolder '${subfolderName}'`);
     
-    return files.map(file => ({
+    return files.map((file: drive_v3.Schema$File) => ({
       id: file.id || '',
       name: file.name || '',
       mimeType: file.mimeType || '',

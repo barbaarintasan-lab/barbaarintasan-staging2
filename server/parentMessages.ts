@@ -3,7 +3,16 @@ import { storage } from "./storage";
 import type { InsertParentMessage } from "@shared/schema";
 import { generateParentMessageAudio } from "./tts";
 import { saveDhambaalToGoogleDrive } from "./googleDrive";
+import { uploadToR2, isR2Configured } from "./r2Storage";
 import OpenAI from "openai";
+import { db } from "./db";
+import { translations } from "@shared/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
+
+function getSomaliaToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
+}
 
 // Use Replit AI Integration on Replit, fallback to direct OpenAI on Fly.io
 const useReplitIntegration = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
@@ -299,7 +308,7 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
 
   console.log(`[Parent Messages] Generated ${images.length} images`);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getSomaliaToday();
 
   const message: InsertParentMessage = {
     title: messageText.title,
@@ -317,9 +326,8 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
 }
 
 export async function generateAndSaveParentMessage(): Promise<void> {
+  const today = getSomaliaToday();
   try {
-    const today = new Date().toISOString().split('T')[0];
-    
     const existingMessage = await storage.getParentMessageByDate(today);
     if (existingMessage) {
       console.log(`[Parent Messages] Message already exists for ${today}`);
@@ -329,6 +337,23 @@ export async function generateAndSaveParentMessage(): Promise<void> {
     const message = await generateParentMessage();
     const saved = await storage.createParentMessage(message);
     console.log(`[Parent Messages] Saved message for ${today}: ${message.title}`);
+
+    // Upload first image to R2 as thumbnail
+    try {
+      if (message.images && message.images.length > 0 && isR2Configured()) {
+        const firstImage = message.images[0];
+        if (firstImage.startsWith('data:image/png;base64,')) {
+          const base64Data = firstImage.replace('data:image/png;base64,', '');
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          const fileName = `dhambaal-${today}-${saved.id.substring(0, 8)}.png`;
+          const { url } = await uploadToR2(imageBuffer, fileName, 'image/png', 'Images', 'dhambaal');
+          await storage.updateParentMessage(saved.id, { thumbnailUrl: url });
+          console.log(`[Parent Messages] Thumbnail uploaded to R2: ${url}`);
+        }
+      }
+    } catch (thumbError) {
+      console.error(`[Parent Messages] Thumbnail upload failed:`, thumbError);
+    }
 
     try {
       console.log(`[Parent Messages] Generating audio (Muuse voice)...`);
@@ -355,6 +380,44 @@ export async function generateAndSaveParentMessage(): Promise<void> {
   }
 }
 
+export async function fixMissingThumbnails(): Promise<number> {
+  if (!isR2Configured()) {
+    console.log("[Parent Messages] R2 not configured, cannot fix thumbnails");
+    return 0;
+  }
+
+  const allMessages = await db.select({
+    id: (await import("@shared/schema")).parentMessages.id,
+    images: (await import("@shared/schema")).parentMessages.images,
+    thumbnailUrl: (await import("@shared/schema")).parentMessages.thumbnailUrl,
+    messageDate: (await import("@shared/schema")).parentMessages.messageDate,
+  }).from((await import("@shared/schema")).parentMessages);
+
+  let fixed = 0;
+  for (const msg of allMessages) {
+    if (msg.thumbnailUrl) continue;
+    if (!msg.images || msg.images.length === 0) continue;
+
+    const firstImage = msg.images[0];
+    if (!firstImage || !firstImage.startsWith('data:image/png;base64,')) continue;
+
+    try {
+      const base64Data = firstImage.replace('data:image/png;base64,', '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+      const fileName = `dhambaal-${msg.messageDate}-${msg.id.substring(0, 8)}.png`;
+      const { url } = await uploadToR2(imageBuffer, fileName, 'image/png', 'Images', 'dhambaal');
+      await storage.updateParentMessage(msg.id, { thumbnailUrl: url });
+      console.log(`[Parent Messages] Fixed thumbnail for ${msg.messageDate}: ${url}`);
+      fixed++;
+    } catch (err) {
+      console.error(`[Parent Messages] Failed to fix thumbnail for ${msg.id}:`, err);
+    }
+  }
+
+  console.log(`[Parent Messages] Fixed ${fixed} missing thumbnails`);
+  return fixed;
+}
+
 // Cache for admin parent messages (module-level for clearing)
 let parentMessagesCache: { data: any[]; timestamp: number } | null = null;
 const CACHE_TTL = 30000; // 30 seconds
@@ -364,10 +427,51 @@ export function clearParentMessagesCache(): void {
   console.log("[Parent Messages] Cache cleared");
 }
 
+async function applyTranslationsToMessages<T extends Record<string, any> & { id: string }>(
+  messages: T[],
+  language: string
+): Promise<T[]> {
+  if (isSomaliLanguage(language) || messages.length === 0) {
+    return messages;
+  }
+
+  const messageIds = messages.map(m => m.id);
+  const allTranslations = await db.select()
+    .from(translations)
+    .where(
+      and(
+        eq(translations.entityType, 'parent_message'),
+        inArray(translations.entityId, messageIds),
+        eq(translations.targetLanguage, normalizeLanguageCode(language))
+      )
+    );
+
+  const translationsByMessage = new Map<string, typeof allTranslations>();
+  for (const translation of allTranslations) {
+    if (!translationsByMessage.has(translation.entityId)) {
+      translationsByMessage.set(translation.entityId, []);
+    }
+    translationsByMessage.get(translation.entityId)!.push(translation);
+  }
+
+  return messages.map(message => {
+    const messageTranslations = translationsByMessage.get(message.id) || [];
+    const translated: Record<string, any> = { ...message };
+    for (const t of messageTranslations) {
+      if (['title', 'content', 'keyPoints'].includes(t.fieldName)) {
+        translated[t.fieldName] = t.translatedText;
+      }
+    }
+    return translated as typeof message;
+  });
+}
+
 export function registerParentMessageRoutes(app: Express): void {
   app.get("/api/parent-messages", async (req: Request, res: Response) => {
     try {
-      const messages = await storage.getParentMessages(30);
+      const lang = req.query.lang as string;
+      let messages = await storage.getParentMessages(30);
+      messages = await applyTranslationsToMessages(messages, lang);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching parent messages:", error);
@@ -390,13 +494,26 @@ export function registerParentMessageRoutes(app: Express): void {
     }
   });
 
+  app.post("/api/admin/parent-messages/fix-thumbnails", async (req: Request, res: Response) => {
+    try {
+      const fixed = await fixMissingThumbnails();
+      clearParentMessagesCache();
+      res.json({ success: true, fixed });
+    } catch (error) {
+      console.error("Error fixing thumbnails:", error);
+      res.status(500).json({ error: "Failed to fix thumbnails" });
+    }
+  });
+
   app.get("/api/parent-messages/today", async (req: Request, res: Response) => {
     try {
-      const message = await storage.getTodayParentMessage();
+      const lang = req.query.lang as string;
+      let message = await storage.getTodayParentMessage();
       if (!message) {
         return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
       }
-      res.json(message);
+      const translated = await applyTranslationsToMessages([message], lang);
+      res.json(translated[0]);
     } catch (error) {
       console.error("Error fetching today's message:", error);
       res.status(500).json({ error: "Failed to fetch message" });
@@ -405,11 +522,13 @@ export function registerParentMessageRoutes(app: Express): void {
 
   app.get("/api/parent-messages/:id", async (req: Request, res: Response) => {
     try {
-      const message = await storage.getParentMessage(req.params.id);
+      const lang = req.query.lang as string;
+      let message = await storage.getParentMessage(req.params.id);
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
       }
-      res.json(message);
+      const translated = await applyTranslationsToMessages([message], lang);
+      res.json(translated[0]);
     } catch (error) {
       console.error("Error fetching message:", error);
       res.status(500).json({ error: "Failed to fetch message" });
@@ -419,7 +538,7 @@ export function registerParentMessageRoutes(app: Express): void {
   app.post("/api/parent-messages/generate", async (req: Request, res: Response) => {
     try {
       await generateAndSaveParentMessage();
-      const message = await storage.getParentMessageByDate(new Date().toISOString().split('T')[0]);
+      const message = await storage.getParentMessageByDate(getSomaliaToday());
       res.json(message);
     } catch (error) {
       console.error("Error generating message:", error);

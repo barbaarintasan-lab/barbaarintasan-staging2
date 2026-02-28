@@ -63,7 +63,6 @@ export function useLiveKitRecording({
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(destinationRef.current);
       sourceNodesRef.current.set(trackId, source);
-      console.log(`[Recording] Added track ${trackId} (total: ${sourceNodesRef.current.size})`);
     } catch (e) {
       console.warn(`[Recording] Failed to add track ${trackId}:`, e);
     }
@@ -121,7 +120,6 @@ export function useLiveKitRecording({
     
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     const audioBlob = new Blob(chunksRef.current, { type: mimeTypeRef.current });
-    console.log(`[Recording] Finalized: ${audioBlob.size} bytes, ${finalDuration}s`);
     
     // Clear chunks after creating blob
     chunksRef.current = [];
@@ -146,7 +144,6 @@ export function useLiveKitRecording({
     
     chunksRef.current = [];
     cleanupResources();
-    console.log('[Recording] Aborted');
   }, [removeEventListeners, cleanupResources]);
 
   useEffect(() => {
@@ -157,7 +154,6 @@ export function useLiveKitRecording({
           removeEventListeners();
         } else {
           // Recording but not stopping - auto-finalize to preserve the recording
-          console.log('[Recording] Unmounting while recording - auto-finalizing');
           isStoppingRef.current = true;
           const mediaRecorder = mediaRecorderRef.current;
           if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -180,7 +176,6 @@ export function useLiveKitRecording({
     }
 
     if (isRecordingRef.current) {
-      console.log('[Recording] Already recording');
       return;
     }
 
@@ -292,7 +287,6 @@ export function useLiveKitRecording({
         setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
 
-      console.log(`[Recording] Started with ${sourceNodesRef.current.size} tracks`);
     } catch (err: any) {
       const errorMsg = err.message || "Failed to start recording";
       setError(errorMsg);
@@ -312,7 +306,6 @@ export function useLiveKitRecording({
       return;
     }
 
-    console.log('[Recording] Stopping...');
     isStoppingRef.current = true;
     mediaRecorder.stop();
   }, [cleanupResources]);

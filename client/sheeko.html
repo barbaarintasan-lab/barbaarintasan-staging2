@@ -3,22 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>Sheeko - Live Audio Rooms</title>
-    <meta name="description" content="Sheeko - Live voice chat rooms for Somali parents. Connect and discuss parenting topics in real-time." />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1a1a2e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Sheeko" />
     <meta name="mobile-web-app-capable" content="yes" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Sheeko - Live Audio Rooms" />
-    <meta property="og:description" content="Live voice chat rooms for Somali parents" />
-    <meta property="og:image" content="/opengraph.jpg" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sheeko - Live Audio Rooms" />
-    <meta name="twitter:description" content="Live voice chat rooms for Somali parents" />
 
     <link rel="icon" type="image/png" href="/sheeko-icon-192.png" />
     <link rel="apple-touch-icon" href="/sheeko-icon-192.png" />
@@ -107,7 +97,7 @@
         </svg>
       </div>
       <div class="sheeko-title">Sheeko</div>
-      <div class="sheeko-subtitle">Live Audio Rooms</div>
+      <div class="sheeko-subtitle">Sug wax yar waa la dajinayaa...</div>
       <div class="loading-dots">
         <span></span>
         <span></span>
@@ -117,15 +107,17 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      window.addEventListener('load', function() {
-        setTimeout(function() {
-          var splash = document.getElementById('sheeko-splash');
-          if (splash) {
-            splash.classList.add('hidden');
-            setTimeout(function() { splash.remove(); }, 300);
-          }
-        }, 500);
-      });
+      window.__hideSplash = function() {
+        const splash = document.getElementById('sheeko-splash');
+        if (splash) {
+          splash.classList.add('hidden');
+          setTimeout(() => splash.remove(), 300);
+        }
+      };
+      // Fallback
+      setTimeout(function() {
+        if (window.__hideSplash) window.__hideSplash();
+      }, 10000);
     </script>
   </body>
 </html>

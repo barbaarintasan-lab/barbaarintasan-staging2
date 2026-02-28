@@ -17,12 +17,13 @@ primary_region = "fra"
   force_https = true
   auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 2
+  max_machines_running = 3
   processes = ["app"]
   
   # Allow long-running requests for cron jobs (AI content generation)
   [http_service.http_options]
-    idle_timeout = 300  # 5 minutes for AI content generation
+    h2_backend = false
 
   [http_service.concurrency]
     type = "connections"
@@ -30,9 +31,9 @@ primary_region = "fra"
     soft_limit = 80
 
 [[vm]]
-  memory = "1gb"
+  memory = "2gb"
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2
 
 [checks]
   [checks.health]
@@ -40,5 +41,5 @@ primary_region = "fra"
     port = 8080
     path = "/api/health"
     interval = "30s"
-    timeout = "5s"
-    grace_period = "10s"
+    timeout = "10s"
+    grace_period = "60s"

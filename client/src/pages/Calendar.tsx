@@ -439,7 +439,7 @@ export default function Calendar() {
                               </span>
                             )
                           ) : (
-                            <Link href="/parent/register">
+                            <Link href="/register">
                               <span className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 cursor-pointer">
                                 Isdiiwaangeli
                               </span>
@@ -529,7 +529,7 @@ export default function Calendar() {
                           const cJoin = dMin <= 15 && now2 <= evEnd;
                           if (!parent) {
                             return (
-                              <Link href="/parent/register">
+                              <Link href="/register">
                                 <span className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg cursor-pointer">Isdiiwaangeli</span>
                               </Link>
                             );

@@ -51,13 +51,6 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Courses - Koorsooyin"
-    },
-    {
-      "src": "/screenshot-wide.png",
-      "sizes": "1408x768",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Desktop View - Muuqaalka Desktop-ka"
     }
   ],
   "shortcuts": [

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -23,7 +23,9 @@ import {
   RotateCw,
   Users,
   Award,
-  Trophy
+  Trophy,
+  SkipBack,
+  SkipForward
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +38,8 @@ import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { toast } from "sonner";
 import { ShareButton, ContentReactions, ContentComments, ThankYouModal } from "@/components/engagement";
 import DhambaalDiscussionGroup from "@/components/DhambaalDiscussionGroup";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useTranslation } from "react-i18next";
 
 function getProxyAudioUrl(audioUrl: string | null): string | null {
   if (!audioUrl) return null;
@@ -60,7 +64,12 @@ interface ParentMessage {
   authorName: string | null;
 }
 
+// Delay before attempting to autoplay audio (allows audio element to be ready)
+const AUTOPLAY_DELAY_MS = 300;
+
 export default function Dhambaal() {
+  const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const [, setLocation] = useLocation();
   const [selectedMessage, setSelectedMessage] = useState<ParentMessage | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -83,11 +92,20 @@ export default function Dhambaal() {
   };
   const audioRef = useRef<HTMLAudioElement>(null);
   const imagesRef = useRef<HTMLDivElement>(null);
+  const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
   const isAdmin = parent?.isAdmin;
 
   // Audio player handlers - scroll to images when playing
+  const pauseCurrentAudio = () => {
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  };
+
   const toggleAudio = (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -138,6 +156,32 @@ export default function Dhambaal() {
         setShowThankYouModal(true);
       }
     }
+    // Auto-play next lesson after a short delay
+    // Clear any existing timeout first
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+    }
+    autoPlayTimeoutRef.current = setTimeout(() => {
+      goToNextLesson();
+    }, 2000); // 2 second delay before auto-playing next
+  };
+
+  // Navigate to previous lesson
+  const goToPreviousLesson = () => {
+    if (!allMessages || allMessages.length === 0 || currentMessageIndex <= 0) return;
+    pauseCurrentAudio();
+    setSelectedMessage(allMessages[currentMessageIndex - 1]);
+    setCurrentImageIndex(0);
+  };
+
+  // Navigate to next lesson
+  const goToNextLesson = () => {
+    if (!allMessages || allMessages.length === 0 || currentMessageIndex < 0) return;
+    if (currentMessageIndex < allMessages.length - 1) {
+      pauseCurrentAudio();
+      setSelectedMessage(allMessages[currentMessageIndex + 1]);
+      setCurrentImageIndex(0);
+    }
   };
 
   const seekBackward = () => {
@@ -165,20 +209,54 @@ export default function Dhambaal() {
     return () => clearInterval(interval);
   }, [isPlaying, selectedMessage]);
 
-  // Reset audio when message changes
+  // Reset audio when message changes and autoplay
   useEffect(() => {
     setIsPlaying(false);
     setAudioProgress(0);
     setAudioCurrentTime(0);
     setAudioDuration(0);
+    
+    // Clear any pending auto-play timeout when message changes
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+    
+    // Autoplay when a message is selected
+    if (selectedMessage?.audioUrl) {
+      // Small delay to ensure audio element is ready
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        const audio = audioRef.current;
+        if (audio) {
+          audio.play().then(() => {
+            setIsPlaying(true);
+            // Scroll to images when starting to play
+            if (imagesRef.current) {
+              imagesRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }).catch(err => {
+            // Autoplay might be blocked by browser, silently fail
+          });
+        }
+        autoPlayTimeoutRef.current = null;
+      }, AUTOPLAY_DELAY_MS);
+    }
+    
+    // Cleanup function that always runs on unmount or when selectedMessage changes
+    return () => {
+      if (autoPlayTimeoutRef.current) {
+        clearTimeout(autoPlayTimeoutRef.current);
+        autoPlayTimeoutRef.current = null;
+      }
+    };
   }, [selectedMessage?.id]);
 
   const { data: todayMessage, isLoading: loadingToday } = useQuery<ParentMessage>({
-    queryKey: ["/api/parent-messages/today"],
+    queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`],
   });
 
   const { data: allMessages, isLoading: loadingAll } = useQuery<ParentMessage[]>({
-    queryKey: ["/api/parent-messages"],
+    queryKey: [`/api/parent-messages?lang=${apiLanguage}`],
   });
 
   const { data: dhambaalProgress = [] } = useQuery<{ contentId: string }[]>({
@@ -191,6 +269,12 @@ export default function Dhambaal() {
     enabled: !!parent,
   });
   const readIds = new Set(dhambaalProgress.map(p => p.contentId));
+
+  // Memoize current message index to avoid redundant array searches
+  const currentMessageIndex = useMemo(() => {
+    if (!allMessages || !selectedMessage) return -1;
+    return allMessages.findIndex(m => m.id === selectedMessage.id);
+  }, [allMessages, selectedMessage?.id]);
 
   const markReadMutation = useMutation({
     mutationFn: async (contentId: string) => {
@@ -208,7 +292,7 @@ export default function Dhambaal() {
       queryClient.invalidateQueries({ queryKey: ["earnedBadges"] });
       queryClient.invalidateQueries({ queryKey: ["contentProgressSummary"] });
       if (data.awardedBadges?.length > 0) {
-        toast.success(`🏆 Abaalmarin cusub: ${data.awardedBadges.join(", ")}`);
+        toast.success(`🏆 ${t("dhambaal.newBadge")}: ${data.awardedBadges.join(", ")}`);
       }
     },
   });
@@ -249,14 +333,14 @@ export default function Dhambaal() {
       return res.json();
     },
     onSuccess: (updatedMessage) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/today"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-messages?lang=${apiLanguage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`] });
       setSelectedMessage(updatedMessage);
       setIsEditing(false);
-      toast.success("Dhambaalka waa la cusboonaysiiyay!");
+      toast.success(t("dhambaal.messageUpdated"));
     },
     onError: () => {
-      toast.error("Wax qalad ah ayaa dhacay");
+      toast.error(t("dhambaal.errorOccurred"));
     },
   });
 
@@ -270,13 +354,13 @@ export default function Dhambaal() {
       return res.json();
     },
     onSuccess: (updatedMessage) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/today"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-messages?lang=${apiLanguage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`] });
       setSelectedMessage(updatedMessage);
-      toast.success("Codka waa la sameeyay!");
+      toast.success(t("dhambaal.audioGenerated"));
     },
     onError: () => {
-      toast.error("Codka lama samayn karin");
+      toast.error(t("dhambaal.audioError"));
     },
   });
 
@@ -361,7 +445,7 @@ export default function Dhambaal() {
               {isToday && (
                 <Badge className="absolute top-2 right-2 bg-emerald-500 text-white">
                   <Sparkles className="w-3 h-3 mr-1" />
-                  Maanta
+                  {t("dhambaal.today")}
                 </Badge>
               )}
             </div>
@@ -380,7 +464,7 @@ export default function Dhambaal() {
             {parent && readIds.has(message.id) && (
               <div className="flex items-center gap-1 mt-1">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-emerald-400 text-xs">Waa la akhriyay</span>
+                <span className="text-emerald-400 text-xs">{t("dhambaal.alreadyRead")}</span>
               </div>
             )}
           </div>
@@ -418,7 +502,7 @@ export default function Dhambaal() {
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={() => setLocation("/")}
+            onClick={() => window.history.back()}
             className="text-white hover:bg-white/10"
             data-testid="button-back"
           >
@@ -430,10 +514,10 @@ export default function Dhambaal() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">
-                Dhambaalka Waalidka
+                {t("home.dhambaal.title")}
               </h1>
               <p className="text-slate-400 text-sm">
-                Talo iyo tilmaamo waalidnimo maalin kasta
+                {t("home.dhambaal.subtitle")}
               </p>
             </div>
           </div>
@@ -444,15 +528,15 @@ export default function Dhambaal() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-emerald-400" />
-                <span className="text-white font-semibold text-sm">Horumarka Akhriskaaga</span>
+                <span className="text-white font-semibold text-sm">{t("dhambaal.readingProgress")}</span>
               </div>
               <span className="text-emerald-300 text-sm font-bold">{readIds.size}/{allMessages.length}</span>
             </div>
             <Progress value={(readIds.size / allMessages.length) * 100} className="h-2 bg-slate-700" />
             <p className="text-slate-400 text-xs mt-2">
-              {readIds.size === 0 ? "Billow akhriskaaga maanta!" : 
-               readIds.size === allMessages.length ? "Hambalyo! Dhammaan ayaad akhriyay! 🎉" :
-               `${allMessages.length - readIds.size} dhambaal ayaad weli akhriyi la'dahay`}
+              {readIds.size === 0 ? t("dhambaal.startReadingToday") : 
+               readIds.size === allMessages.length ? t("dhambaal.congratsAllRead") :
+               t("dhambaal.remainingMessages", { count: allMessages.length - readIds.size })}
             </p>
           </div>
         )}
@@ -469,7 +553,7 @@ export default function Dhambaal() {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-semibold text-white">Dhambaalka Maanta</h2>
+              <h2 className="text-xl font-semibold text-white">{t("dhambaal.todaysMessage")}</h2>
             </div>
             <MessageCard message={todayMessage} isToday />
           </div>
@@ -478,10 +562,10 @@ export default function Dhambaal() {
             <CardContent className="p-8 text-center">
               <MessageCircle className="w-12 h-12 text-slate-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-300 mb-2">
-                Maanta dhambaal cusub ma jirto
+                {t("dhambaal.noMessageToday")}
               </h3>
               <p className="text-slate-500 text-sm">
-                Dhambaalyo cusub way imanayaan!
+                {t("dhambaal.newMessagesComing")}
               </p>
             </CardContent>
           </Card>
@@ -490,7 +574,7 @@ export default function Dhambaal() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-semibold text-white">Dhambaalladeena Hore</h2>
+            <h2 className="text-xl font-semibold text-white">{t("dhambaal.previousMessages")}</h2>
           </div>
           
           {loadingAll ? (
@@ -555,7 +639,7 @@ export default function Dhambaal() {
               <CardContent className="p-8 text-center">
                 <BookOpen className="w-12 h-12 text-slate-500 mx-auto mb-4" />
                 <p className="text-slate-400">
-                  Dhambaallooyinka aan wali la diyaarin
+                  {t("dhambaal.notPreparedYet")}
                 </p>
               </CardContent>
             </Card>
@@ -642,6 +726,39 @@ export default function Dhambaal() {
                 {/* Audio Player - right below images */}
                 {selectedMessage.audioUrl && !isEditing && (
                   <div className="bg-gradient-to-r from-teal-600/30 to-emerald-600/30 rounded-xl p-5 border border-teal-500/30 mb-4">
+                    {/* Playlist position indicator */}
+                    {allMessages && allMessages.length > 1 && (
+                      <div className="flex items-center justify-between mb-3 pb-3 border-b border-teal-500/20">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-teal-300" />
+                          <span className="text-sm text-teal-200 font-medium">
+                            {t("dhambaal.lessonOf", { current: currentMessageIndex + 1, total: allMessages.length })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={goToPreviousLesson}
+                            disabled={currentMessageIndex === 0}
+                            size="sm"
+                            className="h-8 px-3 bg-teal-700/50 hover:bg-teal-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                            data-testid="button-previous-lesson"
+                          >
+                            <SkipBack className="w-4 h-4 text-white mr-1" />
+                            <span className="text-xs text-white">{t("dhambaal.previous")}</span>
+                          </Button>
+                          <Button
+                            onClick={goToNextLesson}
+                            disabled={currentMessageIndex === allMessages.length - 1}
+                            size="sm"
+                            className="h-8 px-3 bg-teal-700/50 hover:bg-teal-600/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                            data-testid="button-next-lesson"
+                          >
+                            <span className="text-xs text-white">{t("dhambaal.next")}</span>
+                            <SkipForward className="w-4 h-4 text-white ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Button
                         onClick={seekBackward}
@@ -676,7 +793,7 @@ export default function Dhambaal() {
                         <div className="flex items-center gap-2 mb-1">
                           <Volume2 className="w-5 h-5 text-teal-300" />
                           <h3 className="font-semibold text-teal-200">
-                            Dhagayso Maqaalka
+                            {t("dhambaal.listenToArticle")}
                           </h3>
                         </div>
                         <div className="h-2 bg-white/20 rounded-full overflow-hidden">
@@ -686,7 +803,7 @@ export default function Dhambaal() {
                           />
                         </div>
                         <p className="text-sm text-teal-200 mt-2" data-testid="text-audio-time">
-                          Dhagaysiga cajladani waa: {formatTime(audioCurrentTime)} / {formatTime(audioDuration)}
+                          {t("dhambaal.audioTime")}: {formatTime(audioCurrentTime)} / {formatTime(audioDuration)}
                         </p>
                       </div>
                     </div>
@@ -705,7 +822,7 @@ export default function Dhambaal() {
                 <div className="bg-slate-800/50 rounded-xl p-4 mb-4 space-y-4">
                   <ShareButton
                     title={selectedMessage.title}
-                    text={`${selectedMessage.title} - Dhambaalka waalidka`}
+                    text={`${selectedMessage.title} - ${t("dhambaal.title")}`}
                     url={`${window.location.origin}/dhambaal?message=${selectedMessage.id}`}
                   />
                   
@@ -739,8 +856,8 @@ export default function Dhambaal() {
                       <Users className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-white font-bold text-sm">Ku Biir Guruubka lagu falanqeeyo Casharkan</p>
-                      <p className="text-emerald-100 text-xs">Waalidiinta kale la wadaag fikradahaaga</p>
+                      <p className="text-white font-bold text-sm">{t("dhambaal.joinGroup")}</p>
+                      <p className="text-emerald-100 text-xs">{t("dhambaal.shareIdeas")}</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-white/80" />
                   </div>
@@ -759,99 +876,32 @@ export default function Dhambaal() {
                   contentId={selectedMessage.id}
                 />
 
-                {/* Content Card - below share/comments, users can scroll down */}
-                <div className="bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl p-6 md:p-8 backdrop-blur-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      {isEditing ? (
-                        <Input
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          className="text-2xl font-bold bg-slate-700 border-slate-600 text-white mb-2"
-                          data-testid="input-edit-title"
-                        />
-                      ) : (
-                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                          {selectedMessage.title}
-                        </h2>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-slate-400">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {formatDate(selectedMessage.messageDate)}
-                        </div>
-                        <Badge className="bg-teal-600 text-white">
-                          {selectedMessage.topic}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    {isAdmin && (
-                      <div className="flex gap-2">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={cancelEditing}
-                              className="border-slate-600 text-slate-300"
-                              data-testid="button-cancel-edit"
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Jooji
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={saveChanges}
-                              disabled={updateMutation.isPending}
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              data-testid="button-save-edit"
-                            >
-                              {updateMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  Kaydi
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={startEditing}
-                              className="border-slate-600 text-slate-300"
-                              data-testid="button-start-edit"
-                            >
-                              <Pencil className="w-4 h-4 mr-1" />
-                              Wax ka Bedel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => selectedMessage && generateAudioMutation.mutate(selectedMessage.id)}
-                              disabled={generateAudioMutation.isPending}
-                              className="bg-purple-600 hover:bg-purple-700"
-                              data-testid="button-generate-audio"
-                            >
-                              {generateAudioMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Mic className="w-4 h-4 mr-1" />
-                                  {selectedMessage?.audioUrl ? "Codka Dib u Samee" : "Codka Samee"}
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                {/* Content Card - below share/comments */}
+                <div className={`bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl p-6 md:p-8 backdrop-blur-sm ${isAdmin && !isEditing ? 'pb-32' : ''}`}>
+                  <div className="flex-1 mb-4">
+                    {isEditing ? (
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="text-2xl font-bold bg-slate-700 border-slate-600 text-white mb-2"
+                        data-testid="input-edit-title"
+                      />
+                    ) : (
+                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                        {selectedMessage.title}
+                      </h2>
                     )}
+                    <div className="flex items-center gap-4 text-sm text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(selectedMessage.messageDate)}
+                      </div>
+                      <Badge className="bg-teal-600 text-white">
+                        {selectedMessage.topic}
+                      </Badge>
+                    </div>
                   </div>
 
-                  {/* Hide message content when audio is playing - use CSS to avoid scroll issues */}
                   <div className={isPlaying ? 'hidden' : ''}>
                     <div className="flex items-center gap-2 mb-6 p-3 bg-slate-700/50 rounded-lg">
                       <User className="w-5 h-5 text-emerald-400" />
@@ -879,13 +929,13 @@ export default function Dhambaal() {
                       <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-500/30">
                         <div className="flex items-center gap-2 mb-3">
                           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                          <h3 className="font-semibold text-emerald-300">Qodobbada Muhiimka ah</h3>
+                          <h3 className="font-semibold text-emerald-300">{t("dhambaal.keyPoints")}</h3>
                         </div>
                         {isEditing ? (
                           <Textarea
                             value={editKeyPoints}
                             onChange={(e) => setEditKeyPoints(e.target.value)}
-                            placeholder="Qodob kasta meel cusub ku qor..."
+                            placeholder={t("dhambaal.keyPointsPlaceholder")}
                             className="bg-slate-700 border-slate-600 text-white"
                             data-testid="textarea-edit-keypoints"
                           />
@@ -901,8 +951,67 @@ export default function Dhambaal() {
                         )}
                       </div>
                     )}
+
+                    {isAdmin && isEditing && (
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEditing}
+                          className="border-slate-600 text-slate-300"
+                          data-testid="button-cancel-edit"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          {t("dhambaal.cancel")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={saveChanges}
+                          disabled={updateMutation.isPending}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          data-testid="button-save-edit"
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-1" />
+                              {t("dhambaal.save")}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {isAdmin && !isEditing && (
+                  <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 via-slate-900 to-transparent p-4 pb-6 z-50">
+                    <div className="max-w-3xl mx-auto flex flex-col gap-2">
+                      <Button
+                        onClick={startEditing}
+                        className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3"
+                        data-testid="button-start-edit"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        {t("dhambaal.edit")}
+                      </Button>
+                      <Button
+                        onClick={() => selectedMessage && generateAudioMutation.mutate(selectedMessage.id)}
+                        disabled={generateAudioMutation.isPending}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
+                        data-testid="button-generate-audio"
+                      >
+                        {generateAudioMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4 mr-2" />
+                        )}
+                        {generateAudioMutation.isPending ? t("dhambaal.generatingAudio") : (selectedMessage?.audioUrl ? t("dhambaal.regenerateAudio") : t("dhambaal.generateAudio"))}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

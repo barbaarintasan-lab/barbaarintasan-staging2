@@ -2,6 +2,7 @@ import { type Server } from "node:http";
 import path from "node:path";
 
 import express, { type Express, type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { startCronJobs } from "./cron";
 import { runMigrations } from 'stripe-replit-sync';
@@ -30,19 +31,30 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
-// Serve attached_assets folder for static images (flashcards, etc.)
-app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
+registerHealthCheck(app);
 
-// Serve course images from the built public folder (for Fly.io production)
-// In production, dist/public/course-images contains the images
-// In development, client/public/course-images contains them
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+const staticCacheOptions = { maxAge: '7d', immutable: false };
+const hashedAssetCache = { maxAge: '1y', immutable: true };
+
+app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets'), staticCacheOptions));
+
 const courseImagesPath = process.env.NODE_ENV === 'production'
   ? path.join(process.cwd(), 'dist', 'public', 'course-images')
   : path.join(process.cwd(), 'client', 'public', 'course-images');
-app.use('/course-images', express.static(courseImagesPath));
+app.use('/course-images', express.static(courseImagesPath, staticCacheOptions));
 
-// Register health check endpoint first (before any middleware that might slow it down)
-registerHealthCheck(app);
+if (process.env.NODE_ENV === 'production') {
+  app.use('/assets', express.static(path.join(process.cwd(), 'dist', 'public', 'assets'), hashedAssetCache));
+}
 
 // Initialize Stripe schema and sync data
 async function initStripe() {

@@ -267,7 +267,7 @@ export default function CelebrationModal({
         </div>
 
         <div className="bg-white p-6 text-center">
-          <p className={`text-gray-700 text-lg leading-relaxed mb-4 transition-all duration-500 ${
+          <p className={`text-gray-700 text-lg leading-relaxed mb-4 transition-all duration-500 whitespace-pre-line ${
             animationPhase >= 3 ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
           }`}>
             {description}

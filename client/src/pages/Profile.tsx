@@ -1896,6 +1896,115 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* Xubinimada - Subscription Status (Prepaid Style) */}
+      {activeEnrollments.length > 0 && (() => {
+        const allAccessEnrollment = allAccessCourse 
+          ? activeEnrollments.find((e: any) => e.courseId === allAccessCourse.id && e.status === "active")
+          : null;
+        const primaryEnrollment = allAccessEnrollment || activeEnrollments.find((e: any) => e.status === "active");
+        
+        if (!primaryEnrollment) return null;
+        
+        const accessEnd = primaryEnrollment.accessEnd ? new Date(primaryEnrollment.accessEnd) : null;
+        const accessStart = primaryEnrollment.accessStart ? new Date(primaryEnrollment.accessStart) : new Date();
+        const now = new Date();
+        const daysLeft = accessEnd ? Math.ceil((accessEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        const totalDays = accessEnd ? Math.ceil((accessEnd.getTime() - accessStart.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        const usedDays = totalDays && daysLeft ? totalDays - daysLeft : 0;
+        const progressPercent = totalDays && totalDays > 0 ? Math.min(100, Math.max(0, ((totalDays - (daysLeft || 0)) / totalDays) * 100)) : 0;
+        const isLifetime = primaryEnrollment.planType === "lifetime" || !accessEnd || (daysLeft !== null && daysLeft > 1825);
+        const isExpired = daysLeft !== null && daysLeft <= 0;
+        const isExpiringSoon = !isLifetime && daysLeft !== null && daysLeft <= 30 && daysLeft > 0;
+        const planLabels: Record<string, string> = { monthly: "Bishii", yearly: "Sannadkii / Dahabi", onetime: "6 Bilood", lifetime: "Weligaa" };
+        const planLabel = planLabels[primaryEnrollment.planType] || primaryEnrollment.planType;
+        
+        const monthsLeft = daysLeft ? Math.floor(daysLeft / 30) : 0;
+        const remainingDaysAfterMonths = daysLeft ? daysLeft % 30 : 0;
+        
+        return (
+          <div className="px-4 mt-4" data-testid="subscription-status-card">
+            <Card className={`border-none shadow-lg overflow-hidden ${isExpired ? "bg-gradient-to-r from-red-50 to-orange-50" : isExpiringSoon ? "bg-gradient-to-r from-amber-50 to-yellow-50" : "bg-gradient-to-r from-blue-50 to-indigo-50"}`}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isExpired ? "bg-red-100" : isExpiringSoon ? "bg-amber-100" : "bg-blue-100"}`}>
+                    {isLifetime ? (
+                      <Crown className={`w-7 h-7 text-blue-600`} />
+                    ) : isExpired ? (
+                      <>
+                        <span className="text-lg font-black text-red-600">0</span>
+                        <span className="text-[8px] font-bold text-red-500 -mt-1">MAALMOOD</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`text-lg font-black ${isExpiringSoon ? "text-amber-600" : "text-blue-700"}`}>{daysLeft}</span>
+                        <span className={`text-[8px] font-bold -mt-1 ${isExpiringSoon ? "text-amber-500" : "text-blue-500"}`}>MAALMOOD</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900 text-sm" data-testid="text-subscription-title">
+                      {allAccessEnrollment ? "Dhammaan Koorsoyinka" : "Xubinimada Koorsada"}
+                    </h3>
+                    <p className="text-xs text-gray-500" data-testid="text-subscription-plan">
+                      {planLabel}
+                    </p>
+                    {isLifetime ? (
+                      <p className="text-xs text-blue-600 font-semibold mt-0.5" data-testid="text-subscription-expiry">
+                        Weligaa furan - Muddo xad ah ma laha
+                      </p>
+                    ) : isExpired ? (
+                      <p className="text-xs text-red-600 font-semibold mt-0.5" data-testid="text-subscription-expiry">
+                        Xubinimadaadu way dhammaatay
+                      </p>
+                    ) : (
+                      <p className={`text-xs mt-0.5 font-semibold ${isExpiringSoon ? "text-amber-600" : "text-gray-600"}`} data-testid="text-subscription-expiry">
+                        {monthsLeft > 0 ? `${monthsLeft} bilood iyo ${remainingDaysAfterMonths} maalmood` : `${daysLeft} maalmood`} ayaa ku hartay
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {!isLifetime && !isExpired && daysLeft !== null && totalDays !== null && (
+                  <div data-testid="subscription-progress">
+                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                      <span>Bilaabmay: {accessStart.toLocaleDateString("so-SO", { day: "numeric", month: "short" })}</span>
+                      <span>Dhamaad: {accessEnd!.toLocaleDateString("so-SO", { day: "numeric", month: "short", year: "numeric" })}</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${isExpiringSoon ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-blue-400 to-indigo-500"}`}
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 text-center">
+                      {usedDays} maalmood la isticmaalay / {totalDays} guud ahaan
+                    </p>
+                  </div>
+                )}
+
+                {isExpired && (
+                  <div className="bg-red-100 rounded-xl p-3 text-center" data-testid="subscription-expired-notice">
+                    <p className="text-xs text-red-700 font-medium">Xubinimadaadu way dhammaatay. Cusboonaysii si aad u sii wado barashada.</p>
+                  </div>
+                )}
+
+                {(isExpired || isExpiringSoon || !isLifetime) && (
+                  <a
+                    href="https://barbaarintasan.com/koorso-iibso/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-full py-2.5 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all ${isExpired ? "bg-gradient-to-r from-red-500 to-orange-500" : isExpiringSoon ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-gradient-to-r from-blue-500 to-indigo-500"}`}
+                    data-testid="button-renew-subscription"
+                  >
+                    {isExpired ? "Cusboonaysii Xubinimada" : "Muddo ku dar / Cusboonaysii"}
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       {/* Guruubyadayda - My Groups Card */}
       <div className="px-4 mt-4">
         <Link href="/groups">
@@ -1997,361 +2106,7 @@ export default function Profile() {
         </Card>
       </div>
 
-      {/* Golden Membership Upgrade Section */}
-      {upgradeEligibleEnrollments.length > 0 && (
-        <div className="px-4 mt-4">
-          <Card className="border-none shadow-xl bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-400 overflow-hidden">
-            <CardContent className="p-0">
-              {/* Header */}
-              <div className="p-4 pb-3">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 bg-white/30 rounded-xl flex items-center justify-center">
-                    <Crown className="w-7 h-7 text-amber-900" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-amber-900 text-lg">
-                      Xubin Dahabi Noqo
-                    </h3>
-                    <p className="text-amber-800 text-xs">Golden Membership</p>
-                  </div>
-                </div>
 
-                {/* Value explanation */}
-                <div className="bg-white/30 rounded-xl p-3 mt-3">
-                  <p className="text-amber-900 text-sm leading-relaxed">
-                    Waxaad horay u bixisay{" "}
-                    <span className="font-bold">$30</span> oo xubin bille ah.
-                    Hadda haddii aad u badalato{" "}
-                    <span className="font-bold text-amber-950">
-                      Xubin Dahabi
-                    </span>{" "}
-                    ah waxaad bixinaysaa oo kaliya{" "}
-                    <span className="font-bold text-green-800">$85</span>,
-                    waxaadna helaysaa in laguugu siyaadiyo wakhtigaaga{" "}
-                    <span className="font-bold">11 bilood oo dheeraad ah</span>,
-                    dhammaan koorsooyinka halka ku jiraa ay kuu wada furmaan
-                    mudadaas.
-                  </p>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-amber-800">
-                    <span className="line-through opacity-75">
-                      $360/sannadkii
-                    </span>
-                    <span className="bg-green-600 text-white px-2 py-0.5 rounded-full font-bold">
-                      $275 keydsatay!
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Eligible courses */}
-              <div className="px-4 pb-4 space-y-2">
-                {upgradeEligibleEnrollments.map((item: any) => (
-                  <Link
-                    key={item.courseId}
-                    href={`/course/${item.courseId}?upgrade=true&planType=yearly&amount=85`}
-                  >
-                    <div className="bg-white/90 rounded-xl p-3 flex items-center gap-3 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-500 to-orange-600">
-                        {item.courseImageUrl ? (
-                          <img
-                            src={item.courseImageUrl}
-                            alt={item.courseTitle}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
-                            {item.courseTitle?.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 text-sm line-clamp-1">
-                          {item.courseTitle}
-                        </h4>
-                        <p className="text-xs text-gray-500">
-                          {item.isActive ? (
-                            <span className="text-green-600">
-                              {item.daysRemaining} maalmood oo hadhay + 11
-                              bilood
-                            </span>
-                          ) : (
-                            <span className="text-orange-600">
-                              Waqtigiisa dhacay - 11 bilood cusub!
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-green-700">
-                          $85
-                        </span>
-                        <ChevronRight className="w-5 h-5 text-amber-600" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Subscription Countdown Section */}
-      {(() => {
-        // Helper to detect lifetime subscriptions
-        const isLifetimeEnrollment = (enrollment: any) => {
-          if (!enrollment) return false;
-          if (
-            enrollment.planType === "lifetime" ||
-            enrollment.planType === "onetime"
-          )
-            return true;
-          if (!enrollment.accessEnd) return true;
-          const accessEnd = new Date(enrollment.accessEnd);
-          const now = new Date();
-          const daysRemaining = Math.ceil(
-            (accessEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          return daysRemaining > 1825; // More than 5 years = lifetime
-        };
-
-        // Find the earliest expiring subscription (exclude lifetime)
-        const coursesWithExpiry = sortedEnrolledCourses
-          .filter(
-            (c: any) =>
-              c.enrollment?.accessEnd && !isLifetimeEnrollment(c.enrollment),
-          )
-          .map((c: any) => {
-            const accessEnd = new Date(c.enrollment.accessEnd);
-            const now = new Date();
-            const daysRemaining = Math.ceil(
-              (accessEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-            );
-            return { ...c, accessEnd, daysRemaining };
-          })
-          .filter((c: any) => c.daysRemaining > 0)
-          .sort((a: any, b: any) => a.daysRemaining - b.daysRemaining);
-
-        const earliestExpiring = coursesWithExpiry[0];
-        const hasLifetimeCourses = sortedEnrolledCourses.some((c: any) =>
-          isLifetimeEnrollment(c.enrollment),
-        );
-
-        if (!earliestExpiring && !hasLifetimeCourses) return null;
-
-        // Calculate progress for circular indicator (based on plan type)
-        const planDays: Record<string, number> = { monthly: 30, yearly: 365 };
-        const totalDays =
-          planDays[earliestExpiring?.enrollment?.planType] || 30;
-        const progressPercent = earliestExpiring
-          ? Math.min(
-              100,
-              Math.max(0, (earliestExpiring.daysRemaining / totalDays) * 100),
-            )
-          : 100;
-        const strokeDasharray = 2 * Math.PI * 45; // radius = 45
-        const strokeDashoffset = strokeDasharray * (1 - progressPercent / 100);
-
-        // Color based on days remaining
-        const getColor = (days: number) => {
-          if (days <= 3)
-            return {
-              bg: "from-red-500 to-red-600",
-              ring: "#ef4444",
-              text: "text-red-600",
-            };
-          if (days <= 7)
-            return {
-              bg: "from-orange-500 to-amber-500",
-              ring: "#f59e0b",
-              text: "text-orange-600",
-            };
-          if (days <= 14)
-            return {
-              bg: "from-yellow-500 to-yellow-600",
-              ring: "#eab308",
-              text: "text-yellow-600",
-            };
-          return {
-            bg: "from-green-500 to-emerald-500",
-            ring: "#22c55e",
-            text: "text-green-600",
-          };
-        };
-
-        const colors = earliestExpiring
-          ? getColor(earliestExpiring.daysRemaining)
-          : {
-              bg: "from-green-500 to-emerald-500",
-              ring: "#22c55e",
-              text: "text-green-600",
-            };
-
-        return (
-          <div className="px-4 mt-4">
-            <Card
-              className={`border-none shadow-xl overflow-hidden ${earliestExpiring?.daysRemaining <= 7 ? "animate-pulse-subtle" : ""}`}
-            >
-              <CardContent className="p-0">
-                <div className={`bg-gradient-to-r ${colors.bg} p-4`}>
-                  <div className="flex items-center gap-4">
-                    {/* Circular Progress Indicator */}
-                    <div className="relative w-24 h-24 flex-shrink-0">
-                      <svg
-                        className="w-full h-full transform -rotate-90"
-                        viewBox="0 0 100 100"
-                      >
-                        {/* Background circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="rgba(255,255,255,0.3)"
-                          strokeWidth="8"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="8"
-                          strokeLinecap="round"
-                          strokeDasharray={strokeDasharray}
-                          strokeDashoffset={strokeDashoffset}
-                          className="transition-all duration-1000 ease-out"
-                        />
-                      </svg>
-                      {/* Center content */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        {hasLifetimeCourses && !earliestExpiring ? (
-                          <>
-                            <span className="text-white text-xl">∞</span>
-                            <span className="text-white/80 text-[8px] font-medium">
-                              WELIGAA
-                            </span>
-                          </>
-                        ) : earliestExpiring?.enrollment?.planType ===
-                          "yearly" ? (
-                          <>
-                            <span className="text-white text-2xl font-bold">
-                              {Math.ceil(earliestExpiring.daysRemaining / 30)}
-                            </span>
-                            <span className="text-white/80 text-[8px] font-medium">
-                              BILO
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-white text-2xl font-bold">
-                              {earliestExpiring?.daysRemaining}
-                            </span>
-                            <span className="text-white/80 text-[8px] font-medium">
-                              MAALMOOD
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Text content */}
-                    <div className="flex-1 text-white">
-                      {hasLifetimeCourses && !earliestExpiring ? (
-                        <>
-                          <h3 className="font-bold text-lg">
-                            ✨ Weligaa Furan!
-                          </h3>
-                          <p className="text-white/80 text-sm mt-1">
-                            Koorsooyinkeena waxay kuu furan yihiin Abiyo,
-                            waliigeed. Waxaa tahay Xubin Dahabi ah oo muhiim ah.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <h3 className="font-bold text-sm flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            Wakhtiga kaaga haray in App-ka uu kuu shaqeeyo
-                          </h3>
-                          <p className="text-white/90 text-sm mt-1 font-medium">
-                            {earliestExpiring?.title}
-                          </p>
-                          <p className="text-xs mt-1">
-                            <span className="text-white/70">
-                              Wuxuu kaa dhacayaa oo lacagta dambe lagaa
-                              rabaa:{" "}
-                            </span>
-                            <span className="text-red-200 font-bold bg-red-900/40 px-2 py-0.5 rounded">
-                              {earliestExpiring?.accessEnd.toLocaleDateString(
-                                "so-SO",
-                                {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )}
-                            </span>
-                          </p>
-                          <Link href="/subscription">
-                            <button
-                              className={`mt-2 px-4 py-1.5 text-xs font-bold rounded-lg shadow-md active:scale-[0.98] transition-all ${
-                                earliestExpiring?.daysRemaining <= 7
-                                  ? "bg-white text-gray-900 animate-pulse"
-                                  : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
-                              }`}
-                              data-testid="button-renew-subscription-banner"
-                            >
-                              {earliestExpiring?.enrollment?.planType ===
-                                "yearly" &&
-                              earliestExpiring?.daysRemaining <= 30 ? (
-                                <>💰 Bixi $114 Sanadka Cusub</>
-                              ) : earliestExpiring?.enrollment?.planType ===
-                                "monthly" ? (
-                                <>💰 Bixi $30 Bisha Soo Socota</>
-                              ) : (
-                                <>🔄 Cusboonaysii Wakhtiga</>
-                              )}
-                            </button>
-                          </Link>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* All subscriptions summary */}
-                {coursesWithExpiry.length > 1 && (
-                  <div className="p-3 bg-gray-50 border-t">
-                    <p className="text-xs text-gray-500 mb-2">
-                      Dhammaan koorsadaada:
-                    </p>
-                    <div className="space-y-1">
-                      {coursesWithExpiry.slice(0, 3).map((c: any) => (
-                        <div
-                          key={c.id}
-                          className="flex items-center justify-between text-xs"
-                        >
-                          <span className="text-gray-700 truncate flex-1">
-                            {c.title}
-                          </span>
-                          <span
-                            className={`font-medium ${c.daysRemaining <= 7 ? "text-red-600" : "text-gray-600"}`}
-                          >
-                            {c.enrollment?.planType === "yearly"
-                              ? `${Math.ceil(c.daysRemaining / 30)} bilo`
-                              : `${c.daysRemaining} maalmood`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        );
-      })()}
 
       {/* Shaqo Guri - Flashcard Learning Section for enrolled parents */}
       {sortedEnrolledCourses.length > 0 && (
@@ -2572,7 +2327,6 @@ export default function Profile() {
                     : null;
                   const isLifetime =
                     enrollment?.planType === "lifetime" ||
-                    enrollment?.planType === "onetime" ||
                     !accessEnd ||
                     (daysUntilExpiry !== null && daysUntilExpiry > 1825);
                   const isExpiringSoon =
@@ -2678,7 +2432,6 @@ export default function Profile() {
                     : null;
                   const isLifetime =
                     enrollment?.planType === "lifetime" ||
-                    enrollment?.planType === "onetime" ||
                     !accessEnd ||
                     (daysUntilExpiry !== null && daysUntilExpiry > 1825);
                   const isExpiringSoon =
@@ -2746,14 +2499,14 @@ export default function Profile() {
                         </Card>
                       </Link>
                       {isExpiringSoon && (
-                        <Link href={`/course/${course.courseId}?renew=true`}>
+                        <a href="https://barbaarintasan.com/koorso-iibso/" target="_blank" rel="noopener noreferrer">
                           <button
                             className="w-full mt-1 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded-lg shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1"
                             data-testid={`button-renew-special-${course.courseId}`}
                           >
                             🔄 Cusboonaysii Koorsada
                           </button>
-                        </Link>
+                        </a>
                       )}
                     </div>
                   );

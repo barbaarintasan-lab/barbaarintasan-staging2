@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { ArrowLeft, Check, Target, ChevronDown, ChevronUp } from "lucide-react";
-import { Link } from "wouter";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import BottomNav from "@/components/BottomNav";
@@ -25,28 +24,24 @@ interface MilestoneProgress {
   notes: string | null;
 }
 
-const categoryColors: Record<string, string> = {
-  physical: "bg-green-100 text-green-700",
-  cognitive: "bg-blue-100 text-blue-700",
-  social: "bg-purple-100 text-purple-700",
-  language: "bg-amber-100 text-amber-700",
-};
 
 export default function Milestones() {
   const { t } = useTranslation();
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
-  const [selectedAge, setSelectedAge] = useState("0-6");
-  const [expandedAge, setExpandedAge] = useState<string | null>("0-6");
+  const [selectedAge, setSelectedAge] = useState("newborn-0-3m");
+  const [expandedAge, setExpandedAge] = useState<string | null>("newborn-0-3m");
   const [showCelebration, setShowCelebration] = useState(false);
   const [completedMilestone, setCompletedMilestone] = useState<Milestone | null>(null);
 
   const ageRanges = [
-    { value: "0-6", label: `0-6 ${t("assessment.months")}` },
-    { value: "6-12", label: `6-12 ${t("assessment.months")}` },
-    { value: "1-2", label: `1-2 ${t("assessment.years")}` },
-    { value: "2-4", label: `2-4 ${t("assessment.years")}` },
-    { value: "4-7", label: `4-7 ${t("assessment.years")}` },
+    { value: "newborn-0-3m", label: "Murjux (0-3 bilood)", icon: "👶" },
+    { value: "infant-3-6m", label: "Fadhi-barad (3-6 bilood)", icon: "🍼" },
+    { value: "infant-6-12m", label: "Gurguurte (6-12 bilood)", icon: "🦶" },
+    { value: "toddler-1-2y", label: "Socod barad (1-2 sano)", icon: "🧒" },
+    { value: "toddler-2-3y", label: "Inyow (2-3 sano)", icon: "🗣️" },
+    { value: "preschool-3-5y", label: "Dareeme (3-5 sano)", icon: "🎨" },
+    { value: "school-age-5-7y", label: "Salaad-barad (5-7 sano)", icon: "🎒" },
   ];
 
   const { data: milestones = [] } = useQuery<Milestone[]>({
@@ -95,11 +90,9 @@ export default function Milestones() {
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-600 to-emerald-600 safe-top shadow-lg">
         <div className="px-4 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/">
-              <button className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
+              <button onClick={() => window.history.back()} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
-            </Link>
             <div>
               <h1 className="font-bold text-white text-lg">{t("milestones.title")}</h1>
               <p className="text-green-100 text-sm">{t("milestones.subtitle")}</p>
@@ -109,7 +102,7 @@ export default function Milestones() {
       </header>
 
       <div className="px-4 py-4">
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {ageRanges.map(age => (
             <button
               key={age.value}
@@ -117,13 +110,14 @@ export default function Milestones() {
                 setSelectedAge(age.value);
                 setExpandedAge(age.value);
               }}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all active:scale-95 ${
                 selectedAge === age.value
-                  ? "bg-green-600 text-white shadow-md"
-                  : "bg-white text-gray-700 border border-gray-200"
+                  ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md"
+                  : "bg-white text-gray-700 border border-gray-200 hover:border-green-300"
               }`}
               data-testid={`button-age-${age.value}`}
             >
+              <span>{age.icon}</span>
               {age.label}
             </button>
           ))}
@@ -170,15 +164,10 @@ export default function Milestones() {
                     {isCompleted && <Check className="w-4 h-4 text-white" />}
                   </button>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="mb-1">
                       <h3 className={`font-semibold ${isCompleted ? "text-green-700" : "text-gray-900"}`}>
                         {milestone.title}
                       </h3>
-                      {milestone.category && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${categoryColors[milestone.category] || "bg-gray-100 text-gray-600"}`}>
-                          {t(`milestones.categories.${milestone.category}`, milestone.category)}
-                        </span>
-                      )}
                     </div>
                     {milestone.description && (
                       <p className="text-sm text-gray-600">{milestone.description}</p>
@@ -204,9 +193,9 @@ export default function Milestones() {
           setCompletedMilestone(null);
         }}
         type="milestone_complete"
-        title="Milestone Guul!"
+        title="Hambalyo!"
         subtitle={completedMilestone?.title || ""}
-        description="Mahadsanid! Waxaad dhamaysay milestone cusub oo muhiim ah korriinka ilmahaaga."
+        description="Mahadsanid! Ilmahaagu wuxuu gaaray marxalad cusub oo muhiim ah. Si fiican ayaad u socdaa!"
       />
 
       <BottomNav />

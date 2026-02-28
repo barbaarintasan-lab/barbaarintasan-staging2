@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { Home, BookOpen, BrainCircuit, User, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface AppShellProps {
   children: ReactNode;
@@ -23,18 +25,22 @@ export default function AppShell({
 }: AppShellProps) {
   const [location] = useLocation();
   const { parent } = useParentAuth();
+  const { t } = useTranslation();
+
+  const hideBottomNavPages = ["/parent-tips", "/talooyinka-waalidka"];
+  const shouldHideBottomNav = hideNav || hideBottomNavPages.some(p => location.startsWith(p));
 
   const navItems = [
-    { icon: Home, label: "Hoyga", path: "/" },
-    { icon: BookOpen, label: "Koorsooyin", path: "/courses" },
+    { icon: Home, label: t("nav.home"), path: "/" },
+    { icon: BookOpen, label: t("nav.courses"), path: "/courses" },
     { icon: BrainCircuit, label: "Quiz", path: "/quiz" },
-    { icon: User, label: "Profile-kaaga", path: "/profile" },
+    { icon: User, label: t("nav.profile"), path: "/profile" },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col safe-area-inset">
       {/* Desktop Top Navigation - hidden on mobile */}
-      {!hideNav && (
+      {!shouldHideBottomNav && (
         <nav className="hidden lg:block sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-8">
             <div className="flex items-center justify-between h-16">
@@ -50,6 +56,7 @@ export default function AppShell({
               
               {/* Desktop Nav Links */}
               <div className="flex items-center gap-2">
+                <LanguageSwitcher />
                 {navItems.map((item) => {
                   const isActive = location === item.path || 
                     (item.path === "/" && location === "/") ||
@@ -81,6 +88,7 @@ export default function AppShell({
                 <button 
                   onClick={onBack || (() => window.history.back())}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                  aria-label="Dib ku laabo"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -96,13 +104,13 @@ export default function AppShell({
 
       <main className={cn(
         "flex-1",
-        !hideNav && "pb-24 lg:pb-0"
+        !shouldHideBottomNav && "pb-24 lg:pb-0"
       )}>
         {children}
       </main>
 
       {/* Bottom navigation - hidden on desktop (lg:hidden) */}
-      {!hideNav && (
+      {!shouldHideBottomNav && (
         <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom lg:hidden">
           <div className="bg-white border-t border-gray-200 shadow-lg">
             <div className="flex items-center justify-around h-16 max-w-md mx-auto">

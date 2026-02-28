@@ -2,18 +2,22 @@ import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink } from "lucide-react";
+import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown } from "lucide-react";
+import { openSSOLink } from "@/lib/api";
 import { VoiceSpaces } from "@/components/VoiceSpaces";
 import { InstallBanner } from "@/components/InstallBanner";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import useEmblaCarousel from "embla-carousel-react";
 import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
 import barahaWaalidiintaImg from "@assets/generated_images/somali_parents_community_gathering.png";
 import bsaAppIcon from "@assets/generated_images/bsa_app_icon_orange_gradient.png";
 import sheekoAppIcon from "@assets/generated_images/sheeko_app_icon_purple_gradient.png";
+import tarbiyaddaLogo from "@assets/logo_1770622897660.png";
 // Furud (Fruits) - 10 items
 import bananaImg from "@assets/generated_images/banana_white_background.png";
 import mangoImg from "@assets/generated_images/mango_white_background.png";
@@ -247,7 +251,11 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
     };
     
     updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
+    const now = new Date();
+    const scheduled = new Date(room.scheduledAt!);
+    const absDiff = Math.abs(scheduled.getTime() - now.getTime());
+    const tickMs = absDiff < 120000 ? 1000 : 30000;
+    const interval = setInterval(updateCountdown, tickMs);
     return () => clearInterval(interval);
   }, [room.scheduledAt]);
 
@@ -325,6 +333,128 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
             )}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PromoVideoSection() {
+  const { data: videos = [] } = useQuery<any[]>({
+    queryKey: ["/api/promo-videos"],
+  });
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start", dragFree: true });
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      setCanScrollPrev(emblaApi.canScrollPrev());
+      setCanScrollNext(emblaApi.canScrollNext());
+    };
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  if (videos.length === 0) return null;
+
+  const getGDriveFileId = (url: string) => {
+    const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (m1) return m1[1];
+    const m2 = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if (m2) return m2[1];
+    const m3 = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+    if (m3) return m3[1];
+    return null;
+  };
+
+  const getEmbedUrl = (url: string) => {
+    const gdriveId = getGDriveFileId(url);
+    if (gdriveId) return `https://drive.google.com/file/d/${gdriveId}/preview`;
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`;
+    return url;
+  };
+
+  const getThumb = (video: any) => {
+    if (video.thumbnailUrl) return video.thumbnailUrl;
+    const gdriveId = getGDriveFileId(video.videoUrl);
+    if (gdriveId) return `https://drive.google.com/thumbnail?id=${gdriveId}&sz=w480`;
+    const ytMatch = video.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+    return null;
+  };
+
+  return (
+    <div className="mt-6 px-4" data-testid="promo-videos-section">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+            <Video className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">Muuqaalo Cusub</h3>
+        </div>
+        {videos.length > 1 && (
+          <div className="flex gap-1">
+            <button onClick={() => emblaApi?.scrollPrev()} disabled={!canScrollPrev} className="p-1.5 rounded-full bg-gray-100 disabled:opacity-30" data-testid="promo-scroll-prev"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => emblaApi?.scrollNext()} disabled={!canScrollNext} className="p-1.5 rounded-full bg-gray-100 disabled:opacity-30" data-testid="promo-scroll-next"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {videos.map((video: any) => (
+          <div key={video.id} className="w-full" data-testid={`promo-video-${video.id}`}>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {activeVideo === video.id ? (
+                <div className="relative aspect-video bg-black">
+                  <iframe
+                    src={getEmbedUrl(video.videoUrl)}
+                    className="w-full h-full"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowFullScreen
+                  />
+                  <button
+                    onClick={() => setActiveVideo(null)}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white z-10"
+                    data-testid={`promo-close-${video.id}`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setActiveVideo(video.id)}
+                  className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
+                  data-testid={`promo-play-${video.id}`}
+                >
+                  {getThumb(video) ? (
+                    <img src={getThumb(video)} alt={video.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video className="w-16 h-16 text-blue-300" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
+                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <Play className="w-7 h-7 text-blue-600 ml-1" />
+                    </div>
+                  </div>
+                </button>
+              )}
+              <div className="p-3">
+                <h4 className="font-semibold text-base text-gray-900 line-clamp-1">{video.title}</h4>
+                {video.description && (
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
+                )}
+                </div>
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   );
@@ -512,6 +642,8 @@ function SheekoSection() {
 }
 
 function DhambaalSection() {
+  const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   interface ParentMessage {
     id: string;
     title: string;
@@ -522,7 +654,7 @@ function DhambaalSection() {
   }
 
   const { data: todayMessage } = useQuery<ParentMessage>({
-    queryKey: ["/api/parent-messages/today"],
+    queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`],
   });
 
   return (
@@ -535,7 +667,7 @@ function DhambaalSection() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Dhambaalka Waalidka</h3>
+                <h3 className="font-bold text-white text-base">{t("home.dhambaal.title")}</h3>
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
                   Cusub
                 </span>
@@ -546,7 +678,7 @@ function DhambaalSection() {
                 </p>
               ) : (
                 <p className="text-sm text-emerald-300 mt-0.5">
-                  Talo iyo tilmaamo waalidnimo
+                  {t("home.dhambaal.subtitle")}
                 </p>
               )}
             </div>
@@ -568,6 +700,8 @@ function DhambaalSection() {
 }
 
 function MaaweeloSection() {
+  const { t } = useTranslation();
+  const { apiLanguage } = useLanguage();
   interface BedtimeStory {
     id: string;
     titleSomali: string;
@@ -578,7 +712,7 @@ function MaaweeloSection() {
   }
 
   const { data: todayStory } = useQuery<BedtimeStory>({
-    queryKey: ["/api/bedtime-stories/today"],
+    queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
   });
 
   return (
@@ -591,18 +725,18 @@ function MaaweeloSection() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Maaweelada Caruurta</h3>
+                <h3 className="font-bold text-white text-base">{t("home.sheeko.title")}</h3>
                 <span className="bg-yellow-500/20 text-yellow-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
                   Cusub
                 </span>
               </div>
               {todayStory ? (
                 <p className="text-sm text-purple-200 truncate mt-0.5">
-                  Cawaysinkeena Caawa: {todayStory.titleSomali}
+                  Sheekada Caawa: {todayStory.titleSomali}
                 </p>
               ) : (
                 <p className="text-sm text-purple-300 mt-0.5">
-                  Sheekooyinka Hurdada
+                  {t("home.sheeko.subtitle")}
                 </p>
               )}
             </div>
@@ -752,10 +886,40 @@ function MeetEventsSection({ parent }: { parent: any }) {
     },
   });
 
-  const activeEvents = events.filter((e: any) => e.isActive);
-  if (activeEvents.length === 0) return null;
+  const [addedToCalendar, setAddedToCalendar] = useState<Set<number>>(() => {
+    try {
+      const stored = localStorage.getItem("meetEventsAddedToCalendar");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const [expandedDescs, setExpandedDescs] = useState<Set<number>>(new Set());
+
+  const safeDateParse = (dateStr: string, timeStr: string) => {
+    const t = timeStr.includes(":") && timeStr.split(":").length === 2 ? timeStr + ":00" : timeStr;
+    return new Date(`${dateStr}T${t}`);
+  };
 
   const now = new Date();
+  const upcomingOrLive = events.filter((e: any) => {
+    if (!e.isActive) return false;
+    const eventEnd = safeDateParse(e.eventDate, e.endTime);
+    return now <= eventEnd;
+  });
+  const pastWithRecording = events
+    .filter((e: any) => {
+      if (!e.isActive) return false;
+      const eventEnd = safeDateParse(e.eventDate, e.endTime);
+      return now > eventEnd && e.driveFileId;
+    })
+    .sort((a: any, b: any) => {
+      const aEnd = safeDateParse(a.eventDate, a.endTime).getTime();
+      const bEnd = safeDateParse(b.eventDate, b.endTime).getTime();
+      return bEnd - aEnd;
+    });
+  const latestRecording = pastWithRecording.length > 0 ? pastWithRecording[0] : null;
+  const activeEvents = [...upcomingOrLive, ...(latestRecording ? [latestRecording] : [])];
+  if (activeEvents.length === 0) return null;
 
   const formatSomaliDate = (dateStr: string) => {
     const months = ["Janaayo", "Febraayo", "Maarso", "Abriil", "May", "Juun", "Luuliyo", "Ogost", "Sebtembar", "Oktoobar", "Nofembar", "Desembar"];
@@ -774,15 +938,15 @@ function MeetEventsSection({ parent }: { parent: any }) {
   return (
     <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
           <Video className="w-4 h-4 text-white" />
         </div>
         <h2 className="text-lg font-bold text-gray-900">Kulannada Tooska ah</h2>
       </div>
       <div className="space-y-3">
         {activeEvents.map((event: any) => {
-          const eventStart = new Date(`${event.eventDate}T${event.startTime}`);
-          const eventEnd = new Date(`${event.eventDate}T${event.endTime}`);
+          const eventStart = safeDateParse(event.eventDate, event.startTime);
+          const eventEnd = safeDateParse(event.eventDate, event.endTime);
           const diffMs = eventStart.getTime() - now.getTime();
           const diffMin = diffMs / 60000;
           const isLive = now >= eventStart && now <= eventEnd;
@@ -791,7 +955,7 @@ function MeetEventsSection({ parent }: { parent: any }) {
 
           const handleJoin = () => {
             if (!parent) {
-              window.location.assign("/parent/register");
+              window.location.assign("/register");
               return;
             }
             if (canJoin) {
@@ -799,14 +963,76 @@ function MeetEventsSection({ parent }: { parent: any }) {
             }
           };
 
+          const isAddedToCal = addedToCalendar.has(event.id);
+
           const handleAddToCalendar = () => {
-            const startDate = eventStart.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-            const endDate = eventEnd.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-            const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(event.description || "")}`;
+            if (isAddedToCal) {
+              toast.info("Kulankaan horay ayaad kalandarka u gelisay");
+              return;
+            }
+            const [year, month, day] = event.eventDate.split("-").map(Number);
+            const [sh, sm] = event.startTime.split(":").map(Number);
+            const [eh, em] = event.endTime.split(":").map(Number);
+            const startUtc = new Date(Date.UTC(year, month - 1, day, sh - 3, sm, 0));
+            const endUtc = new Date(Date.UTC(year, month - 1, day, eh - 3, em, 0));
+            const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+            const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(startUtc)}/${fmt(endUtc)}&details=${encodeURIComponent(event.description || "")}`;
             window.open(calUrl, "_blank");
+            const updated = new Set(addedToCalendar);
+            updated.add(event.id);
+            setAddedToCalendar(updated);
+            try { localStorage.setItem("meetEventsAddedToCalendar", JSON.stringify(Array.from(updated))); } catch {}
+            toast.success("Kalandarka waad ku dartay!");
           };
 
-          if (isPast) return null;
+          if (isPast && !event.driveFileId) return null;
+
+          if (isPast && event.driveFileId) {
+            const recordingTitle = event.mediaTitle || event.title;
+            return (
+              <div
+                key={event.id}
+                className="relative overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-white to-orange-50 p-4 shadow-sm"
+                data-testid={`meet-card-${event.id}`}
+              >
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 text-white text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  Duubis
+                </div>
+                <div className="flex items-start gap-3">
+                  <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-sm text-gray-900 mb-1">{recordingTitle}</h3>
+                    {event.mediaTitle && event.title !== event.mediaTitle && (
+                      <p className="text-xs text-gray-500 mb-1">{event.title}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
+                      <span className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full">
+                        <Calendar className="w-3 h-3 text-blue-500" />
+                        {formatSomaliDate(event.eventDate)}
+                      </span>
+                      <span className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {event.mediaType === "audio" ? <Volume2 className="w-3 h-3 text-purple-500" /> : <Video className="w-3 h-3 text-red-500" />}
+                        {event.mediaType === "audio" ? "Cod" : "Muuqaal"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={`/meet-watch/${event.id}`}
+                  className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                    event.mediaType === "audio"
+                      ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-purple-200"
+                      : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white shadow-red-200"
+                  }`}
+                  data-testid={`btn-watch-meet-${event.id}`}
+                >
+                  {event.mediaType === "audio" ? <Volume2 className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                  {event.mediaType === "audio" ? "Dhageyso Kulankii" : "Daawo Kulankii"}
+                </a>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -820,7 +1046,7 @@ function MeetEventsSection({ parent }: { parent: any }) {
                 if (!showLiveBadge) return null;
                 return (
                   <div className={`absolute top-3 right-3 flex items-center gap-1.5 text-white text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    isLive ? "bg-red-600 animate-pulse" : "bg-red-500 animate-bounce"
+                    isLive ? "bg-red-600 animate-pulse" : "bg-red-500 animate-pulse"
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-white" : "bg-white/80"}`}></span>
                     {isLive ? "LIVE" : (() => {
@@ -832,13 +1058,27 @@ function MeetEventsSection({ parent }: { parent: any }) {
                 );
               })()}
               <div className="flex items-start gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Video className="w-6 h-6 text-white" />
-                </div>
+                <img src={tarbiyaddaLogo} alt="Tarbiyadda Caruurta" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-sm text-gray-900 mb-1">{event.title}</h3>
                   {event.description && (
-                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">{event.description}</p>
+                    <div className="mb-2">
+                      <p className={`text-xs text-gray-600 ${expandedDescs.has(event.id) ? "" : "line-clamp-2"}`}>{event.description}</p>
+                      {event.description.length > 80 && (
+                        <button
+                          onClick={() => setExpandedDescs(prev => {
+                            const next = new Set(prev);
+                            if (next.has(event.id)) next.delete(event.id);
+                            else next.add(event.id);
+                            return next;
+                          })}
+                          className="text-xs text-blue-600 font-medium mt-0.5 hover:underline"
+                          data-testid={`btn-readmore-meet-${event.id}`}
+                        >
+                          {expandedDescs.has(event.id) ? "Yaree ▲" : "Akhri dhamaystirka ▼"}
+                        </button>
+                      )}
+                    </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
                     <span className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full">
@@ -850,10 +1090,12 @@ function MeetEventsSection({ parent }: { parent: any }) {
                       {formatTime12(event.startTime)} - {formatTime12(event.endTime)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                </div>
+              </div>
+              <div className="flex gap-2">
                     {!parent ? (
                       <button
-                        onClick={() => window.location.assign("/parent/register")}
+                        onClick={() => window.location.assign("/register")}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all"
                         data-testid={`btn-join-meet-${event.id}`}
                       >
@@ -880,20 +1122,38 @@ function MeetEventsSection({ parent }: { parent: any }) {
                     <button
                       onClick={() => {
                         if (!parent) {
-                          window.location.assign("/parent/register");
+                          window.location.assign("/register");
                           return;
                         }
                         handleAddToCalendar();
                       }}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all"
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                        isAddedToCal
+                          ? "bg-green-50 border border-green-200 text-green-700"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
                       data-testid={`btn-calendar-meet-${event.id}`}
                     >
-                      <Calendar className="w-3.5 h-3.5" />
-                      Kalandarka
+                      {isAddedToCal ? <Check className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                      {isAddedToCal ? "Kalandarka waad ku dartay" : "Kalandarka"}
                     </button>
-                  </div>
-                </div>
               </div>
+              {event.driveFileId && (
+                <div className="mt-3">
+                  <a
+                    href={`/meet-watch/${event.id}`}
+                    className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                      event.mediaType === "audio"
+                        ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white shadow-purple-200"
+                        : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white shadow-red-200"
+                    }`}
+                    data-testid={`btn-watch-meet-${event.id}`}
+                  >
+                    {event.mediaType === "audio" ? <Volume2 className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                    {event.mediaType === "audio" ? "Dhageyso Kulankii" : "Daawo Kulankii"}
+                  </a>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1043,14 +1303,18 @@ function AiTipCard() {
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <h3 className="font-bold text-gray-900 text-base">{t("home.dailyTips")}</h3>
-            <span className="text-xs bg-purple-200/80 text-purple-800 px-2.5 py-0.5 rounded-full font-medium">
-              {getAgeLabel(aiTip.ageRange)}
-            </span>
-            <span className="text-xs bg-indigo-200/80 text-indigo-800 px-2.5 py-0.5 rounded-full font-medium">
-              {getCategoryLabel(aiTip.category)}
-            </span>
+          <div className="flex flex-col gap-1 mb-1.5">
+            <h3 className="font-bold text-gray-900 text-sm leading-snug">
+              Maraaxisha da'da ilmaha (Child development stages by age)
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs bg-purple-200/80 text-purple-800 px-2.5 py-0.5 rounded-full font-medium">
+                {getAgeLabel(aiTip.ageRange)}
+              </span>
+              <span className="text-xs bg-indigo-200/80 text-indigo-800 px-2.5 py-0.5 rounded-full font-medium">
+                {getCategoryLabel(aiTip.category)}
+              </span>
+            </div>
           </div>
           <h4 className="font-semibold text-gray-800 text-[15px] mb-1.5">{aiTip.title}</h4>
           <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
@@ -1159,6 +1423,143 @@ function DailyTipCard() {
             <p className="text-[10px] text-gray-500 italic">{t("home.signatureTagline")}</p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface HomepageParentTip {
+  id: string;
+  title: string;
+  content: string;
+  stage: string;
+  topic: string;
+  keyPoints: string | null;
+  images: string[];
+  audioUrl: string | null;
+  tipDate: string;
+  generatedAt: string;
+}
+
+const DEV_STAGE_LABELS: Record<string, { label: string; icon: string }> = {
+  "newborn-0-3m": { label: "Murjux (0-3 bilood)", icon: "👶" },
+  "infant-3-6m": { label: "Fadhi-barad (3-6 bilood)", icon: "🍼" },
+  "infant-6-12m": { label: "Gurguurte (6-12 bilood)", icon: "🦶" },
+  "toddler-1-2y": { label: "Socod barad (1-2 sano)", icon: "🧒" },
+  "toddler-2-3y": { label: "Inyow (2-3 sano)", icon: "🗣️" },
+  "preschool-3-5y": { label: "Dareeme (3-5 sano)", icon: "🎨" },
+  "school-age-5-7y": { label: "Salaad-barad (5-7 sano)", icon: "🎒" },
+};
+
+function HomepageTipsSection() {
+  const { data: tips = [] } = useQuery<HomepageParentTip[]>({
+    queryKey: ["homepage-parent-tips"],
+    queryFn: async () => {
+      const res = await fetch("/api/parent-tips/homepage");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const [playingTipId, setPlayingTipId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const getProxyAudioUrl = (audioUrl: string | null): string | null => {
+    if (!audioUrl) return null;
+    const match = audioUrl.match(/[?&]id=([^&]+)/);
+    if (match) return `/api/tts-audio/${match[1]}`;
+    return audioUrl;
+  };
+
+  const toggleAudio = (tipId: string, audioUrl: string | null) => {
+    const proxyUrl = getProxyAudioUrl(audioUrl);
+    if (!proxyUrl) return;
+    if (playingTipId === tipId) {
+      audioRef.current?.pause();
+      setPlayingTipId(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.src = proxyUrl;
+        audioRef.current.play().then(() => setPlayingTipId(tipId)).catch(() => {});
+      }
+    }
+  };
+
+  if (tips.length === 0) return null;
+
+  return (
+    <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-500" />
+          Talooyinkeena Maalin kasta ah
+        </h2>
+        <Link href="/parent-tips">
+          <span className="text-sm text-purple-600 font-medium flex items-center gap-1">
+            Dhammaan <ChevronRight className="w-4 h-4" />
+          </span>
+        </Link>
+      </div>
+      <audio
+        ref={audioRef}
+        onEnded={() => setPlayingTipId(null)}
+        preload="none"
+      />
+      <div className="space-y-4">
+        {tips.map((tip) => {
+          const stageInfo = DEV_STAGE_LABELS[tip.stage];
+          return (
+            <Link key={tip.id} href="/parent-tips">
+              <div
+                className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-2xl p-4 border border-purple-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                data-testid={`homepage-tip-${tip.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="font-bold text-gray-900 text-sm">Talooyinkeena Maalin kasta ah</h3>
+                      {stageInfo && (
+                        <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-medium">
+                          {stageInfo.label}
+                        </span>
+                      )}
+                      <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-medium">
+                        {tip.topic}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-gray-800 text-sm mb-1">{tip.title}</p>
+                    <p className="text-gray-700 text-sm leading-relaxed line-clamp-4">
+                      {tip.content}
+                    </p>
+                    <div className="mt-2 flex items-center gap-3">
+                      {tip.audioUrl && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleAudio(tip.id, tip.audioUrl); }}
+                          className="flex items-center gap-1.5 text-xs text-purple-600 font-medium bg-purple-100 px-3 py-1.5 rounded-full hover:bg-purple-200 transition-colors"
+                          data-testid={`play-tip-${tip.id}`}
+                        >
+                          {playingTipId === tip.id ? (
+                            <><Pause className="w-3 h-3" /> Jooji</>
+                          ) : (
+                            <><Volume2 className="w-3 h-3" /> Dhagayso</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-purple-200/50">
+                      <p className="text-xs text-gray-600 font-medium">Mahadsanid</p>
+                      <p className="text-[10px] text-gray-500 italic">Barbaarintasan Academy.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -1633,163 +2034,6 @@ function getWeeklyFlashcards() {
   };
 }
 
-function GoldenMembershipBanner({ parent }: { parent: any }) {
-  const { t } = useTranslation();
-  const [, setLocation] = useLocation();
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  
-  const { data: goldenSoldCount } = useQuery({
-    queryKey: ["golden-membership-sold"],
-    queryFn: async () => {
-      const res = await fetch("/api/golden-membership-sold-count");
-      if (!res.ok) return 3;
-      const data = await res.json();
-      return data.count || 3;
-    }
-  });
-  const soldCount = goldenSoldCount || 3;
-  const totalSpots = 114;
-  const pricePerYear = 114;
-  
-  // Fixed target date: February 28, 2026 - offer expires
-  const endDate = new Date("2026-02-28T23:59:59");
-  
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime();
-      const end = endDate.getTime();
-      const difference = end - now;
-      
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((difference % (1000 * 60)) / 1000)
-        });
-      }
-    };
-    
-    calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  
-  const spotsRemaining = totalSpots - soldCount;
-  const progressPercent = (soldCount / totalSpots) * 100;
-  
-  return (
-    <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
-      <div className="relative overflow-hidden bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-500 rounded-2xl p-5 shadow-xl border-2 border-amber-300">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="text-3xl">🏆</span>
-            <h2 className="text-lg font-black text-amber-900 text-center">{t("goldenMember.bannerTitle")}</h2>
-            <span className="text-3xl">🏆</span>
-          </div>
-          
-          <div className="bg-white/90 rounded-xl p-4 mb-4">
-            <div className="grid grid-cols-4 gap-2 text-center mb-3">
-              <div className="bg-amber-100 rounded-lg p-2">
-                <span className="text-2xl font-black text-amber-700">{timeLeft.days}</span>
-                <p className="text-[10px] text-amber-600 font-medium">{t("goldenMember.days")}</p>
-              </div>
-              <div className="bg-amber-100 rounded-lg p-2">
-                <span className="text-2xl font-black text-amber-700">{timeLeft.hours}</span>
-                <p className="text-[10px] text-amber-600 font-medium">{t("goldenMember.hours")}</p>
-              </div>
-              <div className="bg-amber-100 rounded-lg p-2">
-                <span className="text-2xl font-black text-amber-700">{timeLeft.minutes}</span>
-                <p className="text-[10px] text-amber-600 font-medium">{t("goldenMember.minutes")}</p>
-              </div>
-              <div className="bg-amber-100 rounded-lg p-2">
-                <span className="text-2xl font-black text-amber-700">{timeLeft.seconds}</span>
-                <p className="text-[10px] text-amber-600 font-medium">{t("goldenMember.seconds")}</p>
-              </div>
-            </div>
-            
-            {/* Course Start Announcement */}
-            <div className="bg-blue-600 rounded-xl p-4 mb-3 text-center">
-              <p className="text-white font-black text-lg mb-2">
-                📚 Koorsadayada waxay bilaabmayaan 7.02.2026
-              </p>
-              <div className="text-white font-bold text-base">
-                <p>• Koorsada Ilmo Is-Dabira</p>
-                <p>• Koorsada 0-6 Bilood</p>
-              </div>
-            </div>
-            
-            <div className="mb-3">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-1">
-                  <span className="text-2xl font-black text-green-600">{soldCount}</span>
-                  <span className="text-amber-700 font-medium text-sm">{t("goldenMember.soldLabel")}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-2xl font-black text-amber-700">{spotsRemaining}</span>
-                  <span className="text-amber-700 font-medium text-sm">{t("goldenMember.remainingLabel")}</span>
-                </div>
-              </div>
-              <div className="h-3 bg-amber-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                ></div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-center gap-1 text-amber-800 text-sm">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span>{t("goldenMember.allCourses")}</span>
-            </div>
-          </div>
-          
-          <div className="text-center mb-4">
-            <span className="text-amber-900 text-lg">{t("goldenMember.only")}</span>
-            <span className="text-3xl font-black text-amber-900 mx-2">${pricePerYear}</span>
-            <span className="text-amber-900 text-lg">{t("goldenMember.perYear")}</span>
-          </div>
-          
-          <div className="text-center text-amber-800 text-xs mb-4 flex items-center justify-center gap-1">
-            <span>⚠️</span>
-            <span className="font-semibold">{t("goldenMember.priceWarning")}</span>
-          </div>
-          
-          <button 
-            onClick={() => {
-              if (parent) {
-                setLocation("/golden-membership");
-              } else {
-                setLocation("/login?redirect=/golden-membership&message=iibso");
-              }
-            }}
-            className="w-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 hover:from-amber-700 hover:via-yellow-600 hover:to-amber-700 text-white font-black py-4 rounded-xl shadow-xl active:scale-[0.97] transition-all text-lg border-2 border-amber-300 animate-pulse hover:animate-none relative overflow-hidden group"
-            data-testid="button-golden-membership"
-          >
-            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></span>
-            <span className="relative flex items-center justify-center gap-2">
-              <span className="text-2xl">🏆</span>
-              <span>{t("goldenMember.buyNow")}</span>
-              <span className="text-2xl">🏆</span>
-            </span>
-          </button>
-          
-          <button 
-            onClick={() => setLocation("/share-info")}
-            className="w-full mt-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl shadow-lg active:scale-[0.97] transition-all flex items-center justify-center gap-2"
-            data-testid="button-share-info"
-          >
-            <span>📤</span>
-            <span>La Wadaag Ehelka & Asxaabtaada</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function FlashcardModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -1979,6 +2223,46 @@ function GettingStartedGuide({
   );
 }
 
+function LiveStatsBar() {
+  useEffect(() => {
+    const ping = () => fetch("/api/stats/ping", { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { data: liveStats, isLoading } = useQuery({
+    queryKey: ["liveStats"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats/live");
+      if (!res.ok) return { onlineCount: 0, enrolledCount: 0, totalUsers: 0 };
+      return res.json();
+    },
+    refetchInterval: 120000,
+  });
+
+  const onlineCount = liveStats?.onlineCount || 0;
+  const enrolledCount = liveStats?.enrolledCount || 0;
+
+  return (
+    <div className="flex items-center justify-center gap-4 sm:gap-8" data-testid="live-stats-bar">
+      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2.5 shadow-sm border border-gray-100" data-testid="stat-online-users">
+        <span className="relative flex h-4 w-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 shadow-[0_0_8px_2px_rgba(34,197,94,0.5)]"></span>
+        </span>
+        <span className="text-base font-bold text-gray-800">{isLoading ? "..." : onlineCount}</span>
+        <span className="text-sm text-gray-500">online</span>
+      </div>
+      <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2.5 shadow-sm border border-gray-100" data-testid="stat-enrolled-users">
+        <GraduationCap className="w-5 h-5 text-indigo-500" />
+        <span className="text-base font-bold text-gray-800">{isLoading ? "..." : enrolledCount}</span>
+        <span className="text-sm text-gray-500">enrolled</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { t, i18n } = useTranslation();
   const { parent, isLoading, logout } = useParentAuth();
@@ -2104,11 +2388,9 @@ export default function Home() {
       }
       return data;
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    retry: 3,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
 
   const isSectionVisible = (sectionKey: string) => {
@@ -2116,7 +2398,9 @@ export default function Home() {
       return true;
     }
     const section = homepageSections.find((s: any) => s.sectionKey === sectionKey);
-    return section !== undefined;
+    if (section !== undefined) return true;
+    if (sectionKey === "gold_membership") return true;
+    return false;
   };
 
   const hasEnrollments = enrollments.filter((e: any) => e.status === "active").length > 0;
@@ -2146,7 +2430,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white pb-24 lg:pb-8">
       <InstallBanner />
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 safe-top">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 safe-top prevent-flicker">
         <div className="px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2253,7 +2537,7 @@ export default function Home() {
             {hasEnrollments ? (
               <>
                 <p className="text-gray-600 text-base mb-5">{t("home.knowledgeBasedParenting")}</p>
-                <Link href="/profile">
+                <Link href="/learning-hub">
                   <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-continue-learning">
                     <Play className="w-5 h-5" />
                     {t("home.startLessons")}
@@ -2263,10 +2547,10 @@ export default function Home() {
             ) : (
               <>
                 <p className="text-gray-600 text-base mb-5">{t("home.chooseCourse")}</p>
-                <Link href="/courses">
-                  <button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-buy-course">
+                <Link href="/learning-hub">
+                  <button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-browse-courses">
                     <Sparkles className="w-5 h-5" />
-                    {t("home.buyCourse")}
+                    {t("home.browseCourses", "Arag Koorsooyinka")}
                   </button>
                 </Link>
               </>
@@ -2296,9 +2580,14 @@ export default function Home() {
       </div>
       </div>
 
+      {/* Live Stats Bar - Online Users & Enrolled Students */}
+      <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
+        <LiveStatsBar />
+      </div>
+
       {/* Stats Section */}
       {isSectionVisible("stats") && (
-      <div className="mt-8 px-4 max-w-7xl mx-auto lg:px-8">
+      <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
         <div className="grid grid-cols-4 gap-3 lg:gap-6">
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
@@ -2319,6 +2608,34 @@ export default function Home() {
             <p className="text-sm text-gray-500 font-medium mb-1">Telegram</p>
             <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.followUs")}</p>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Xubin Dahabi ah - Gold Membership Card */}
+      {isSectionVisible("gold_membership") && (
+      <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
+        <div 
+          onClick={() => { import("@/lib/api").then(m => m.openSSOLink()); }}
+          className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 rounded-2xl p-4 shadow-lg cursor-pointer active:scale-[0.98] transition-transform hover:shadow-xl"
+          data-testid="link-gold-membership"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Crown className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-bold text-lg">Xubin Dahabi ah Noqo Maanta 💛</h3>
+              <p className="text-white/90 text-sm leading-relaxed">
+                Taageer Barnaamijkeena — Booqo barbaarintasan.com
+              </p>
+            </div>
+            <div className="flex-shrink-0 bg-white/20 rounded-lg px-3 py-2">
+              <span className="text-white text-sm font-semibold flex items-center gap-1">
+                Booqo <ExternalLink className="w-3.5 h-3.5" />
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -2377,6 +2694,9 @@ export default function Home() {
       {/* Google Meet Events Section */}
       <MeetEventsSection parent={parent} />
 
+      {/* Promo Videos - Muuqaalo Xayeesiin */}
+      {isSectionVisible("promo_videos") && <PromoVideoSection />}
+
       {/* BSAv.1 Sheeko - Voice Spaces Section (below stats) */}
       <SheekoSection />
 
@@ -2389,8 +2709,6 @@ export default function Home() {
       {/* Maaweelada Caruurta - Bedtime Stories Section */}
       <MaaweeloSection />
 
-      {/* 114 Golden Members Promotional Banner */}
-      <GoldenMembershipBanner parent={parent} />
 
       {/* Getting Started Guide - 5 Steps for New Parents */}
       {isSectionVisible("getting_started") && (
@@ -2405,7 +2723,7 @@ export default function Home() {
       {isSectionVisible("services") && (
       <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
         <h2 className="text-lg font-bold text-gray-900 mb-3 lg:text-xl">{t("home.otherServices")}</h2>
-        <div className="grid grid-cols-3 gap-1.5 lg:grid-cols-6 lg:gap-6">
+        <div className="grid grid-cols-4 gap-1.5 lg:grid-cols-8 lg:gap-6">
           <a href="/sheeko" onClick={(e) => { e.preventDefault(); window.location.assign('/sheeko'); }}>
             <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-red-200 active:scale-95 transition-all cursor-pointer min-w-0 relative" data-testid="link-sheeko">
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
@@ -2415,20 +2733,28 @@ export default function Home() {
               <span className="text-[10px] lg:text-sm font-bold text-red-600 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Sheeko</span>
             </div>
           </a>
+          <Link href="/resources#quran">
+            <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-emerald-200 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-quran">
+              <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
+                <BookOpen className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <span className="text-[10px] lg:text-sm font-semibold text-emerald-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Quraanka</span>
+            </div>
+          </Link>
+          <Link href="/parent-tips">
+            <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-orange-200 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-parent-tips">
+              <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
+                <Lightbulb className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Horumarka Da'da</span>
+            </div>
+          </Link>
           <Link href="/milestones">
             <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-milestones">
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <Target className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Horumarkaaga</span>
-            </div>
-          </Link>
-          <Link href="/badges">
-            <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-badges">
-              <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
-                <Award className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
-              </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Abaalmarinta</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Horumarka ilmaha</span>
             </div>
           </Link>
           <Link href="/resources">
@@ -2439,12 +2765,28 @@ export default function Home() {
               <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Maktabada</span>
             </div>
           </Link>
+          <Link href="/waalid/feed">
+            <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-blue-200 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-baraha">
+              <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
+                <Users className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <span className="text-[10px] lg:text-sm font-semibold text-blue-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Baraha</span>
+            </div>
+          </Link>
           <Link href="/groups">
             <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-indigo-200 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-groups">
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-indigo-400 to-blue-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <UserPlus className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
               <span className="text-[10px] lg:text-sm font-semibold text-indigo-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Guruubada</span>
+            </div>
+          </Link>
+          <Link href="/learning-hub">
+            <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-sky-200 active:scale-95 transition-all cursor-pointer min-w-0" data-testid="link-baro">
+              <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-sky-400 to-cyan-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
+                <GraduationCap className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <span className="text-[10px] lg:text-sm font-semibold text-sky-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Baro</span>
             </div>
           </Link>
         </div>
@@ -2588,7 +2930,8 @@ export default function Home() {
       {/* AI Generated Tip Card */}
       {isSectionVisible("ai_tip") && <AiTipCard />}
 
-
+      {/* Talooyinkeena Maalin kasta ah - Fresh AI Parent Tips (last 3 hours) */}
+      <HomepageTipsSection />
 
       {/* General Age Courses with Filter Tabs */}
       {isSectionVisible("general_courses") && (
@@ -2694,7 +3037,7 @@ export default function Home() {
           <Link href="/testimonials">
             <button className="w-full mt-4 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-2xl text-white font-bold text-lg shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-300 animate-pulse hover:animate-none" data-testid="link-all-testimonials">
               <span className="flex items-center justify-center gap-2">
-                Arag Waayo-aragnimada Waalidka
+                Arag walidiinta waxay dhaheen
                 <span className="text-xl">👍❤️👏🤲</span>
               </span>
             </button>
@@ -2702,22 +3045,7 @@ export default function Home() {
         </div>
       )}
 
-      {isSectionVisible("cta") && (
-      <div className="mx-4 mt-6 bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 rounded-3xl p-6 border border-sky-200 shadow-sm">
-        <div className="text-center mb-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h3 className="font-bold text-xl text-gray-900 mb-2">{t("home.startTodayCourse")}</h3>
-          <p className="text-gray-600 text-base font-medium">{t("home.viewAllNewCourses")}</p>
-        </div>
-        <Link href="/courses">
-          <button className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-4 rounded-2xl shadow-xl active:scale-[0.98] transition-all text-lg" data-testid="button-get-premium">
-            {t("home.startNow")}
-          </button>
-        </Link>
-      </div>
-      )}
+      
 
       {/* Ogeeysiisyada - Announcements Section (hoose, nav-ka kor) */}
       {isSectionVisible("announcements") && announcements.length > 0 && (
