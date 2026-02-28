@@ -360,7 +360,19 @@ function PromoVideoSection() {
 
   if (videos.length === 0) return null;
 
+  const getGDriveFileId = (url: string) => {
+    const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (m1) return m1[1];
+    const m2 = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if (m2) return m2[1];
+    const m3 = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+    if (m3) return m3[1];
+    return null;
+  };
+
   const getEmbedUrl = (url: string) => {
+    const gdriveId = getGDriveFileId(url);
+    if (gdriveId) return `https://drive.google.com/file/d/${gdriveId}/preview`;
     const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
     if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0`;
     const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
@@ -370,6 +382,8 @@ function PromoVideoSection() {
 
   const getThumb = (video: any) => {
     if (video.thumbnailUrl) return video.thumbnailUrl;
+    const gdriveId = getGDriveFileId(video.videoUrl);
+    if (gdriveId) return `https://drive.google.com/thumbnail?id=${gdriveId}&sz=w480`;
     const ytMatch = video.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
     if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
     return null;
