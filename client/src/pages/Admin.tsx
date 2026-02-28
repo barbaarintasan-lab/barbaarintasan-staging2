@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { toast } from "sonner";
 import { useUpload } from "@/hooks/use-upload";
 import Papa from "papaparse";
@@ -15062,52 +15063,47 @@ function PromoVideosTab() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch("/api/admin/promo-videos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed");
+      const res = await apiRequest("POST", "/api/admin/promo-videos", data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
       resetForm();
       toast.success("Muuqaalka waa la keydiyay!");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Waa la waayay in la keydiyo");
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      const res = await fetch(`/api/admin/promo-videos/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed");
+      const res = await apiRequest("PATCH", `/api/admin/promo-videos/${id}`, data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
       resetForm();
       toast.success("Waa la cusbooneysiiyay!");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Waa la waayay in la cusboonaysiiyo");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/admin/promo-videos/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+      await apiRequest("DELETE", `/api/admin/promo-videos/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
       toast.success("Waa la tirtiray!");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Waa la waayay in la tirtiro");
     },
   });
 
