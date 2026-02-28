@@ -406,57 +406,55 @@ function PromoVideoSection() {
         )}
       </div>
 
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex gap-3">
-          {videos.map((video: any) => (
-            <div key={video.id} className="flex-none w-[280px]" data-testid={`promo-video-${video.id}`}>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                {activeVideo === video.id ? (
-                  <div className="relative aspect-video bg-black">
-                    <iframe
-                      src={getEmbedUrl(video.videoUrl)}
-                      className="w-full h-full"
-                      allow="autoplay; encrypted-media"
-                      allowFullScreen
-                    />
-                    <button
-                      onClick={() => setActiveVideo(null)}
-                      className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white"
-                      data-testid={`promo-close-${video.id}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
+      <div className="space-y-3">
+        {videos.map((video: any) => (
+          <div key={video.id} className="w-full" data-testid={`promo-video-${video.id}`}>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {activeVideo === video.id ? (
+                <div className="relative aspect-video bg-black">
+                  <iframe
+                    src={getEmbedUrl(video.videoUrl)}
+                    className="w-full h-full"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowFullScreen
+                  />
                   <button
-                    onClick={() => setActiveVideo(video.id)}
-                    className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
-                    data-testid={`promo-play-${video.id}`}
+                    onClick={() => setActiveVideo(null)}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white z-10"
+                    data-testid={`promo-close-${video.id}`}
                   >
-                    {getThumb(video) ? (
-                      <img src={getThumb(video)} alt={video.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Video className="w-12 h-12 text-blue-300" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
-                      <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <Play className="w-6 h-6 text-blue-600 ml-1" />
-                      </div>
-                    </div>
+                    <X className="w-5 h-5" />
                   </button>
-                )}
-                <div className="p-3">
-                  <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{video.title}</h4>
-                  {video.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{video.description}</p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setActiveVideo(video.id)}
+                  className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
+                  data-testid={`promo-play-${video.id}`}
+                >
+                  {getThumb(video) ? (
+                    <img src={getThumb(video)} alt={video.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video className="w-16 h-16 text-blue-300" />
+                    </div>
                   )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
+                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <Play className="w-7 h-7 text-blue-600 ml-1" />
+                    </div>
+                  </div>
+                </button>
+              )}
+              <div className="p-3">
+                <h4 className="font-semibold text-base text-gray-900 line-clamp-1">{video.title}</h4>
+                {video.description && (
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
+                )}
                 </div>
               </div>
             </div>
           ))}
-        </div>
       </div>
     </div>
   );
