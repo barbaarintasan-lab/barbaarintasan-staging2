@@ -1,0 +1,31 @@
+name: Daily Somali TTS
+
+# Jadwalka workflow-ga: subax kasta 8 AM UTC
+on:
+  schedule:
+    - cron: "0 8 * * *"  # Subax kasta 8 AM UTC
+  workflow_dispatch:       # Haddii aad rabto inaad manual ku ordo
+
+jobs:
+  generate-tts:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout repo-ga
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Setup Python
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: pip install huggingface-hub
+
+      # Step 4: Run Somali TTS script
+      - name: Run generate_hf_somali_tts.py
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}  # GitHub Secret-kaaga Hugging Face
+        run: python generate_hf_somali_tts.py
