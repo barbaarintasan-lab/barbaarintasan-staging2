@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages, Copy } from "lucide-react";
+import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages } from "lucide-react";
 import AIModerationPanel from "@/components/AIModerationPanel";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -689,7 +689,6 @@ export default function Admin() {
   const [accessibilityReport, setAccessibilityReport] = useState<any>(null);
   const [isLoadingAccessibilityReport, setIsLoadingAccessibilityReport] = useState(false);
   const [isExportingUsersWP, setIsExportingUsersWP] = useState(false);
-  const [isImportingParents, setIsImportingParents] = useState(false);
   
   // Content Creator states
   const [contentType, setContentType] = useState<"dhambaal" | "sheeko">("dhambaal");
@@ -804,7 +803,7 @@ export default function Admin() {
   const [enrollmentPlanType, setEnrollmentPlanType] = useState("lifetime");
   const [parentToDelete, setParentToDelete] = useState<Parent | null>(null);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
-  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number; parentName?: string; courseName?: string; courseId?: string; planType?: string; status?: string } | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number } | null>(null);
   const [adminToggleConfirm, setAdminToggleConfirm] = useState<{parent: Parent, makeAdmin: boolean} | null>(null);
   const [hostToggleConfirm, setHostToggleConfirm] = useState<{parent: Parent, makeHost: boolean} | null>(null);
 
@@ -1083,42 +1082,6 @@ export default function Admin() {
     } finally {
       setIsExportingUsersWP(false);
     }
-  };
-
-  // Import Parents Handler (recover lost user data)
-  const handleImportParents = async () => {
-    if (isImportingParents) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e: any) => {
-      const file = e.target?.files?.[0];
-      if (!file) return;
-      setIsImportingParents(true);
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        const res = await fetch("/api/admin/import-parents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(data),
-        });
-        const result = await res.json();
-        if (res.ok) {
-          toast.success(result.message || "Parents waa la soo dejiyay!");
-          queryClient.invalidateQueries({ queryKey: ["/api/admin/parents"] });
-        } else {
-          toast.error(result.error || "Import-ku wuu fashilmay");
-        }
-      } catch (error) {
-        console.error("Parents import error:", error);
-        toast.error("File-ka JSON-ka ma aha sax");
-      } finally {
-        setIsImportingParents(false);
-      }
-    };
-    input.click();
   };
 
   // Import Content Handler
@@ -4553,7 +4516,7 @@ ${baseUrl}/maaweelo`;
             )}
             
             {/* Settings sub-tabs */}
-            {["homepage", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events", "batch-translation"].includes(activeTab) && (
+            {["homepage", "promo-videos", "resources", "milestones", "flashcards", "parent-community", "email-test", "meet-events", "batch-translation"].includes(activeTab) && (
               <>
                 <Button
                   variant={activeTab === "homepage" ? "secondary" : "ghost"}
@@ -4563,6 +4526,15 @@ ${baseUrl}/maaweelo`;
                   data-testid="tab-homepage"
                 >
                   <LayoutDashboard className="w-3 h-3 mr-1" /> Bogga Hore
+                </Button>
+                <Button
+                  variant={activeTab === "promo-videos" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setActiveTab("promo-videos")}
+                  data-testid="tab-promo-videos"
+                >
+                  <Video className="w-3 h-3 mr-1" /> Muuqaalo
                 </Button>
                 <Button
                   variant={activeTab === "parent-community" ? "secondary" : "ghost"}
@@ -8813,15 +8785,6 @@ ${baseUrl}/maaweelo`;
                         >
                           {isExportingUsersWP ? "⏳ Exporting..." : "🔄 WordPress Export"}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleImportParents}
-                          disabled={isImportingParents}
-                          data-testid="btn-import-parents"
-                        >
-                          {isImportingParents ? "⏳ Importing..." : "📤 Import Users"}
-                        </Button>
                       </div>
                       <div className="flex gap-2 text-sm text-gray-500">
                         <Badge variant="outline">
@@ -10276,6 +10239,10 @@ ${baseUrl}/maaweelo`;
 
             <TabsContent value="homepage">
               <HomepageSectionsTab />
+            </TabsContent>
+
+            <TabsContent value="promo-videos">
+              <PromoVideosTab />
             </TabsContent>
 
             <TabsContent value="parent-community">
@@ -14661,9 +14628,9 @@ function MeetEventsAdmin() {
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const { data: events = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/meet-events"],
+    queryKey: ["/api/meet-events"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/meet-events", { credentials: "include" });
+      const res = await fetch("/api/meet-events", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch events");
       return res.json();
     },
@@ -14753,7 +14720,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to save event");
       toast.success(editingEvent ? "Kulanka waa la cusbooneysiiyay" : "Kulanka cusub waa la abuuray");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
       resetForm();
     } catch (err: any) {
       toast.error(err.message || "Khalad ayaa dhacay");
@@ -14771,7 +14738,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to delete");
       toast.success("Kulanka waa la tiray");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
     } catch {
       toast.error("Khalad ayaa dhacay");
     }
@@ -14786,7 +14753,7 @@ function MeetEventsAdmin() {
         body: JSON.stringify({ isActive: !event.isActive }),
       });
       if (!res.ok) throw new Error("Failed to toggle");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
       toast.success(event.isActive ? "Kulanka waa la damiyay" : "Kulanka waa la shaqeeyay");
     } catch {
       toast.error("Khalad ayaa dhacay");
@@ -14802,7 +14769,7 @@ function MeetEventsAdmin() {
       });
       if (!res.ok) throw new Error("Failed to archive");
       toast.success("Kulanka Maktabada ayuu u wareegay");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/meet-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/meet-events"] });
     } catch {
       toast.error("Khalad ayaa dhacay");
     }
@@ -15020,28 +14987,6 @@ function MeetEventsAdmin() {
                               </span>
                             </div>
                             <p className="text-[9px] text-gray-500 mt-1 truncate">ID: {event.driveFileId}</p>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <a
-                                href={`/meet-watch/${event.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] text-blue-600 hover:underline truncate flex-1"
-                                data-testid={`watch-link-${event.id}`}
-                              >
-                                /meet-watch/{event.id}
-                              </a>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/meet-watch/${event.id}`);
-                                  toast.success("Link-ga waa la koobiyeeyay");
-                                }}
-                                className="p-0.5 rounded hover:bg-purple-100 text-purple-600 shrink-0"
-                                title="Koobiyee link-ga"
-                                data-testid={`copy-watch-link-${event.id}`}
-                              >
-                                <Copy className="w-3 h-3" />
-                              </button>
-                            </div>
                           </div>
                         )}
                       </div>
@@ -15099,6 +15044,189 @@ function MeetEventsAdmin() {
         </CardContent>
       </Card>
 
+    </div>
+  );
+}
+
+function PromoVideosTab() {
+  const queryClient = useQueryClient();
+  const { data: videos = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/promo-videos"],
+  });
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/admin/promo-videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      resetForm();
+      toast.success("Muuqaalka waa la keydiyay!");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const res = await fetch(`/api/admin/promo-videos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      resetForm();
+      toast.success("Waa la cusbooneysiiyay!");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/promo-videos/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-videos"] });
+      toast.success("Waa la tirtiray!");
+    },
+  });
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setTitle("");
+    setDescription("");
+    setVideoUrl("");
+    setThumbnailUrl("");
+  };
+
+  const startEdit = (video: any) => {
+    setEditingId(video.id);
+    setTitle(video.title);
+    setDescription(video.description || "");
+    setVideoUrl(video.videoUrl);
+    setThumbnailUrl(video.thumbnailUrl || "");
+    setShowForm(true);
+  };
+
+  const handleSubmit = () => {
+    if (!title || !videoUrl) return;
+    const data = { title, description, videoUrl, thumbnailUrl };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const toggleVisibility = (video: any) => {
+    updateMutation.mutate({ id: video.id, isVisible: !video.isVisible });
+  };
+
+  return (
+    <div className="space-y-4" data-testid="promo-videos-admin">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="w-5 h-5 text-blue-600" />
+                Muuqaalada Xayeesiinta
+              </CardTitle>
+              <p className="text-sm text-gray-500 mt-1">Ku dar muuqaalo cusub oo waalidka daawan karaan bogga hoyga</p>
+            </div>
+            <Button onClick={() => { resetForm(); setShowForm(!showForm); }} size="sm" data-testid="btn-add-promo">
+              <Plus className="w-4 h-4 mr-1" /> Ku Dar Cusub
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {showForm && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 space-y-3" data-testid="promo-form">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Cinwaanka *</label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tusaale: Koorsada Cusub ee 0-6 Bilood" data-testid="input-promo-title" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Sharaxaad (ikhtiyaari)</label>
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Sharaxaad kooban..." data-testid="input-promo-desc" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Video URL * (YouTube, Vimeo, ama link kale)</label>
+                <Input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." data-testid="input-promo-url" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Sawirka Muuqaalka (ikhtiyaari)</label>
+                <Input value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} placeholder="https://..." data-testid="input-promo-thumb" />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSubmit} disabled={!title || !videoUrl || createMutation.isPending || updateMutation.isPending} size="sm" data-testid="btn-save-promo">
+                  <Save className="w-4 h-4 mr-1" /> {editingId ? "Cusboonaysii" : "Kaydi"}
+                </Button>
+                <Button variant="outline" onClick={resetForm} size="sm">Xir</Button>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <p className="text-center text-gray-400 py-8">Waa la soo dejinayaa...</p>
+          ) : videos.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">Weli muuqaal lama gelin. Guji "Ku Dar Cusub".</p>
+          ) : (
+            <div className="space-y-3">
+              {videos.map((video: any) => (
+                <div key={video.id} className={`flex items-center gap-3 p-3 rounded-xl border ${video.isVisible ? "bg-white border-gray-200" : "bg-gray-50 border-gray-200 opacity-60"}`} data-testid={`admin-promo-${video.id}`}>
+                  <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
+                    {video.thumbnailUrl ? (
+                      <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-6 h-6 text-gray-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-sm truncate">{video.title}</h4>
+                    {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
+                    <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-none">
+                    <Button variant="ghost" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
+                      {video.isVisible ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
+                      <Edit className="w-4 h-4 text-blue-600" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

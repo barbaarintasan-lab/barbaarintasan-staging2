@@ -338,6 +338,116 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
   );
 }
 
+function PromoVideoSection() {
+  const { data: videos = [] } = useQuery<any[]>({
+    queryKey: ["/api/promo-videos"],
+  });
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start", dragFree: true });
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      setCanScrollPrev(emblaApi.canScrollPrev());
+      setCanScrollNext(emblaApi.canScrollNext());
+    };
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  if (videos.length === 0) return null;
+
+  const getEmbedUrl = (url: string) => {
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`;
+    return url;
+  };
+
+  const getThumb = (video: any) => {
+    if (video.thumbnailUrl) return video.thumbnailUrl;
+    const ytMatch = video.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+    return null;
+  };
+
+  return (
+    <div className="mt-6 px-4" data-testid="promo-videos-section">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
+            <Video className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">Muuqaalo Cusub</h3>
+        </div>
+        {videos.length > 1 && (
+          <div className="flex gap-1">
+            <button onClick={() => emblaApi?.scrollPrev()} disabled={!canScrollPrev} className="p-1.5 rounded-full bg-gray-100 disabled:opacity-30" data-testid="promo-scroll-prev"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => emblaApi?.scrollNext()} disabled={!canScrollNext} className="p-1.5 rounded-full bg-gray-100 disabled:opacity-30" data-testid="promo-scroll-next"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex gap-3">
+          {videos.map((video: any) => (
+            <div key={video.id} className="flex-none w-[280px]" data-testid={`promo-video-${video.id}`}>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {activeVideo === video.id ? (
+                  <div className="relative aspect-video bg-black">
+                    <iframe
+                      src={getEmbedUrl(video.videoUrl)}
+                      className="w-full h-full"
+                      allow="autoplay; encrypted-media"
+                      allowFullScreen
+                    />
+                    <button
+                      onClick={() => setActiveVideo(null)}
+                      className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white"
+                      data-testid={`promo-close-${video.id}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setActiveVideo(video.id)}
+                    className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
+                    data-testid={`promo-play-${video.id}`}
+                  >
+                    {getThumb(video) ? (
+                      <img src={getThumb(video)} alt={video.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Video className="w-12 h-12 text-blue-300" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
+                      <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Play className="w-6 h-6 text-blue-600 ml-1" />
+                      </div>
+                    </div>
+                  </button>
+                )}
+                <div className="p-3">
+                  <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{video.title}</h4>
+                  {video.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{video.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SheekoSection() {
   const { parent } = useParentAuth();
   const canHost = parent?.isAdmin || parent?.canHostSheeko;
@@ -2574,6 +2684,9 @@ export default function Home() {
 
       {/* Google Meet Events Section */}
       <MeetEventsSection parent={parent} />
+
+      {/* Promo Videos - Muuqaalo Xayeesiin */}
+      {isSectionVisible("promo_videos") && <PromoVideoSection />}
 
       {/* BSAv.1 Sheeko - Voice Spaces Section (below stats) */}
       <SheekoSection />
