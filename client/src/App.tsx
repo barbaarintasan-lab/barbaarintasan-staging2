@@ -9,7 +9,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ParentAuthProvider } from "@/contexts/ParentAuthContext";
 import { NotificationModalProvider } from "@/contexts/NotificationModalContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
-import { motion, AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RefreshCw, Loader2 } from "lucide-react";
 import logoImage from "@assets/NEW_LOGO-BSU_1_1768990258338.png";
@@ -95,17 +94,6 @@ function SheekoRoom() {
   );
 }
 
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 }
-};
-
-const pageTransition = {
-  type: "tween" as const,
-  ease: "easeOut" as const,
-  duration: 0.08
-};
 
 function PullToRefresh() {
   const [pullDistance, setPullDistance] = useState(0);
@@ -222,76 +210,65 @@ function Router() {
   return (
     <div className="bg-gradient-to-b from-blue-100 via-blue-50 to-blue-100 min-h-screen flex flex-col lg:items-center font-semibold">
       <div className="flex-1 w-full lg:max-w-[672px] lg:mx-auto bg-gradient-to-b from-blue-50 via-blue-50 to-blue-100 lg:shadow-xl min-h-screen">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={pageVariants}
-            transition={pageTransition}
-          >
-            <Suspense fallback={<PageLoader />}>
-              <Switch>
-                <Route path="/" component={Home} />
-                <Route path="/courses" component={Courses} />
-                <Route path="/course/:id" component={CourseDetail} />
-                <Route path="/lesson/:id" component={LessonView} />
-                <Route path="/quiz" component={Quiz} />
-                <Route path="/quiz/:quizId" component={QuizPlayer} />
-                <Route path="/assignment/:id" component={AssignmentView} />
-                <Route path="/testimonials" component={Testimonials} />
-                <Route path="/submit-testimonial" component={SubmitTestimonial} />
-                <Route path="/calendar" component={Calendar} />
-                <Route path="/milestones" component={Milestones} />
-                <Route path="/badges" component={Badges} />
-                <Route path="/resources" component={Resources} />
-                <Route path="/community" component={Community} />
-                <Route path="/events" component={Events} />
-                <Route path="/assessment" component={Assessment} />
-                <Route path="/learning-path" component={LearningPath} />
-                <Route path="/homework-helper" component={HomeworkHelper} />
-                <Route path="/ai-caawiye" component={AiCaawiye} />
-                <Route path="/tarbiya-helper" component={TarbiyaHelper} />
-                <Route path="/register" component={Register} />
-                <Route path="/login" component={Register} />
-                <Route path="/forgot-password" component={ForgotPassword} />
-                <Route path="/reset-password/:token" component={ResetPassword} />
-                <Route path="/profile" component={Profile} />
-                <Route path="/admin" component={Admin} />
-                <Route path="/admin/quiz/:lessonId" component={QuizCreator} />
-                <Route path="/appointments" component={Appointments} />
-                <Route path="/subscription" component={Subscription} />
-                <Route path="/bookmarks" component={Bookmarks} />
-                <Route path="/notifications" component={Notifications} />
-                <Route path="/downloads" component={Downloads} />
-                <Route path="/golden-membership" component={GoldenMembership} />
-                <Route path="/learning-hub" component={LearningHub} />
-                <Route path="/parent-tips" component={ParentTips} />
-                <Route path="/messenger" component={MessengerPage} />
-                <Route path="/sheeko" component={Sheeko} />
-                <Route path="/sheeko/:roomId" component={SheekoRoom} />
-                <Route path="/maaweelo" component={Maaweelo} />
-                <Route path="/dhambaal" component={Dhambaal} />
-                <Route path="/parent/:id" component={ParentProfile} />
-                <Route path="/messages" component={Messages} />
-                <Route path="/messages/:partnerId" component={Messages} />
-                <Route path="/waalid/feed" component={ParentFeed} />
-                <Route path="/baraha" component={ParentFeed} />
-                <Route path="/groups" component={LearningGroups} />
-                <Route path="/meet-watch/:id" component={MeetWatch} />
-                <Route path="/parent-community-terms" component={ParentCommunityTerms} />
-                <Route path="/terms" component={TermsConditions} />
-                <Route path="/privacy-policy" component={PrivacyPolicy} />
-                <Route path="/community-guidelines" component={CommunityGuidelines} />
-                <Route path="/legal" component={Legal} />
-                <Route path="/share-info" component={ShareInfo} />
-                <Route path="/install" component={Install} />
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
-          </motion.div>
-        </AnimatePresence>
+        <Suspense fallback={<PageLoader />}>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/courses" component={Courses} />
+            <Route path="/course/:id" component={CourseDetail} />
+            <Route path="/lesson/:id" component={LessonView} />
+            <Route path="/quiz" component={Quiz} />
+            <Route path="/quiz/:quizId" component={QuizPlayer} />
+            <Route path="/assignment/:id" component={AssignmentView} />
+            <Route path="/testimonials" component={Testimonials} />
+            <Route path="/submit-testimonial" component={SubmitTestimonial} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/milestones" component={Milestones} />
+            <Route path="/badges" component={Badges} />
+            <Route path="/resources" component={Resources} />
+            <Route path="/community" component={Community} />
+            <Route path="/events" component={Events} />
+            <Route path="/assessment" component={Assessment} />
+            <Route path="/learning-path" component={LearningPath} />
+            <Route path="/homework-helper" component={HomeworkHelper} />
+            <Route path="/ai-caawiye" component={AiCaawiye} />
+            <Route path="/tarbiya-helper" component={TarbiyaHelper} />
+            <Route path="/register" component={Register} />
+            <Route path="/login" component={Register} />
+            <Route path="/forgot-password" component={ForgotPassword} />
+            <Route path="/reset-password/:token" component={ResetPassword} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/admin" component={Admin} />
+            <Route path="/admin/quiz/:lessonId" component={QuizCreator} />
+            <Route path="/appointments" component={Appointments} />
+            <Route path="/subscription" component={Subscription} />
+            <Route path="/bookmarks" component={Bookmarks} />
+            <Route path="/notifications" component={Notifications} />
+            <Route path="/downloads" component={Downloads} />
+            <Route path="/golden-membership" component={GoldenMembership} />
+            <Route path="/learning-hub" component={LearningHub} />
+            <Route path="/parent-tips" component={ParentTips} />
+            <Route path="/messenger" component={MessengerPage} />
+            <Route path="/sheeko" component={Sheeko} />
+            <Route path="/sheeko/:roomId" component={SheekoRoom} />
+            <Route path="/maaweelo" component={Maaweelo} />
+            <Route path="/dhambaal" component={Dhambaal} />
+            <Route path="/parent/:id" component={ParentProfile} />
+            <Route path="/messages" component={Messages} />
+            <Route path="/messages/:partnerId" component={Messages} />
+            <Route path="/waalid/feed" component={ParentFeed} />
+            <Route path="/baraha" component={ParentFeed} />
+            <Route path="/groups" component={LearningGroups} />
+            <Route path="/meet-watch/:id" component={MeetWatch} />
+            <Route path="/parent-community-terms" component={ParentCommunityTerms} />
+            <Route path="/terms" component={TermsConditions} />
+            <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/community-guidelines" component={CommunityGuidelines} />
+            <Route path="/legal" component={Legal} />
+            <Route path="/share-info" component={ShareInfo} />
+            <Route path="/install" component={Install} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
       </div>
       {showBottomNav && (
         <Suspense fallback={null}>

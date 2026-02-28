@@ -46,7 +46,7 @@ export default function CourseDetail() {
     },
     enabled: !!course?.id,
     staleTime: 30000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const { data: courseQuizzes = [] } = useQuery({

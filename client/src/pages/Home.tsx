@@ -1459,8 +1459,7 @@ function HomepageTipsSection() {
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 
   const [playingTipId, setPlayingTipId] = useState<string | null>(null);
@@ -2239,7 +2238,7 @@ function LiveStatsBar() {
       if (!res.ok) return { onlineCount: 0, enrolledCount: 0, totalUsers: 0 };
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   const onlineCount = liveStats?.onlineCount || 0;
@@ -2389,11 +2388,9 @@ export default function Home() {
       }
       return data;
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    retry: 3,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
 
   const isSectionVisible = (sectionKey: string) => {
