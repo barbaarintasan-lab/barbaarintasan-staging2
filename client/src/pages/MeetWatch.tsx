@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Video, Volume2, Calendar, Clock, Loader2, Play, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowLeft, Video, Volume2, Calendar, Clock, Loader2, Play, RefreshCw } from "lucide-react";
 import tarbiyaddaLogo from "@assets/logo_1770622897660.png";
 
 export default function MeetWatch() {
@@ -179,19 +179,6 @@ export default function MeetWatch() {
                 )}
               </div>
 
-              {driveViewUrl && (
-                <div className="mt-4 px-3 pb-3 sm:px-0">
-                  <a
-                    href={driveViewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg"
-                  >
-                    <ExternalLink className="w-5 h-5" />
-                    Ku Daawo Google Drive (Hadii uu sare ka shaqayn waayo)
-                  </a>
-                </div>
-              )}
 
               <div className="mt-3 flex items-center justify-between text-white/70 text-sm px-3 pb-3 sm:px-0 sm:pb-0">
                 <div className="flex items-center gap-2">
