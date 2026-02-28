@@ -1,20 +1,27 @@
 from pathlib import Path
-import torch
-from TTS.api import TTS  # TTS library
+from TTS.api import TTS
 
-# Folder model-kaaga local
 MODEL_PATH = "./Hussein_tts"
-OUTPUT_FOLDER = "./output_audio"
+TEXT_FILE = "./daily_text.txt"
+OUTPUT_FOLDER = "./daily_audio"
+
 Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
-# Load model
-tts = TTS(model_path=MODEL_PATH, progress_bar=True, gpu=False)  # GPU haddii available
+print("[INFO] Loading model...")
+tts = TTS(model_path=MODEL_PATH, progress_bar=True, gpu=False)
 
-# Qoraalka Somali
-somali_text = "Asalaamu calaykum, tani waa tijaabo cod Somali ah."
+if not Path(TEXT_FILE).exists():
+    raise FileNotFoundError("daily_text.txt lama helin")
 
-# Output
-output_file = f"{OUTPUT_FOLDER}/output.wav"
-tts.tts_to_file(text=somali_text, file_path=output_file)
+with open(TEXT_FILE, "r", encoding="utf-8") as f:
+    lines = [l.strip() for l in f.readlines() if l.strip()]
 
-print(f"Audio saved to {output_file}")
+if not lines:
+    raise ValueError("daily_text.txt waa madhan")
+
+for i, text in enumerate(lines, 1):
+    out_file = OUTPUT_FOLDER / f"somali_{i}.wav"
+    print(f"[INFO] Generating {out_file}")
+    tts.tts_to_file(text=text, file_path=str(out_file))
+
+print("[DONE] Audio files created successfully")
