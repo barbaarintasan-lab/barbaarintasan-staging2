@@ -537,6 +537,8 @@ export default function CourseDetail() {
                         
                         const isLessonAccessible = (hasAccess && !isTimeLocked) || isFreeTrial;
                         
+                        const isLessonDone = lessonProgress.some((p: any) => p.lessonId === lesson.id && p.completed);
+                        
                         const handleLessonClick = (e: React.MouseEvent) => {
                           if (isTimeLocked && hasAccess) {
                             e.preventDefault();
@@ -550,11 +552,11 @@ export default function CourseDetail() {
                         return (
                         <Link key={lesson.id} href={isLessonAccessible ? linkPath : '#'} onClick={handleLessonClick}>
                           <div 
-                            className={`px-6 py-4 flex items-center gap-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer ${isQuizItem ? 'bg-purple-50' : isAssignmentItem ? 'bg-orange-50' : ''} ${isTimeLocked && hasAccess ? 'opacity-60' : ''}`}
+                            className={`px-6 py-4 flex items-center gap-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer ${isLessonDone ? 'bg-green-50' : isQuizItem ? 'bg-purple-50' : isAssignmentItem ? 'bg-orange-50' : 'bg-white'} ${isTimeLocked && hasAccess ? 'opacity-60' : ''}`}
                             data-testid={`lesson-${lesson.id}`}
                           >
-                            <span className={`w-7 h-7 rounded-full ${isQuizItem ? 'bg-purple-100 text-purple-600' : isAssignmentItem ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'} text-sm font-bold flex items-center justify-center flex-shrink-0`}>
-                              {lessonNumber}
+                            <span className={`w-7 h-7 rounded-full ${isLessonDone ? 'bg-green-500 text-white' : isQuizItem ? 'bg-purple-100 text-purple-600' : isAssignmentItem ? 'bg-orange-100 text-orange-600' : 'bg-white border-2 border-gray-300 text-gray-600'} text-sm font-bold flex items-center justify-center flex-shrink-0`}>
+                              {isLessonDone ? '✓' : lessonNumber}
                             </span>
                             {getLessonIcon(lesson)}
                             <div className="flex-1 min-w-0">
@@ -585,7 +587,9 @@ export default function CourseDetail() {
                             {lesson.duration && (
                               <span className="text-gray-400 text-sm flex-shrink-0">{lesson.duration}</span>
                             )}
-                            {isLessonAccessible ? (
+                            {isLessonDone ? (
+                              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                            ) : isLessonAccessible ? (
                               <PlayCircle className={`w-5 h-5 ${isQuizItem ? 'text-purple-500' : 'text-green-500'} flex-shrink-0`} />
                             ) : isTimeLocked && hasAccess ? (
                               <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
