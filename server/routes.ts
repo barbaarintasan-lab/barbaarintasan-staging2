@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -2072,7 +2072,7 @@ Ka jawaab qaabkan JSON ah:
         }
 
         // Sync new user to WordPress so they can log into barbaarintasan.com
-        syncUserToWordPress(parent.email, parent.name, parent.phone || '', hashedPassword).catch(err => {
+        syncUserToWordPress(parent.email, parent.name, parent.phone || '', password).catch(err => {
           console.error('[WP-SYNC] Background user sync failed:', err);
         });
 
@@ -9037,6 +9037,77 @@ Return a JSON object with:
     }
   });
 
+  // ========== PROMO VIDEOS ROUTES ==========
+
+  app.get("/api/promo-videos", async (_req, res) => {
+    try {
+      const videos = await db.select().from(promoVideos).where(eq(promoVideos.isVisible, true)).orderBy(promoVideos.order);
+      res.json(videos);
+    } catch (error) {
+      console.error("Error fetching promo videos:", error);
+      res.status(500).json({ error: "Failed to fetch promo videos" });
+    }
+  });
+
+  app.get("/api/admin/promo-videos", requireAuth, async (_req, res) => {
+    try {
+      const videos = await db.select().from(promoVideos).orderBy(promoVideos.order);
+      res.json(videos);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch promo videos" });
+    }
+  });
+
+  app.post("/api/admin/promo-videos", requireAuth, async (req, res) => {
+    try {
+      const { title, description, videoUrl, thumbnailUrl } = req.body;
+      if (!title || !videoUrl) {
+        return res.status(400).json({ error: "Title and video URL are required" });
+      }
+      const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${promoVideos.order}), 0)` }).from(promoVideos);
+      const [video] = await db.insert(promoVideos).values({
+        title,
+        description: description || null,
+        videoUrl,
+        thumbnailUrl: thumbnailUrl || null,
+        order: (maxOrder[0]?.max || 0) + 1,
+      }).returning();
+      res.json(video);
+    } catch (error) {
+      console.error("Error creating promo video:", error);
+      res.status(500).json({ error: "Failed to create promo video" });
+    }
+  });
+
+  app.patch("/api/admin/promo-videos/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { title, description, videoUrl, thumbnailUrl, isVisible, order } = req.body;
+      const updates: any = {};
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (videoUrl !== undefined) updates.videoUrl = videoUrl;
+      if (thumbnailUrl !== undefined) updates.thumbnailUrl = thumbnailUrl;
+      if (isVisible !== undefined) updates.isVisible = isVisible;
+      if (order !== undefined) updates.order = order;
+      const [video] = await db.update(promoVideos).set(updates).where(eq(promoVideos.id, id)).returning();
+      if (!video) return res.status(404).json({ error: "Video not found" });
+      res.json(video);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update promo video" });
+    }
+  });
+
+  app.delete("/api/admin/promo-videos/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(promoVideos).where(eq(promoVideos.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete promo video" });
+    }
+  });
+
   // ========== HOMEPAGE SECTIONS ROUTES ==========
 
   // Public: Get visible homepage sections (ordered)
@@ -15712,7 +15783,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
   // Sync new user registrations from App → WordPress
   const WORDPRESS_SITE_URL = 'https://barbaarintasan.com';
   
-  async function syncUserToWordPress(email: string, name: string, phone: string, passwordHash: string) {
+  async function syncUserToWordPress(email: string, name: string, phone: string, password: string) {
     const apiKey = process.env.WORDPRESS_API_KEY;
     if (!apiKey) {
       console.log('[WP-SYNC] WORDPRESS_API_KEY not set - skipping sync');
@@ -15726,7 +15797,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
           'Content-Type': 'application/json',
           'X-API-Key': apiKey,
         },
-        body: JSON.stringify({ email, name, phone, password_hash: passwordHash }),
+        body: JSON.stringify({ email, name, phone, password, api_key: apiKey }),
       });
       
       const result = await response.json();

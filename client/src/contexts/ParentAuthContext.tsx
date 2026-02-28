@@ -48,7 +48,6 @@ export function ParentAuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json().catch(() => ({}));
         if (data.code === "SESSION_SUPERSEDED") {
           setParent(null);
-          console.log("[AUTH] Session superseded - another device logged in");
         }
       }
     } catch (error) {
@@ -115,7 +114,6 @@ export function ParentAuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json().catch(() => ({}));
         if (data.code === "SESSION_SUPERSEDED") {
           setParent(null);
-          console.log("[AUTH] Session superseded - another device logged in");
         }
       }
     } catch (error) {

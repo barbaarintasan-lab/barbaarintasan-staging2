@@ -104,7 +104,7 @@ const pageVariants = {
 const pageTransition = {
   type: "tween" as const,
   ease: "easeOut" as const,
-  duration: 0.15
+  duration: 0.08
 };
 
 function PullToRefresh() {

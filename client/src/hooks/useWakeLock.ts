@@ -10,10 +10,8 @@ export function useWakeLock(enabled: boolean) {
       try {
         if ("wakeLock" in navigator && enabled && isActive) {
           wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
-          console.log("[WakeLock] ✅ Screen will stay awake");
 
           wakeLockRef.current?.addEventListener("release", () => {
-            console.log("[WakeLock] Released by browser");
           });
         }
       } catch (err) {
@@ -38,7 +36,6 @@ export function useWakeLock(enabled: boolean) {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().catch(() => {});
         wakeLockRef.current = null;
-        console.log("[WakeLock] Released on cleanup");
       }
     };
   }, [enabled]);

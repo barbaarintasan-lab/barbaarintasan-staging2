@@ -95,7 +95,6 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
           document.addEventListener("touchstart", resumeAudio, { once: true });
         });
 
-        console.log(`[LiveKit] Audio track subscribed for ${participant.identity}`);
       }
     },
     []
@@ -111,7 +110,6 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
           audio.remove();
           audioElementsRef.current.delete(participant.identity);
         }
-        console.log(`[LiveKit] Audio track unsubscribed for ${participant.identity}`);
       }
     },
     []
@@ -125,14 +123,12 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
 
   const connect = useCallback(async () => {
     if (!userId || userId.startsWith('guest-')) {
-      console.log("[LiveKit] Skipping connect for unauthenticated/guest user");
       setConnectionError("Fadlan gal akoonkaaga si aad codka u maqlid");
       return;
     }
 
     try {
       setConnectionError(null);
-      console.log(`[LiveKit] Connecting to room ${roomId}...`);
 
       const response = await fetch("/api/livekit/token", {
         method: "POST",
@@ -160,7 +156,6 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
       });
 
       room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
-        console.log(`[LiveKit] Connection state: ${state}`);
         if (state === ConnectionState.Connected) {
           setIsConnected(true);
           setIsReconnecting(false);
@@ -177,13 +172,11 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-        console.log(`[LiveKit] Participant joined: ${participant.identity}`);
         updateParticipants();
         onParticipantJoined?.(participant.identity);
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-        console.log(`[LiveKit] Participant left: ${participant.identity}`);
         const audio = audioElementsRef.current.get(participant.identity);
         if (audio) {
           audio.srcObject = null;
@@ -204,10 +197,8 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
       if (canPub) {
         await room.localParticipant.setMicrophoneEnabled(false);
         setIsMuted(true);
-        console.log("[LiveKit] Microphone ready (muted by default)");
       }
 
-      console.log(`[LiveKit] Connected to ${roomName} with ${room.remoteParticipants.size} participants`);
     } catch (error: any) {
       console.error("[LiveKit] Connection error:", error);
       setConnectionError(error.message);
@@ -243,22 +234,18 @@ export function useLiveKitRoom(options: UseLiveKitRoomOptions) {
     try {
       await roomRef.current.localParticipant.setMicrophoneEnabled(!newMutedState);
       setIsMuted(newMutedState);
-      console.log(`[LiveKit] Microphone ${newMutedState ? "muted" : "unmuted"}`);
     } catch (error) {
       console.error("[LiveKit] Failed to toggle mute:", error);
     }
   }, [isMuted, canPublish]);
 
   const raiseHand = useCallback((raised: boolean) => {
-    console.log(`[LiveKit] Hand ${raised ? "raised" : "lowered"} (handled via HTTP API)`);
   }, []);
 
   const reconnect = useCallback(async () => {
     if (!userId || userId.startsWith('guest-')) {
-      console.log("[LiveKit] Skipping reconnect for unauthenticated/guest user");
       return;
     }
-    console.log("[LiveKit] Reconnecting to refresh permissions...");
     disconnect();
     await new Promise(resolve => setTimeout(resolve, 500));
     await connect();

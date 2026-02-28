@@ -31,7 +31,6 @@ interface UseUploadOptions {
  * function FileUploader() {
  *   const { uploadFile, isUploading, error } = useUpload({
  *     onSuccess: (response) => {
- *       console.log("Uploaded to:", response.objectPath);
  *     },
  *   });
  *
@@ -63,7 +62,6 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
-      console.log("[Upload] Requesting upload URL for:", file.name, file.size, file.type);
       
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
@@ -78,7 +76,6 @@ export function useUpload(options: UseUploadOptions = {}) {
         }),
       });
 
-      console.log("[Upload] Response status:", response.status);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -87,7 +84,6 @@ export function useUpload(options: UseUploadOptions = {}) {
       }
 
       const data = await response.json();
-      console.log("[Upload] Got upload URL successfully");
       return data;
     },
     []
@@ -98,7 +94,6 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const uploadToPresignedUrl = useCallback(
     async (file: File, uploadURL: string): Promise<void> => {
-      console.log("[Upload] Uploading file to presigned URL");
       
       const response = await fetch(uploadURL, {
         method: "PUT",
@@ -108,14 +103,12 @@ export function useUpload(options: UseUploadOptions = {}) {
         },
       });
 
-      console.log("[Upload] Upload response status:", response.status);
       
       if (!response.ok) {
         console.error("[Upload] Upload to storage failed:", response.status, response.statusText);
         throw new Error("Failed to upload file to storage");
       }
       
-      console.log("[Upload] File uploaded successfully");
     },
     []
   );
@@ -125,7 +118,6 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const directUpload = useCallback(
     async (file: File): Promise<UploadResponse | null> => {
-      console.log("[Upload] Trying direct upload for:", file.name);
       
       const formData = new FormData();
       formData.append("file", file);
@@ -136,7 +128,6 @@ export function useUpload(options: UseUploadOptions = {}) {
         body: formData,
       });
 
-      console.log("[Upload] Direct upload response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -145,7 +136,6 @@ export function useUpload(options: UseUploadOptions = {}) {
       }
 
       const data = await response.json();
-      console.log("[Upload] Direct upload success:", data.objectPath);
       return data;
     },
     []
@@ -169,7 +159,6 @@ export function useUpload(options: UseUploadOptions = {}) {
         
         if (isOnFlyIo) {
           // On Fly.io: Always use direct upload (base64) to avoid Object Storage issues
-          console.log("[Upload] On Fly.io - using direct upload");
           setProgress(30);
           const directResult = await directUpload(file);
           
@@ -193,7 +182,6 @@ export function useUpload(options: UseUploadOptions = {}) {
             options.onSuccess?.(uploadResponse);
             return uploadResponse;
           } catch (presignedError) {
-            console.log("[Upload] Presigned URL flow failed, trying direct upload:", presignedError);
             
             // Fallback to direct upload
             setProgress(30);
@@ -268,46 +256,10 @@ export function useUpload(options: UseUploadOptions = {}) {
     []
   );
 
-  /**
-   * Upload a file to Google Drive via the server API.
-   * Returns the web content link URL or null on failure.
-   */
-  const uploadToGoogleDrive = useCallback(
-    async (file: File): Promise<string | null> => {
-      setIsUploading(true);
-      setError(null);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await fetch("/api/uploads/google-drive", {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "Google Drive upload failed");
-        }
-        const data = await response.json();
-        return data.url || data.webContentLink || null;
-      } catch (err) {
-        const uploadError = err instanceof Error ? err : new Error("Upload failed");
-        setError(uploadError);
-        options.onError?.(uploadError);
-        return null;
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [options]
-  );
-
   return {
     uploadFile,
     getUploadParameters,
-    uploadToGoogleDrive,
     isUploading,
-    uploading: isUploading,
     error,
     progress,
   };

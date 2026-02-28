@@ -2176,6 +2176,21 @@ export const insertTranslationSchema = createInsertSchema(translations).omit({ i
 export type InsertTranslation = z.infer<typeof insertTranslationSchema>;
 export type Translation = typeof translations.$inferSelect;
 
+export const promoVideos = pgTable("promo_videos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoUrl: text("video_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  isVisible: boolean("is_visible").notNull().default(true),
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPromoVideoSchema = createInsertSchema(promoVideos).omit({ id: true, createdAt: true });
+export type InsertPromoVideo = z.infer<typeof insertPromoVideoSchema>;
+export type PromoVideo = typeof promoVideos.$inferSelect;
+
 export const ssoTokens = pgTable("sso_tokens", {
   id: serial("id").primaryKey(),
   token: text("token").notNull().unique(),

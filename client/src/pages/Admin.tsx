@@ -6318,7 +6318,6 @@ ${baseUrl}/maaweelo`;
                                                       setGeneratedVideoUrl(URL.createObjectURL(blob));
                                                       toast.success("Video waa la sameeyay!");
                                                     } else {
-                                                      console.log("[AI-VIDEO] Response structure:", JSON.stringify(statusData.response));
                                                       toast.error("Video-ga lama helin natiijada");
                                                     }
                                                   }

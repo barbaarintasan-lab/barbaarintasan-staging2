@@ -10,11 +10,9 @@ const lockOrientation = async () => {
       const orientation = window.screen.orientation;
       if ('lock' in orientation && typeof orientation.lock === 'function') {
         await orientation.lock('portrait');
-        console.log('[Orientation] Locked to portrait mode');
       }
     }
   } catch (error) {
-    console.log('[Orientation] Lock not supported or already locked:', error);
   }
 };
 
@@ -109,9 +107,7 @@ if (rootElement) {
     import('./SheekoApp').then(({ SheekoApp }) => {
       root.render(<SheekoApp />);
       hideSplash();
-    }).catch(err => {
-      console.error("Failed to load SheekoApp:", err);
-      // Fallback to main App if Sheeko fails
+    }).catch(() => {
       root.render(<App />);
       hideSplash();
     });
