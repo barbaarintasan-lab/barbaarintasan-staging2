@@ -984,21 +984,33 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const results: any = { dhambaal: null, sheeko: null };
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
+      const results: any = { dhambaal: null, sheeko: null, date: today };
 
-      try {
-        await generateAndSaveParentMessage();
-        results.dhambaal = "success";
-      } catch (e: any) {
-        results.dhambaal = e.message || "failed";
+      const existingDhambaal = await storage.getParentMessageByDate(today);
+      if (existingDhambaal) {
+        results.dhambaal = "already_exists";
+      } else {
+        try {
+          await generateAndSaveParentMessage();
+          const check = await storage.getParentMessageByDate(today);
+          results.dhambaal = check ? "generated" : "failed_to_save";
+        } catch (e: any) {
+          results.dhambaal = e.message || "failed";
+        }
       }
 
-      try {
-        const { generateDailyBedtimeStory } = await import("./bedtimeStories");
-        await generateDailyBedtimeStory();
-        results.sheeko = "success";
-      } catch (e: any) {
-        results.sheeko = e.message || "failed";
+      const existingStory = await storage.getTodayBedtimeStory();
+      if (existingStory) {
+        results.sheeko = "already_exists";
+      } else {
+        try {
+          const { generateDailyBedtimeStory } = await import("./bedtimeStories");
+          await generateDailyBedtimeStory();
+          results.sheeko = "generated";
+        } catch (e: any) {
+          results.sheeko = e.message || "failed";
+        }
       }
 
       res.json(results);
