@@ -976,6 +976,37 @@ ${todayStory?.titleSomali ? `📖 ${todayStory.titleSomali}` : ''}
     }
   });
 
+  // Internal: Trigger daily content generation via secret key
+  app.post("/api/internal/generate-daily", async (req, res) => {
+    try {
+      const apiKey = req.headers["x-api-key"] || req.body?.apiKey;
+      if (apiKey !== process.env.WORDPRESS_API_KEY) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const results: any = { dhambaal: null, sheeko: null };
+
+      try {
+        await generateAndSaveParentMessage();
+        results.dhambaal = "success";
+      } catch (e: any) {
+        results.dhambaal = e.message || "failed";
+      }
+
+      try {
+        const { generateDailyBedtimeStory } = await import("./bedtimeStories");
+        await generateDailyBedtimeStory();
+        results.sheeko = "success";
+      } catch (e: any) {
+        results.sheeko = e.message || "failed";
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin: Generate Dhambaalka Waalidka only
   app.post("/api/admin/generate-dhambaal", async (req, res) => {
     try {
