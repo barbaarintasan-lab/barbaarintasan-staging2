@@ -192,6 +192,10 @@ export function registerObjectStorageRoutes(app: Express): void {
         return res.status(400).json({ error: "Filename required" });
       }
 
+      if (!process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
       const objectFile = await objectStorageService.searchPublicObject(filename);
       if (!objectFile) {
         return res.status(404).json({ error: "File not found" });
@@ -199,7 +203,6 @@ export function registerObjectStorageRoutes(app: Express): void {
 
       await objectStorageService.downloadObject(objectFile, res, 3600, req);
     } catch (error) {
-      console.error("Error serving public file:", error);
       return res.status(500).json({ error: "Failed to serve file" });
     }
   });

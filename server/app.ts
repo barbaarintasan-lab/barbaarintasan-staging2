@@ -9,14 +9,6 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 
-// Memory usage monitoring - logs every 60 seconds
-setInterval(() => {
-  const m = process.memoryUsage();
-  console.log({
-    rss: Math.round(m.rss / 1024 / 1024) + 'MB',
-    heapUsed: Math.round(m.heapUsed / 1024 / 1024) + 'MB',
-  });
-}, 60000);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
