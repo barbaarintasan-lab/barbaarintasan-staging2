@@ -506,7 +506,7 @@ The image should:
           size: "1024x1024",
         });
 
-        const imageBase64 = response.data?.[0]?.b64_json;
+        const imageBase64 = response.data[0]?.b64_json;
         if (!imageBase64) {
           console.log(`[CRON] No image generated for ${word.somali}`);
           continue;
@@ -967,49 +967,30 @@ export function startCronJobs() {
 
   // Generate AI parenting tip every 3 hours from 6:00 AM to 9:00 PM East Africa Time
   // Runs at: 6:00 AM, 9:00 AM, 12:00 PM, 3:00 PM, 6:00 PM, 9:00 PM EAT
-  cron.schedule("0 6,9,12,15,18,21 * * *", async () => {
-    await generateAiParentingTip();
-  }, { timezone: "Africa/Nairobi" });
+  // DISABLED: OpenAI AI parenting tips (cost savings - manual content now)
+  // cron.schedule("0 6,9,12,15,18,21 * * *", async () => {
+  //   await generateAiParentingTip();
+  // }, { timezone: "Africa/Nairobi" });
 
-  // Generate AI flashcard images daily at 7:00 AM
-  cron.schedule("0 7 * * *", async () => {
-    await generateAiFlashcards();
-  });
+  // DISABLED: OpenAI AI flashcard generation (cost savings)
+  // cron.schedule("0 7 * * *", async () => {
+  //   await generateAiFlashcards();
+  // });
 
-  // Generate daily parent message (Dhambaalka Waalidka) at 8:00 AM East Africa Time
-  cron.schedule("0 8 * * *", async () => {
-    console.log("[CRON] Generating daily parent message (Dhambaalka Waalidka)...");
-    try {
-      await generateAndSaveParentMessage();
-      console.log("[CRON] Daily parent message generated successfully");
-    } catch (error) {
-      console.error("[CRON] Failed to generate daily parent message:", error);
-    }
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI daily parent message auto-generation (manual content now)
+  // cron.schedule("0 8 * * *", async () => {
+  //   await generateAndSaveParentMessage();
+  // }, { timezone: "Africa/Mogadishu" });
 
-  // Generate daily bedtime story at 8:00 AM East Africa Time (same time as parent message)
-  cron.schedule("0 8 * * *", async () => {
-    console.log("[CRON] Generating daily bedtime story...");
-    try {
-      await generateDailyBedtimeStory();
-      console.log("[CRON] Daily bedtime story generated successfully");
-    } catch (error) {
-      console.error("[CRON] Failed to generate daily bedtime story:", error);
-    }
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI daily bedtime story auto-generation (manual content now)
+  // cron.schedule("0 8 * * *", async () => {
+  //   await generateDailyBedtimeStory();
+  // }, { timezone: "Africa/Mogadishu" });
 
-  // Generate daily parent tips for one random stage at 7:30 AM East Africa Time
-  cron.schedule("30 7 * * *", async () => {
-    console.log("[CRON] Generating daily parent tip...");
-    try {
-      const stages = ["newborn-0-3m", "infant-3-6m", "infant-6-12m", "toddler-1-2y", "toddler-2-3y", "preschool-3-5y", "school-age-5-7y"];
-      const randomStage = stages[Math.floor(Math.random() * stages.length)];
-      await generateAndSaveParentTip(randomStage);
-      console.log(`[CRON] Daily parent tip generated successfully for ${randomStage}`);
-    } catch (error) {
-      console.error("[CRON] Failed to generate daily parent tip:", error);
-    }
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI daily parent tips auto-generation (cost savings)
+  // cron.schedule("30 7 * * *", async () => {
+  //   await generateAndSaveParentTip(randomStage);
+  // }, { timezone: "Africa/Mogadishu" });
 
   // Send bedtime story notification at 6:00 PM East Africa Time
   cron.schedule("0 18 * * *", async () => {
@@ -1023,30 +1004,18 @@ export function startCronJobs() {
     await sendInactiveParentNotifications();
   });
 
-  // Run OpenAI Batch API worker every night at 2:00 AM East Africa Time
-  cron.schedule("0 2 * * *", async () => {
-    console.log("[CRON] Running OpenAI Batch API worker for bulk translations and content generation...");
-    try {
-      await runBatchWorker();
-      console.log("[CRON] Batch API worker completed successfully");
-    } catch (error) {
-      console.error("[CRON] Failed to run batch API worker:", error);
-    }
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI Batch API worker (cost savings - translations paused)
+  // cron.schedule("0 2 * * *", async () => {
+  //   await runBatchWorker();
+  // }, { timezone: "Africa/Mogadishu" });
 
-  // Check batch job status every hour
-  cron.schedule("30 * * * *", async () => {
-    console.log("[CRON] Checking OpenAI Batch API job status...");
-    try {
-      await checkAllBatchJobsStatus();
-      console.log("[CRON] Batch API status check completed");
-    } catch (error) {
-      console.error("[CRON] Failed to check batch API status:", error);
-    }
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI Batch API status check (cost savings)
+  // cron.schedule("30 * * * *", async () => {
+  //   await checkAllBatchJobsStatus();
+  // }, { timezone: "Africa/Mogadishu" });
 
   console.log(
-    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, AI tips every 3h (6AM-9PM EAT), flashcards 7AM, parent message 8AM, bedtime story 8AM EAT, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h, batch worker 2AM EAT, batch status check hourly)",
+    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h) | DISABLED: AI tips, flashcards, parent message, bedtime story, batch worker, batch status",
   );
 
   setTimeout(async () => {
@@ -1055,44 +1024,19 @@ export function startCronJobs() {
     await expireSubscriptions();
   }, 10000);
 
-  // Check for missed daily content on startup (catches days where cron didn't fire)
+  // DISABLED: Auto-generation on startup - content is now created manually by admin
   setTimeout(async () => {
-    console.log("[CRON] Checking for missed daily content on startup...");
-    try {
-      const today = new Date();
-      const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' }); // YYYY-MM-DD Somalia time
-
-      // Check if today's Dhambaal exists
-      const todayDhambaal = await storage.getTodayParentMessage();
-      if (!todayDhambaal) {
-        console.log(`[CRON] No Dhambaal found for today (${todayStr}), generating now...`);
-        try {
-          await generateAndSaveParentMessage();
-          console.log("[CRON] Missed Dhambaal generated successfully on startup");
-        } catch (err) {
-          console.error("[CRON] Failed to generate missed Dhambaal on startup:", err);
-        }
-      } else {
-        console.log(`[CRON] Today's Dhambaal already exists: "${todayDhambaal.title}"`);
-      }
-
-      // Check if today's bedtime story exists
-      const todayStory = await storage.getTodayBedtimeStory();
-      if (!todayStory) {
-        console.log(`[CRON] No bedtime story found for today (${todayStr}), generating now...`);
-        try {
-          await generateDailyBedtimeStory();
-          console.log("[CRON] Missed bedtime story generated successfully on startup");
-        } catch (err) {
-          console.error("[CRON] Failed to generate missed bedtime story on startup:", err);
-        }
-      } else {
-        console.log(`[CRON] Today's bedtime story already exists: "${todayStory.titleSomali}"`);
-      }
-    } catch (error) {
-      console.error("[CRON] Error checking for missed daily content:", error);
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
+    const todayDhambaal = await storage.getTodayParentMessage();
+    const todayStory = await storage.getTodayBedtimeStory();
+    if (!todayDhambaal) {
+      console.log(`[CRON] Xusuusin: Maanta (${todayStr}) Dhambaal cusub lama abuurin - Admin panel-ka ka samee`);
     }
-  }, 15000); // Wait 15 seconds after startup to allow DB connections to settle
+    if (!todayStory) {
+      console.log(`[CRON] Xusuusin: Maanta (${todayStr}) Sheeko cusub lama abuurin - Admin panel-ka ka samee`);
+    }
+  }, 15000);
 }
 
 // AI Lesson Settings - stored in JSON file

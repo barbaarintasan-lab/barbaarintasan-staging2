@@ -141,7 +141,7 @@ Ka jawaab qaabkan JSON ah:
       }
     ],
     temperature: 0.8,
-    max_tokens: 2048,
+    max_tokens: 4096,
     response_format: { type: "json_object" }
   });
 
@@ -372,14 +372,21 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 
     try {
       console.log(`[Bedtime Stories] Generating audio (Ubax voice)...`);
-      const audioUrl = await generateBedtimeStoryAudio(newStory.content, newStory.moralLesson, newStory.id);
+      const { generateAndUploadAudio } = await import("./tts");
+      const audioUrl = await generateAndUploadAudio(
+        newStory.content,
+        `maaweelo-${newStory.id}`,
+        "tts-audio/maaweelada",
+        { azureVoice: "so-SO-UbaxNeural" },
+        'maaweelo'
+      );
       await storage.updateBedtimeStory(newStory.id, { audioUrl });
-      console.log(`[Bedtime Stories] Audio generated and saved`);
+      console.log(`[Bedtime Stories] Audio generated and saved to R2: ${audioUrl}`);
     } catch (audioError) {
       console.error(`[Bedtime Stories] Audio generation failed (story saved without audio):`, audioError);
     }
     
-    // Backup to Google Drive
+    /* Google Drive backup disabled as per user request
     try {
       await saveMaaweelToGoogleDrive(
         storyText.titleSomali,
@@ -392,6 +399,7 @@ export async function generateDailyBedtimeStory(): Promise<void> {
     } catch (driveError) {
       console.error(`[Bedtime Stories] Google Drive backup failed:`, driveError);
     }
+    */
   } catch (error: any) {
     if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('duplicate')) {
       console.log(`[Bedtime Stories] Story already exists for ${today} (caught duplicate insert)`);
@@ -404,11 +412,12 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 
 // Cache for admin bedtime stories (module-level for clearing)
 let bedtimeStoriesCache: { data: any[]; timestamp: number } | null = null;
-const STORIES_CACHE_TTL = 30000; // 30 seconds
+const STORIES_CACHE_TTL = 30000;
+const todayStoryCache = new Map<string, { data: any; expiry: number }>();
 
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
-  console.log("[Bedtime Stories] Cache cleared");
+  todayStoryCache.clear();
 }
 
 async function applyTranslationsToStories<T extends Record<string, any> & { id: string }>(
@@ -440,13 +449,13 @@ async function applyTranslationsToStories<T extends Record<string, any> & { id: 
 
   return stories.map(story => {
     const storyTranslations = translationsByStory.get(story.id) || [];
-    const translated: Record<string, any> = { ...story };
+    const translated = { ...story };
     for (const t of storyTranslations) {
       if (['title', 'content', 'moralLesson'].includes(t.fieldName)) {
         translated[t.fieldName] = t.translatedText;
       }
     }
-    return translated as typeof story;
+    return translated;
   });
 }
 
@@ -483,12 +492,19 @@ export function registerBedtimeStoryRoutes(app: Express): void {
   app.get("/api/bedtime-stories/today", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;
+      const cacheKey = `bs-today-${lang || 'so'}`;
+      const cached = todayStoryCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiry) {
+        return res.json(cached.data);
+      }
       let story = await storage.getTodayBedtimeStory();
       if (!story) {
         return res.status(404).json({ error: "No story available for today" });
       }
       const translated = await applyTranslationsToStories([story], lang);
-      res.json(translated[0]);
+      const result = translated[0];
+      todayStoryCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching today's story:", error);
       res.status(500).json({ error: "Failed to fetch story" });
