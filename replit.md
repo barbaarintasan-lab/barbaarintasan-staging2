@@ -19,6 +19,9 @@ A subscription-based access model offers monthly and yearly plans with manual up
 ### Learning & Engagement Features
 The platform includes a Duolingo-style daily streak system for lesson completion, downloadable PDF certificates, and dynamic management of 14 homepage sections by admins.
 
+### Weekly Drip-Release System
+Courses "Koorsada Ilmo Is-Dabira" and "0-6 Bilood Jir" use a drip-release system: enrolled users get 2 lessons unlocked per week starting from their enrollment start date. Previously completed lessons remain accessible regardless of drip schedule. The system uses `dripEnabled` and `dripLessonsPerWeek` fields on the `courses` table, and `firstLessonAt` on the `enrollments` table. Users click "Bilow Koorsada" to start the drip clock. API endpoints: `GET /api/course/:courseId/drip-status` and `POST /api/enrollments/:id/start`.
+
 ### BSAv.1 Sheeko (Voice Spaces)
 This feature provides Clubhouse/Twitter Spaces-like voice chat using LiveKit SFU for scalable audio and WebSockets for real-time events. Rooms can be scheduled, live, or ended, supporting roles like Listener, Speaker, Co-host, and Host. Features include hand-raising, one-tap session recording (to Google Drive), and moderation tools. AI content moderation via OpenAI flags harmful chat messages, with culturally sensitive analysis and admin review.
 

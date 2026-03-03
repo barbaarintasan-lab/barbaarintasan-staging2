@@ -33,8 +33,9 @@ export const courses = pgTable("courses", {
   ageRange: text("age_range"), // "0-6", "6-12", "1-2", "2-4", "4-6", "all" or null for special courses
   // Content readiness - controls whether enrolled parents can access course content
   contentReady: boolean("content_ready").notNull().default(false), // Admin sets true when content is uploaded
-  // Custom coming soon message for popup
   comingSoonMessage: text("coming_soon_message"),
+  dripEnabled: boolean("drip_enabled").notNull().default(false),
+  dripLessonsPerWeek: integer("drip_lessons_per_week").notNull().default(2),
 });
 
 // Modules table (sections within a course)

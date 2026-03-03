@@ -801,7 +801,7 @@ export default function Admin() {
   const [paidParentFilter, setPaidParentFilter] = useState<string | null>(null);
   const [selectedParentForEnrollment, setSelectedParentForEnrollment] = useState<string | null>(null);
   const [enrollmentCourseId, setEnrollmentCourseId] = useState("");
-  const [enrollmentPlanType, setEnrollmentPlanType] = useState("lifetime");
+  const [enrollmentPlanType, setEnrollmentPlanType] = useState("monthly");
   const [parentToDelete, setParentToDelete] = useState<Parent | null>(null);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number } | null>(null);
@@ -8958,9 +8958,9 @@ ${baseUrl}/maaweelo`;
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent className="z-[9999]">
-                                            <SelectItem value="lifetime">Nolosha oo dhan</SelectItem>
-                                            <SelectItem value="monthly">Bil ($15)</SelectItem>
-                                            <SelectItem value="yearly">Sannad ($114)</SelectItem>
+                                            <SelectItem value="monthly">Bil (1 bil)</SelectItem>
+                                            <SelectItem value="6-month">6 Bilood</SelectItem>
+                                            <SelectItem value="yearly">Sannad (12 bilood)</SelectItem>
                                           </SelectContent>
                                         </Select>
                                         <div className="flex gap-2">

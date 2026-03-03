@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { openSSOLink } from "@/lib/api";
-import { PlayCircle, FileText, HelpCircle, ChevronLeft, ChevronDown, ChevronUp, Lock, CheckCircle, Video, ClipboardList, Calendar, Loader2, Star, Download, Users, ChevronRight } from "lucide-react";
+import { PlayCircle, FileText, HelpCircle, ChevronLeft, ChevronDown, ChevronUp, Lock, CheckCircle, Video, ClipboardList, Calendar, Loader2, Star, Download, Users, ChevronRight, Clock, Rocket } from "lucide-react";
 import CourseMindMap from "@/components/CourseMindMap";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useRoute, useLocation } from "wouter";
@@ -98,6 +98,32 @@ export default function CourseDetail() {
   });
 
   const hasAccess = accessInfo?.hasAccess === true;
+
+  const { data: dripStatus } = useQuery({
+    queryKey: ["dripStatus", course?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/course/${course.id}/drip-status`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!course?.id && isLoggedIn,
+  });
+
+  const startCourseMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const res = await fetch(`/api/enrollments/${enrollmentId}/start`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to start");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dripStatus", course?.id] });
+      queryClient.invalidateQueries({ queryKey: ["courseAccess", course?.id] });
+      toast.success("Koorsada waa la bilaabay! 2 cashar ayaa kuu furan.");
+    },
+  });
 
   const { data: lessonProgress = [] } = useQuery({
     queryKey: ["lessonProgress", course?.id],
@@ -337,11 +363,51 @@ export default function CourseDetail() {
       {hasAccess && (
         <section className="px-4 py-6 bg-green-500">
           <div className="max-w-md mx-auto text-center">
-            <div className="inline-flex items-center gap-3 bg-white/20 rounded-full px-6 py-3 mb-3">
-              <CheckCircle className="w-6 h-6 text-white" />
-              <span className="text-white font-bold text-lg">{t("courseDetail.courseOpen")}</span>
-            </div>
-            <p className="text-green-100 text-sm">{t("courseDetail.clickToStart")}</p>
+            {dripStatus?.dripEnabled && !dripStatus?.started ? (
+              <>
+                <div className="inline-flex items-center gap-3 bg-white/20 rounded-full px-6 py-3 mb-3">
+                  <Rocket className="w-6 h-6 text-white" />
+                  <span className="text-white font-bold text-lg">Koorsadaada waa diyaar!</span>
+                </div>
+                <p className="text-green-100 text-sm mb-4">Riix badhanka hoose si aad casharada u bilowdo</p>
+                <Button
+                  onClick={() => {
+                    if (accessInfo?.enrollment?.id) {
+                      startCourseMutation.mutate(accessInfo.enrollment.id);
+                    }
+                  }}
+                  disabled={startCourseMutation.isPending}
+                  className="bg-white text-green-600 hover:bg-green-50 font-bold px-8 py-3 rounded-xl text-lg shadow-lg"
+                  data-testid="button-start-course"
+                >
+                  {startCourseMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  ) : (
+                    <Rocket className="w-5 h-5 mr-2" />
+                  )}
+                  Bilow Koorsada
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="inline-flex items-center gap-3 bg-white/20 rounded-full px-6 py-3 mb-3">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                  <span className="text-white font-bold text-lg">{t("courseDetail.courseOpen")}</span>
+                </div>
+                <p className="text-green-100 text-sm">{t("courseDetail.clickToStart")}</p>
+                {dripStatus?.dripEnabled && dripStatus?.started && (
+                  <div className="mt-3 bg-white/20 rounded-xl p-3 text-white">
+                    <p className="font-semibold text-sm">Cashar {dripStatus.totalUnlocked}/{dripStatus.totalLessons} ayaa furan</p>
+                    {dripStatus.nextUnlockDate && dripStatus.daysUntilNextUnlock > 0 && (
+                      <p className="text-green-100 text-xs mt-1 flex items-center justify-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {dripStatus.daysUntilNextUnlock} maalmood ka dib {dripStatus.lessonsPerWeek} cashar cusub ayaa furmi doona
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
             
             {/* Offline Download Button */}
             {course && lessons.length > 0 && (
@@ -524,25 +590,22 @@ export default function CourseDetail() {
                         const isQuizItem = lesson.type === "quiz";
                         const isAssignmentItem = lesson.type === "assignment";
                         
-                        const LIVE_COURSE_IDS = [
-                          '02eec0ad-c335-4756-9b94-861117bfb058',
-                          'fde44d06-e012-4eab-867f-59d52e312453'
-                        ];
-                        const UNLOCK_DATE = new Date('2026-02-07T00:00:00');
-                        const isLiveCourse = LIVE_COURSE_IDS.includes(course?.id || '');
-                        const lessonOrder = typeof lesson.order === 'number' ? lesson.order : 999;
-                        const isTimeLocked = isLiveCourse && lessonOrder >= 20 && new Date() < UNLOCK_DATE;
-                        
                         const isFreeTrial = lesson.isFree === true || lessonNumber <= 5;
                         
-                        const isLessonAccessible = (hasAccess && !isTimeLocked) || isFreeTrial;
+                        const isDripLocked = dripStatus?.dripEnabled && dripStatus?.started && !dripStatus.unlockedLessonIds?.includes(lesson.id) && !isFreeTrial;
+                        const isDripNotStarted = dripStatus?.dripEnabled && !dripStatus?.started && !isFreeTrial;
+                        
+                        const isLessonAccessible = (hasAccess && !isDripLocked && !isDripNotStarted) || isFreeTrial;
                         
                         const isLessonDone = lessonProgress.some((p: any) => p.lessonId === lesson.id && p.completed);
                         
                         const handleLessonClick = (e: React.MouseEvent) => {
-                          if (isTimeLocked && hasAccess) {
+                          if (isDripLocked && hasAccess) {
                             e.preventDefault();
-                            toast.info("Casharkaan wuxuu furmi doonaa 7.2.2026", { duration: 3000 });
+                            toast.info(`Casharkani wuxuu furmayaa ${dripStatus?.daysUntilNextUnlock || 0} maalmood ka dib`, { duration: 3000 });
+                          } else if (isDripNotStarted && hasAccess) {
+                            e.preventDefault();
+                            toast.info('Fadlan riix "Bilow Koorsada" si aad casharada u bilowdo', { duration: 3000 });
                           } else if (!hasAccess && !isFreeTrial) {
                             e.preventDefault();
                             toast.info("Si aad casharada oo dhan u aragto, booqo barbaarintasan.com", { duration: 5000 });
@@ -552,7 +615,7 @@ export default function CourseDetail() {
                         return (
                         <Link key={lesson.id} href={isLessonAccessible ? linkPath : '#'} onClick={handleLessonClick}>
                           <div 
-                            className={`px-6 py-4 flex items-center gap-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer ${isLessonDone ? 'bg-green-50' : isQuizItem ? 'bg-purple-50' : isAssignmentItem ? 'bg-orange-50' : 'bg-white'} ${isTimeLocked && hasAccess ? 'opacity-60' : ''}`}
+                            className={`px-6 py-4 flex items-center gap-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer ${isLessonDone ? 'bg-green-50' : isQuizItem ? 'bg-purple-50' : isAssignmentItem ? 'bg-orange-50' : 'bg-white'} ${isDripLocked && hasAccess ? 'opacity-60' : ''}`}
                             data-testid={`lesson-${lesson.id}`}
                           >
                             <span className={`w-7 h-7 rounded-full ${isLessonDone ? 'bg-green-500 text-white' : isQuizItem ? 'bg-purple-100 text-purple-600' : isAssignmentItem ? 'bg-orange-100 text-orange-600' : 'bg-white border-2 border-gray-300 text-gray-600'} text-sm font-bold flex items-center justify-center flex-shrink-0`}>
@@ -576,9 +639,15 @@ export default function CourseDetail() {
                                     ✨ Tijaabi oo Arag
                                   </span>
                                 )}
-                                {isTimeLocked && hasAccess && (
-                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
-                                    Furmi: 7.2.2026
+                                {isDripLocked && hasAccess && (
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Todobaadka xiga
+                                  </span>
+                                )}
+                                {isDripNotStarted && hasAccess && (
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                    Bilow Koorsada
                                   </span>
                                 )}
                               </div>
@@ -591,7 +660,7 @@ export default function CourseDetail() {
                               <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                             ) : isLessonAccessible ? (
                               <PlayCircle className={`w-5 h-5 ${isQuizItem ? 'text-purple-500' : 'text-green-500'} flex-shrink-0`} />
-                            ) : isTimeLocked && hasAccess ? (
+                            ) : isDripLocked && hasAccess ? (
                               <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
                             ) : (
                               <Lock className="w-4 h-4 text-gray-300 flex-shrink-0" />

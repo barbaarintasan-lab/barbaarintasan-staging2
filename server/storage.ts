@@ -111,6 +111,8 @@ export interface IStorage {
   checkLessonUnlocked(parentId: string, lesson: Lesson): Promise<{ unlocked: boolean; reason?: string; unlockDate?: string }>;
   checkPreviousLessonCompleted(parentId: string, lesson: Lesson): Promise<{ canAccess: boolean; previousLessonId?: string; previousLessonTitle?: string }>;
   getAllLessonProgress(parentId: string, courseId: string): Promise<LessonProgress[]>;
+  getDripStatus(parentId: string, courseId: string): Promise<{ dripEnabled: boolean; lessonsPerWeek: number; totalUnlocked: number; totalLessons: number; nextUnlockDate: string | null; daysUntilNextUnlock: number; unlockedLessonIds: string[]; started: boolean }>;
+  startCourseEnrollment(enrollmentId: string): Promise<void>;
 
   // Testimonial operations
   getPublishedTestimonials(): Promise<Testimonial[]>;
@@ -1550,9 +1552,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async checkLessonUnlocked(parentId: string, lesson: Lesson): Promise<{ unlocked: boolean; reason?: string; unlockDate?: string }> {
-    // Admin bypass - admins can access all lessons without restrictions
     const parent = await this.getParent(parentId);
     if (parent?.isAdmin) {
+      return { unlocked: true };
+    }
+
+    const course = await db.select().from(courses).where(eq(courses.id, lesson.courseId)).then(r => r[0]);
+    if (course?.dripEnabled) {
+      const dripStatus = await this.getDripStatus(parentId, lesson.courseId);
+      if (!dripStatus.started) {
+        return { unlocked: false, reason: 'Fadlan riix "Bilow Koorsada" si aad casharada u bilowdo' };
+      }
+      if (!dripStatus.unlockedLessonIds.includes(lesson.id)) {
+        return {
+          unlocked: false,
+          reason: `Casharkani wuxuu furmayaa ${dripStatus.nextUnlockDate || 'dhowaan'}. ${dripStatus.daysUntilNextUnlock} maalmood ayaa ku hadhay.`,
+          unlockDate: dripStatus.nextUnlockDate || undefined,
+        };
+      }
       return { unlocked: true };
     }
     
@@ -1667,6 +1684,82 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { unlocked: true };
+  }
+
+  async getDripStatus(parentId: string, courseId: string): Promise<{ dripEnabled: boolean; lessonsPerWeek: number; totalUnlocked: number; totalLessons: number; nextUnlockDate: string | null; daysUntilNextUnlock: number; unlockedLessonIds: string[]; started: boolean }> {
+    const course = await db.select().from(courses).where(eq(courses.id, courseId)).then(r => r[0]);
+    if (!course || !course.dripEnabled) {
+      const allLessons = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.courseId, courseId));
+      return { dripEnabled: false, lessonsPerWeek: 0, totalUnlocked: allLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: allLessons.map(l => l.id), started: true };
+    }
+
+    let enrollment = await db.select().from(enrollments)
+      .where(and(eq(enrollments.parentId, parentId), eq(enrollments.courseId, courseId), eq(enrollments.status, 'active')))
+      .then(r => r[0]);
+
+    if (!enrollment) {
+      const allAccessCourse = await this.getCourseByCourseId("all-access");
+      if (allAccessCourse) {
+        enrollment = await db.select().from(enrollments)
+          .where(and(eq(enrollments.parentId, parentId), eq(enrollments.courseId, allAccessCourse.id), eq(enrollments.status, 'active')))
+          .then(r => r[0]);
+      }
+    }
+
+    const allLessons = await db.select().from(lessons)
+      .where(eq(lessons.courseId, courseId))
+      .orderBy(asc(lessons.order));
+
+    if (!enrollment) {
+      const freeLessons = allLessons.filter((_, i) => i < 5);
+      return { dripEnabled: true, lessonsPerWeek: course.dripLessonsPerWeek, totalUnlocked: freeLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: freeLessons.map(l => l.id), started: false };
+    }
+
+    const startDate = enrollment.firstLessonAt || enrollment.accessStart;
+    if (!startDate) {
+      const freeLessons = allLessons.filter((_, i) => i < 5);
+      return { dripEnabled: true, lessonsPerWeek: course.dripLessonsPerWeek, totalUnlocked: freeLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: freeLessons.map(l => l.id), started: false };
+    }
+
+    const now = new Date();
+    const msElapsed = now.getTime() - new Date(startDate).getTime();
+    const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);
+    const weeksElapsed = Math.floor(daysElapsed / 7);
+    const maxUnlockedIndex = (weeksElapsed + 1) * course.dripLessonsPerWeek;
+
+    const completedProgress = await db.select({ lessonId: lessonProgress.lessonId }).from(lessonProgress)
+      .where(and(eq(lessonProgress.parentId, parentId), eq(lessonProgress.courseId, courseId), eq(lessonProgress.completed, true)));
+    const completedLessonIds = new Set(completedProgress.map(p => p.lessonId));
+
+    const unlockedLessonIds: string[] = [];
+    for (let i = 0; i < allLessons.length; i++) {
+      if (i < maxUnlockedIndex || completedLessonIds.has(allLessons[i].id)) {
+        unlockedLessonIds.push(allLessons[i].id);
+      }
+    }
+
+    const nextWeekStart = new Date(startDate);
+    nextWeekStart.setDate(nextWeekStart.getDate() + (weeksElapsed + 1) * 7);
+    const daysUntilNextUnlock = Math.max(0, Math.ceil((nextWeekStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const nextUnlockDate = maxUnlockedIndex >= allLessons.length ? null : nextWeekStart.toISOString().split('T')[0];
+
+    return {
+      dripEnabled: true,
+      lessonsPerWeek: course.dripLessonsPerWeek,
+      totalUnlocked: unlockedLessonIds.length,
+      totalLessons: allLessons.length,
+      nextUnlockDate,
+      daysUntilNextUnlock,
+      unlockedLessonIds,
+      started: true,
+    };
+  }
+
+  async startCourseEnrollment(enrollmentId: string): Promise<void> {
+    const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, enrollmentId));
+    if (enrollment && !enrollment.firstLessonAt) {
+      await db.update(enrollments).set({ firstLessonAt: new Date() }).where(eq(enrollments.id, enrollmentId));
+    }
   }
 
   async checkPreviousLessonCompleted(parentId: string, lesson: Lesson): Promise<{ canAccess: boolean; previousLessonId?: string; previousLessonTitle?: string }> {

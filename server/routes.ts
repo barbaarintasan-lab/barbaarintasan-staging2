@@ -5147,6 +5147,32 @@ Ka jawaab qaabkan JSON ah:
     }
   });
 
+  app.get("/api/course/:courseId/drip-status", requireParentAuth, async (req, res) => {
+    const { courseId } = req.params;
+    try {
+      const status = await storage.getDripStatus(req.session.parentId!, courseId);
+      res.json(status);
+    } catch (error) {
+      console.error("Error checking drip status:", error);
+      res.status(500).json({ error: "Failed to check drip status" });
+    }
+  });
+
+  app.post("/api/enrollments/:id/start", requireParentAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const enrollment = await storage.getEnrollment(id);
+      if (!enrollment || enrollment.parentId !== req.session.parentId) {
+        return res.status(404).json({ error: "Enrollment not found" });
+      }
+      await storage.startCourseEnrollment(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error starting enrollment:", error);
+      res.status(500).json({ error: "Failed to start enrollment" });
+    }
+  });
+
   // Course routes
   app.get("/api/courses", async (req, res) => {
     try {
@@ -8622,11 +8648,26 @@ Return a JSON object with:
         return res.status(400).json({ error: "Parent already has active enrollment for this course" });
       }
 
+      let computedAccessEnd: Date | null = accessEnd ? new Date(accessEnd) : null;
+      if (!computedAccessEnd) {
+        const now = new Date();
+        if (planType === "monthly") {
+          computedAccessEnd = new Date(now);
+          computedAccessEnd.setMonth(computedAccessEnd.getMonth() + 1);
+        } else if (planType === "6-month" || planType === "6month") {
+          computedAccessEnd = new Date(now);
+          computedAccessEnd.setMonth(computedAccessEnd.getMonth() + 6);
+        } else if (planType === "yearly") {
+          computedAccessEnd = new Date(now);
+          computedAccessEnd.setFullYear(computedAccessEnd.getFullYear() + 1);
+        }
+      }
+
       const enrollment = await storage.createEnrollment({
         parentId,
         courseId,
         planType,
-        accessEnd: accessEnd ? new Date(accessEnd) : null,
+        accessEnd: computedAccessEnd,
         status: "active",
         customerPhone: parent.phone || "",
       });
