@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BarbaarintaSan</string>
+    <string name="title_activity_main">BarbaarintaSan</string>
+    <string name="package_name">com.barbaarintasan.app</string>
+    <string name="custom_url_scheme">com.barbaarintasan.app</string>
+</resources>
