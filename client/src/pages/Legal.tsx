@@ -284,9 +284,11 @@ export default function Legal() {
           </CardContent>
         </Card>
         
-        <div className="mt-6 text-center text-xs text-gray-500">
+        <div className="mt-6 text-center text-xs text-gray-500 space-y-1">
           <p>© 2026 Barbaarintasan Academy. All rights reserved.</p>
-          <p className="mt-1">EU-registered nonprofit organization</p>
+          <p>EU-registered nonprofit organization</p>
+          <p>App Name: Barbaarintasan (EN) / Barbaarintasan (SO)</p>
+          <p>Developer: Musse Said Aw-Musse (EN & SO)</p>
         </div>
       </div>
     </div>
