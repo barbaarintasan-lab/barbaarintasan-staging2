@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
             <div className="space-y-6 text-gray-800 leading-relaxed">
               <section>
                 <h3 className="font-bold text-lg border-b border-gray-100 pb-1 mb-2 text-gray-900">1. Data Controller</h3>
-                <p>This application is operated by an EU-based nonprofit organization, which acts as the Data Controller in accordance with the General Data Protection Regulation (GDPR).</p>
+                <p>This application is operated by Barbaarintasan Academy (Legal name: Musse Said Aw-Musse), an EU-registered nonprofit organization, acting as the Data Controller under GDPR.</p>
               </section>
 
               <section>
@@ -102,7 +102,7 @@ export default function PrivacyPolicy() {
             <div className="space-y-6 text-gray-800 leading-relaxed">
               <section>
                 <h3 className="font-bold text-lg border-b border-gray-100 pb-1 mb-2 text-gray-900">1. Xog-haye (Data Controller)</h3>
-                <p>App-kan waxaa maamula hay’ad aan faa’iido doon ahayn oo ka diiwaangashan Midowga Yurub (EU), taas oo ah xog-hayaha masuulka ka ah xogta sida uu qabo xeerka GDPR.</p>
+                <p>App-kan waxaa maamula Barbaarintasan Academy (Legal name: Musse Said Aw-Musse), hay’ad EU ku diiwaangashan, taas oo ah xog-hayaha masuulka ka ah xogta sida uu qabo GDPR.</p>
               </section>
 
               <section>
@@ -140,9 +140,8 @@ export default function PrivacyPolicy() {
               <section>
                 <h3 className="font-bold text-lg border-b border-gray-100 pb-1 mb-2 text-gray-900">5. Ilaalinta iyo Kaydinta Xogta</h3>
                 <ul className="list-disc pl-5 space-y-2 mt-2">
-                  <li>Waxaan raacnaa mabda’a xaddidaadda xogta (data minimization)</li>
-                  <li>Xogta waxaa lagu kaydiyaa si ammaan ah</li>
-                  <li>Xogta waxaa la hayaa kaliya muddada loo baahan yahay ama sida uu sharcigu qabo</li>
+                  <li>Waxaan raacnaa mabda’a xaddidaadda xogta (data minimization) iyo amniga farsamo iyo mid urureed</li>
+                  <li>Xogta waxaa lagu hayaa inta loo baahan yahay ama sida uu sharcigu qabo</li>
                   <li>Ma iibinno mana ganacsanno xogta shakhsiga ah</li>
                 </ul>
               </section>
@@ -162,15 +161,17 @@ export default function PrivacyPolicy() {
 
               <section>
                 <h3 className="font-bold text-lg border-b border-gray-100 pb-1 mb-2 text-gray-900">7. Asturnaanta Carruurta</h3>
-                <p>App-kan looguma talagelin carruurta. Ma ururinno xog carruur, akoon kasta oo lagu tuhmo ilmo si degdeg ah ayaa looga saarayaa.</p>
+                <p>App-kan looguma talagelin carruurta. Akoon kasta oo ilmo lagu tuhmo si degdeg ah ayaa looga saarayaa.</p>
               </section>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t flex flex-wrap justify-center gap-6 text-sm">
-          <Link href="/terms" className="text-indigo-600 font-semibold hover:underline bg-indigo-50 px-4 py-2 rounded-full transition-colors">Terms & Conditions / Shuruudaha & Xaaladdaha</Link>
-          <Link href="/community-guidelines" className="text-indigo-600 font-semibold hover:underline bg-indigo-50 px-4 py-2 rounded-full transition-colors">Community Guidelines / Hagaha Bulshada</Link>
+        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-1 text-sm">
+          <p>© 2026 BSA. All rights reserved.</p>
+          <p>EU-registered nonprofit organization</p>
+          <p>App Name: BSA</p>
+          <p>Developer: Barbaarintasan Academy (Legal name: Musse Said Aw-Musse)</p>
         </div>
       </div>
     </div>
