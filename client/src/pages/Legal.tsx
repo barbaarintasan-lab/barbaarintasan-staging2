@@ -57,7 +57,7 @@ const content = {
         },
         {
           title: "Data Controller",
-          content: "The app is operated by an EU-based nonprofit organization, acting as the Data Controller under GDPR."
+          content: "The app is operated by Barbaarintasan Academy (Legal name: Musse Said Aw-Musse), an EU-registered nonprofit organization, acting as the Data Controller under GDPR."
         },
         {
           title: "Data We Collect",
@@ -77,7 +77,11 @@ const content = {
         },
         {
           title: "8. Children's Privacy",
-          content: "This application is not intended for children. Any suspected child account will be promptly removed."
+          content: "This application is not intended for children. Any suspected child account will be promptly removed"
+        },
+        {
+          title: "© 2026 Barbaarintasan Academy",
+          content: "App Name: Barbaarintasan (EN) / Barbaarintasan (SO)\nDeveloper: Barbaarintasan Academy (Legal name: Musse Said Aw-Musse)\nEU-registered nonprofit organization"
         }
       ]
     },
@@ -139,7 +143,7 @@ const content = {
         },
         {
           title: "Xog-haye",
-          content: "App-kan waxaa maamula hay'ad EU ku diiwaangashan, taas oo ah xog-hayaha masuulka ka ah xogta."
+          content: "App-kan waxaa maamula Barbaarintasan Academy (Magaca sharciga: Musse Said Aw-Musse), urur EU ku diiwaangashan, isagoo ah xog-hayaha masuulka ka ah xogta."
         },
         {
           title: "Xogta Aan Ururinno",
@@ -160,6 +164,10 @@ const content = {
         {
           title: "8. Asturnaanta Carruurta",
           content: "App-kan looguma talagelin carruurta. Akoon kasta oo ilmo lagu tuhmo si degdeg ah ayaa loo tirtirayaa."
+        },
+        {
+          title: "© 2026 Barbaarintasan Academy",
+          content: "App Name: Barbaarintasan (EN) / Barbaarintasan (SO)\nDeveloper: Barbaarintasan Academy (Magaca sharciga: Musse Said Aw-Musse)\nUrur EU ku diiwaangashan"
         }
       ]
     },
@@ -284,11 +292,9 @@ export default function Legal() {
           </CardContent>
         </Card>
         
-        <div className="mt-6 text-center text-xs text-gray-500 space-y-1">
+        <div className="mt-6 text-center text-xs text-gray-500">
           <p>© 2026 Barbaarintasan Academy. All rights reserved.</p>
-          <p>EU-registered nonprofit organization</p>
-          <p>App Name: Barbaarintasan (EN) / Barbaarintasan (SO)</p>
-          <p>Developer: Musse Said Aw-Musse (EN & SO)</p>
+          <p className="mt-1">EU-registered nonprofit organization</p>
         </div>
       </div>
     </div>
