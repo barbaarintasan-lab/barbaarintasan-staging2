@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 // Use Replit AI integration key if available, fallback to standard OPENAI_API_KEY
 const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-const openai = new OpenAI({ apiKey: apiKey || "" });
+const openai = new OpenAI({ apiKey: apiKey || "missing-key" });
 
 export interface ModerationResult {
   isFlagged: boolean;
