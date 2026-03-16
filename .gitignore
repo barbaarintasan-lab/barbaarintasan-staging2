@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+server/public/
+
+# Cache
+.cache/
+.upm/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+test-db-validation.js
+
+# Archive / backup files
+*.tar.gz
+*.zip
+barbaarintasan-part-*
+barbaarintasan-app-*.zip
+
+# TTS audio temp files
+tts-audio/
+
+# Vite temp files
+vite.config.ts.*
+
+# Replit internal
+.local/
+
+# IDE
+.idea/
+.vscode/
+
+# Flyctl binary
+flyctl
+
+# github-update folder (old backup)
+github-update/
+
+# Attached assets - not needed in repo
+attached_assets/
+
+# Large public assets (served from CDN/R2 in production)
+client/public/course-images/
+client/public/google-play-header.png
+
+# WordPress plugin archives
+wordpress-plugin/*.zip
+wordpress-plugin/course-images.zip

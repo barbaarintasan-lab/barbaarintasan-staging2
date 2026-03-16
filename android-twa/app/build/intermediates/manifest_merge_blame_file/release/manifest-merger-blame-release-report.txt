@@ -1,0 +1,172 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.barbaarintasan.academy"
+4    android:versionCode="10"
+5    android:versionName="2.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="35" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:4:5-67
+11-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:4:22-64
+12
+13    <queries>
+13-->[com.google.androidbrowserhelper:androidbrowserhelper:2.5.0] /home/runner/.gradle/caches/transforms-3/806ad10ac7da0fa970b68ea44b55a093/transformed/androidbrowserhelper-2.5.0/AndroidManifest.xml:26:5-34:15
+14        <intent>
+14-->[com.google.androidbrowserhelper:androidbrowserhelper:2.5.0] /home/runner/.gradle/caches/transforms-3/806ad10ac7da0fa970b68ea44b55a093/transformed/androidbrowserhelper-2.5.0/AndroidManifest.xml:27:9-33:18
+15            <action android:name="android.intent.action.VIEW" />
+15-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:31:17-69
+15-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:31:25-66
+16
+17            <category android:name="android.intent.category.BROWSABLE" />
+17-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:33:17-78
+17-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:33:27-75
+18
+19            <data android:scheme="https" />
+19-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:34:23-45
+20        </intent>
+21    </queries>
+22
+23    <permission
+23-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:22:5-24:47
+24        android:name="com.barbaarintasan.academy.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+24-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:23:9-81
+25        android:protectionLevel="signature" />
+25-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:24:9-44
+26
+27    <uses-permission android:name="com.barbaarintasan.academy.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+27-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:26:5-97
+27-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:26:22-94
+28
+29    <application
+30        android:allowBackup="true"
+30-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:7:9-35
+31        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+31-->[androidx.core:core:1.9.0] /home/runner/.gradle/caches/transforms-3/75919e89ab9acfe92b320b18b5eba894/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
+32        android:extractNativeLibs="true"
+33        android:icon="@mipmap/ic_launcher"
+33-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:8:9-43
+34        android:label="BSA"
+34-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:9:9-40
+35        android:supportsRtl="true"
+35-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:10:9-35
+36        android:theme="@style/Theme.LauncherActivity" >
+36-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:11:9-54
+37        <meta-data
+38            android:name="asset_statements"
+38-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:14:13-44
+39            android:value="[{ &quot;relation&quot;: [&quot;delegate_permission/common.handle_all_urls&quot;], &quot;target&quot;: { &quot;namespace&quot;: &quot;web&quot;, &quot;site&quot;: &quot;https://appbarbaarintasan.com&quot; } }]" />
+39-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:15:13-47
+40
+41        <activity
+41-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:17:9-37:20
+42            android:name="com.barbaarintasan.academy.BSALauncherActivity"
+42-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:18:13-74
+43            android:exported="true"
+43-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:19:13-36
+44            android:theme="@style/Theme.LauncherActivity" >
+44-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:20:13-58
+45            <intent-filter>
+45-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:21:13-24:29
+46                <action android:name="android.intent.action.MAIN" />
+46-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:22:17-69
+46-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:22:25-66
+47
+48                <category android:name="android.intent.category.LAUNCHER" />
+48-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:23:17-77
+48-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:23:27-74
+49            </intent-filter>
+50
+51            <meta-data
+52                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+52-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:27:17-78
+53                android:value="https://appbarbaarintasan.com/" />
+53-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:28:17-46
+54
+55            <intent-filter android:autoVerify="true" >
+55-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:30:13-36:29
+55-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:30:28-53
+56                <action android:name="android.intent.action.VIEW" />
+56-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:31:17-69
+56-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:31:25-66
+57
+58                <category android:name="android.intent.category.DEFAULT" />
+58-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:32:17-76
+58-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:32:27-73
+59                <category android:name="android.intent.category.BROWSABLE" />
+59-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:33:17-78
+59-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:33:27-75
+60
+61                <data
+62                    android:host="appbarbaarintasan.com"
+62-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:35:21-47
+63                    android:scheme="https" />
+63-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:34:23-45
+64            </intent-filter>
+65        </activity>
+66        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+66-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:39:9-90
+66-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:39:19-87
+67
+68        <service
+68-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:41:9-49:19
+69            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+69-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:42:13-85
+70            android:enabled="true"
+70-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:43:13-35
+71            android:exported="true" >
+71-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:44:13-36
+72            <intent-filter>
+72-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:45:13-48:29
+73                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+73-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:46:17-105
+73-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:46:25-103
+74
+75                <category android:name="android.intent.category.DEFAULT" />
+75-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:32:17-76
+75-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:32:27-73
+76            </intent-filter>
+77        </service>
+78
+79        <provider
+80            android:name="androidx.core.content.FileProvider"
+80-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:52:13-62
+81            android:authorities="com.barbaarintasan.academy.fileprovider"
+81-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:53:13-64
+82            android:exported="false"
+82-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:54:13-37
+83            android:grantUriPermissions="true" >
+83-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:55:13-47
+84            <meta-data
+84-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:56:13-58:53
+85                android:name="android.support.FILE_PROVIDER_PATHS"
+85-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:57:17-67
+86                android:resource="@xml/filepaths" />
+86-->/home/runner/workspace/android-twa/app/src/main/AndroidManifest.xml:58:17-50
+87        </provider>
+88        <provider
+88-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+89            android:name="androidx.startup.InitializationProvider"
+89-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
+90            android:authorities="com.barbaarintasan.academy.androidx-startup"
+90-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
+91            android:exported="false" >
+91-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
+92            <meta-data
+92-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+93                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+93-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
+94                android:value="androidx.startup" />
+94-->[androidx.emoji2:emoji2:1.2.0] /home/runner/.gradle/caches/transforms-3/4db699d37aeb53b95d33ff3db7cc3cca/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
+95            <meta-data
+95-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/runner/.gradle/caches/transforms-3/644bbf8f5e2ecfe65e8d027b17221503/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+96                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+96-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/runner/.gradle/caches/transforms-3/644bbf8f5e2ecfe65e8d027b17221503/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
+97                android:value="androidx.startup" />
+97-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/runner/.gradle/caches/transforms-3/644bbf8f5e2ecfe65e8d027b17221503/transformed/lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+98        </provider>
+99    </application>
+100
+101</manifest>

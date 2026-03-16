@@ -1,0 +1,40 @@
+{
+  "number": 113,
+  "name": "سُورَةُ الفَلَقِ",
+  "englishName": "Al-Falaq",
+  "englishNameTranslation": "The Dawn",
+  "revelationType": "Meccan",
+  "numberOfAyahs": 5,
+  "ayahs": [
+    {
+      "number": 1,
+      "text": "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَـٰنِ ٱلرَّحِیمِ قُلۡ أَعُوذُ بِرَبِّ ٱلۡفَلَقِ",
+      "juz": 30,
+      "page": 604
+    },
+    {
+      "number": 2,
+      "text": "مِن شَرِّ مَا خَلَقَ",
+      "juz": 30,
+      "page": 604
+    },
+    {
+      "number": 3,
+      "text": "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
+      "juz": 30,
+      "page": 604
+    },
+    {
+      "number": 4,
+      "text": "وَمِن شَرِّ ٱلنَّفَّـٰثَـٰتِ فِی ٱلۡعُقَدِ",
+      "juz": 30,
+      "page": 604
+    },
+    {
+      "number": 5,
+      "text": "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
+      "juz": 30,
+      "page": 604
+    }
+  ]
+}

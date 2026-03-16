@@ -1,0 +1,28 @@
+{
+  "number": 108,
+  "name": "سُورَةُ الكَوۡثَرِ",
+  "englishName": "Al-Kawthar",
+  "englishNameTranslation": "Abundance",
+  "revelationType": "Meccan",
+  "numberOfAyahs": 3,
+  "ayahs": [
+    {
+      "number": 1,
+      "text": "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَـٰنِ ٱلرَّحِیمِ إِنَّاۤ أَعۡطَیۡنَـٰكَ ٱلۡكَوۡثَرَ",
+      "juz": 30,
+      "page": 602
+    },
+    {
+      "number": 2,
+      "text": "فَصَلِّ لِرَبِّكَ وَٱنۡحَرۡ",
+      "juz": 30,
+      "page": 602
+    },
+    {
+      "number": 3,
+      "text": "إِنَّ شَانِئَكَ هُوَ ٱلۡأَبۡتَرُ",
+      "juz": 30,
+      "page": 602
+    }
+  ]
+}
