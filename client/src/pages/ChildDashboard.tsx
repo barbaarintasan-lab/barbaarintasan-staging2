@@ -409,42 +409,24 @@ export default function ChildDashboard() {
                 <Gamepad2 className="w-5 h-5 text-[#A855F7]" />
                 Ciyaaraha Farxad leh
               </h3>
-              <p className="text-white/40 text-xs">Cashar dhameystir si aad ciyaaro u furto!</p>
+              <p className="text-white/40 text-xs">Ciyaaruhu way furan yihiin marka surah la dhammeeyo. Xanibaad dambe ma jirto.</p>
             </div>
 
-            <div className="flex gap-2 mb-4">
-              <div className="flex-1 bg-[#A855F7]/10 rounded-xl p-3 border border-[#A855F7]/20 flex items-center gap-2">
-                <Gamepad2 className="w-5 h-5 text-[#A855F7] shrink-0" />
+            <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-4">
+              <div className="flex items-center gap-3">
+                <Gamepad2 className="h-5 w-5 shrink-0 text-green-400" />
                 <div>
-                  <p className="text-white text-sm font-bold">{gameTokens} token</p>
-                  <p className="text-white/30 text-[10px]">Max 5</p>
-                </div>
-              </div>
-              <div className={`flex-1 rounded-xl p-3 border flex items-center gap-2 ${
-                gamesRemainingToday > 0
-                  ? "bg-green-500/10 border-green-500/20"
-                  : "bg-red-500/10 border-red-500/20"
-              }`}>
-                <Clock className={`w-5 h-5 shrink-0 ${gamesRemainingToday > 0 ? "text-green-400" : "text-red-400"}`} />
-                <div>
-                  <p className="text-white text-sm font-bold">{gamesRemainingToday}/3</p>
-                  <p className="text-white/30 text-[10px]">Maanta (45 daq)</p>
+                  <p className="text-sm font-bold text-white">Ciyaaruhu waa furan yihiin</p>
+                  <p className="text-[11px] text-white/40">Token iyo xadka maalinlaha ah waa laga qaaday qaybta carruurta.</p>
                 </div>
               </div>
             </div>
-
-            {gamesRemainingToday <= 0 && (
-              <div className="bg-orange-500/10 rounded-2xl p-4 border border-orange-500/20 text-center mb-4">
-                <p className="text-orange-300 text-sm font-semibold mb-1">Maanta 3 ciyaar ayaad ciyaartay!</p>
-                <p className="text-white/40 text-xs">Berri ku soo noqo ciyaar cusub. Hadda cashar baro! 📖</p>
-              </div>
-            )}
 
             {unlockedGames.length === 0 ? (
               <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
                 <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                <h4 className="text-white/60 font-semibold mb-2">Ciyaaro wali ma furna</h4>
-                <p className="text-white/30 text-sm">Surah dhameystir si aad ciyaaraha u furto. Casharrada Quraanka ka bilow!</p>
+                <h4 className="text-white/60 font-semibold mb-2">Weli ma muuqato surah la dhammeeyey</h4>
+                <p className="text-white/30 text-sm">Marka hal surah la dhammeeyo, dhammaan ciyaaraha surah-kaas si toos ah bay u muuqanayaan.</p>
                 <button
                   onClick={() => setActiveTab("quran")}
                   className="mt-4 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-6 py-2 rounded-xl font-bold text-sm active:scale-95 transition-transform"
@@ -469,17 +451,11 @@ export default function ChildDashboard() {
                     <div className="grid grid-cols-3 gap-2">
                       {ug.games.map(gameKey => {
                         const info = GAME_INFO[gameKey];
-                        const disabled = gameTokens <= 0 || gamesRemainingToday <= 0;
                         return (
                           <button
                             key={gameKey}
-                            onClick={() => !disabled && setLocation(`${GAME_ROUTES[gameKey]}/${ug.surahNumber}`)}
-                            className={`rounded-xl p-3 text-center transition-all active:scale-95 ${
-                              disabled
-                                ? "bg-white/5 border border-white/5 opacity-40"
-                                : "bg-white/10 border border-white/10 hover:bg-white/15"
-                            }`}
-                            disabled={disabled}
+                            onClick={() => setLocation(`${GAME_ROUTES[gameKey]}/${ug.surahNumber}`)}
+                            className="rounded-xl border border-white/10 bg-white/10 p-3 text-center transition-all hover:bg-white/15 active:scale-95"
                             data-testid={`game-${gameKey}-${ug.surahNumber}`}
                           >
                             <span className="text-2xl block mb-1">{info.emoji}</span>
@@ -490,20 +466,6 @@ export default function ChildDashboard() {
                     </div>
                   </div>
                 ))}
-
-                {gameTokens <= 0 && unlockedGames.length > 0 && (
-                  <div className="bg-red-500/10 rounded-2xl p-4 border border-red-500/20 text-center">
-                    <p className="text-red-300 text-sm font-semibold mb-1">Token ma haysatid!</p>
-                    <p className="text-white/40 text-xs">Cashar cusub dhameystir si aad token u hesho.</p>
-                    <button
-                      onClick={() => setActiveTab("quran")}
-                      className="mt-3 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-5 py-1.5 rounded-xl font-bold text-xs active:scale-95 transition-transform"
-                      data-testid="button-earn-tokens"
-                    >
-                      Cashar Bilow 📖
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </>
