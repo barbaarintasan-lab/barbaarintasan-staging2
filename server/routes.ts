@@ -579,7 +579,45 @@ async function checkCourseAccess(parentId: string, courseId: string): Promise<{ 
   return { hasAccess: true };
 }
 
+async function runMigrations() {
+  try {
+    const migrationsDir = path.join(process.cwd(), "migrations");
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    console.log("[Migrations] Starting database migrations...");
+    console.log("[Migrations] Found migrations:", files);
+
+    for (const file of files) {
+      const filePath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(filePath, "utf-8");
+      console.log(`[Migrations] Executing: ${file}`);
+      try {
+        await pool.query(sql);
+        console.log(`[Migrations] ✓ Completed: ${file}`);
+      } catch (err: any) {
+        if (err.message?.includes("already exists")) {
+          console.log(`[Migrations] ✓ Already applied: ${file}`);
+        } else {
+          console.error(`[Migrations] ✗ Failed: ${file}`, err.message);
+          throw err;
+        }
+      }
+    }
+
+    console.log("[Migrations] All migrations completed successfully");
+  } catch (err) {
+    console.error("[Migrations] Fatal error:", err);
+    throw err;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Run database migrations on startup
+  await runMigrations();
+
   // Trust proxy for Replit's infrastructure (always enabled for Replit)
   app.set("trust proxy", 1);
 
