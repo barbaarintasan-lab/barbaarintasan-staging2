@@ -41,5 +41,5 @@ primary_region = "fra"
     port = 8080
     path = "/api/health"
     interval = "30s"
-    timeout = "10s"
-    grace_period = "30s"
+    timeout = "15s"
+    grace_period = "60s"
