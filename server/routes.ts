@@ -10731,8 +10731,6 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         sessionToken: childSessionToken,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
-      delete req.session.parentId;
-      delete req.session.isAdmin;
       req.session.childId = child.id;
       req.session.childSessionToken = childSessionToken;
       const { password: _, ...safeChild } = child;
@@ -10797,13 +10795,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         eq(childSessions.sessionToken, req.session.childSessionToken)
       );
     }
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("[CHILD AUTH] Logout error:", err);
-      }
-      res.clearCookie("barbaarintasan.sid");
-      res.json({ success: true });
-    });
+    delete req.session.childId;
+    delete req.session.childSessionToken;
+    res.json({ success: true });
   });
 
   app.get("/api/children/:id/progress", requireParentAuth, async (req: Request, res: Response) => {
