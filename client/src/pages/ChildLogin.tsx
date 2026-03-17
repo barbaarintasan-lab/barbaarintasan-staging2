@@ -106,7 +106,7 @@ export default function ChildLogin() {
 
     const ageValue = parseInt(newChild.age, 10);
     if (!Number.isInteger(ageValue) || ageValue < 3 || ageValue > 15) {
-      toast.error("Da'da waa inay noqotaa 3 ilaa 15");
+      toast.error("Da'da waa inay noqotaa 3 ilaa 10 Sano");
       return;
     }
 
@@ -126,7 +126,7 @@ export default function ChildLogin() {
       setParentChildren(prev => [...prev, created]);
       setShowAddForm(false);
       setNewChild({ name: "", age: "", username: "", password: "", avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)] });
-      toast.success(`${created.name} akoonkiisa waa la sameeyay!`);
+      toast.success(`${created.name} Ilmaha akoonkiisi waa la sameeyay!`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -241,7 +241,7 @@ export default function ChildLogin() {
             ) : (
               <div className="w-full max-w-sm mt-4">
                 <p className="text-white/50 text-center text-sm mb-5">
-                  Ilmahaaga dooro si uu Quraanka u barto
+                  Ilmahaaga u samee akoon cusub si uu Quraanka u barto
                 </p>
 
                 {parentChildren.length > 0 ? (
@@ -362,7 +362,7 @@ export default function ChildLogin() {
         ) : (
           <>
             <p className="text-white/60 text-center mb-8 text-sm">
-              Soo gal akoonkaaga si aad Quraanka u barato
+              Soo gal akoonkaaga si aad Quraanka u barato, ka dibna u ciyaarto
             </p>
             <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
               <div>
