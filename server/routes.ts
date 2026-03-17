@@ -11085,26 +11085,10 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         return res.status(400).json({ error: "Audio, surah, iyo ayah number waa loo baahan yahay" });
       }
       const childId = req.session.childId!;
-      const { DAILY_ATTEMPT_LIMIT, getRandomEncouragement } = await import("./quranLessons");
+      const { getRandomEncouragement } = await import("./quranLessons");
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayStr = todayStart.toISOString().slice(0, 10);
-      const todayAttemptRows = await db.select({
-        totalDailyAttempts: sql<number>`coalesce(sum(${quranLessonProgress.dailyAttempts}), 0)`.as("total_daily_attempts"),
-      }).from(quranLessonProgress).where(
-        and(
-          eq(quranLessonProgress.childId, childId),
-          eq(quranLessonProgress.dailyAttemptDate, todayStr)
-        )
-      );
-      const totalAttemptsToday = Number(todayAttemptRows[0]?.totalDailyAttempts || 0);
-      if (totalAttemptsToday >= DAILY_ATTEMPT_LIMIT) {
-        return res.json({
-          outcome: "daily_limit",
-          message: "Maanta waxaad aad u dadaashay! Berri soo noqo oo sii wad casharkaaga. 🌙",
-          completed: false,
-        });
-      }
       const sNum = parseInt(surahNumber);
       const aNum = parseInt(ayahNumber);
       const paddedNum = sNum.toString().padStart(3, "0");

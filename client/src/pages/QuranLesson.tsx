@@ -16,7 +16,7 @@ interface AyahProgress {
 }
 
 interface CheckResult {
-  outcome: "correct" | "needs_retry" | "daily_limit";
+  outcome: "correct" | "needs_retry";
   completed: boolean;
   message: string;
 }
@@ -65,7 +65,6 @@ export default function QuranLesson() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [sessionTimeLeft, setSessionTimeLeft] = useState(60 * 60);
   const [sessionExpired, setSessionExpired] = useState(false);
-  const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [hasListened, setHasListened] = useState(false);
   const [selectedReciter, setSelectedReciter] = useState<string>(() => {
     try { return localStorage.getItem("quran_reciter") || "husary_muallim"; } catch { return "husary_muallim"; }
@@ -329,13 +328,6 @@ export default function QuranLesson() {
       }
       const result: CheckResult = await response.json();
 
-      if (result.outcome === "daily_limit") {
-        setDailyLimitReached(true);
-        setCheckResult(result);
-        setIsChecking(false);
-        return;
-      }
-
       setCheckResult(result);
       const wasAlreadyCompleted = ayahProgress[currentAyah.number]?.completed || false;
       const updatedProgress = {
@@ -555,23 +547,7 @@ export default function QuranLesson() {
           </div>
         </div>
 
-        {dailyLimitReached && (
-          <div className="px-4 mb-6">
-            <div className="bg-gradient-to-r from-[#4ECDC4]/20 to-[#45B7AA]/20 rounded-3xl p-6 border border-[#4ECDC4]/30 text-center" data-testid="daily-limit-message">
-              <div className="text-5xl mb-4">&#x1F319;</div>
-              <h3 className="text-white font-bold text-xl mb-2">Maanta waad dhamaysay!</h3>
-              <p className="text-white/70 text-base mb-4">Maanta waxaad aad u dadaashay! Berri soo noqo oo sii wad casharkaaga.</p>
-              <button onClick={() => setLocation("/child-login")}
-                className="px-8 py-3 bg-[#4ECDC4] text-[#1a1a2e] font-bold rounded-2xl text-lg hover:bg-[#45B7AA] transition-colors active:scale-95"
-                data-testid="button-daily-limit-back"
-              >
-                Ku noqo Casharrada
-              </button>
-            </div>
-          </div>
-        )}
-
-        {currentAyah && !dailyLimitReached && (
+        {currentAyah && (
           <div className="px-4 mb-6">
             <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-6 border border-white/10">
               <div className="flex items-center justify-between mb-4">
@@ -719,7 +695,7 @@ export default function QuranLesson() {
           </div>
         )}
 
-        {checkResult && checkResult.outcome !== "daily_limit" && !dailyLimitReached && (
+        {checkResult && (
           <div className="px-4 mb-6">
             {checkResult.outcome === "correct" ? (
               <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-3xl p-6 border-2 border-green-500/40 text-center" data-testid="result-correct">
