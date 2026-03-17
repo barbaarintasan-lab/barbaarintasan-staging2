@@ -10604,6 +10604,12 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       if (!name || !age || !username || !password) {
         return res.status(400).json({ error: "Buuxi dhammaan meelaha" });
       }
+
+      const parsedAge = Number.parseInt(String(age), 10);
+      if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
+        return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+      }
+
       if (username.length < 3) {
         return res.status(400).json({ error: "Username waa inuu ka badan yahay 3 xaraf" });
       }
@@ -10615,7 +10621,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       const child = await storage.createChild({
         parentId: req.session.parentId,
         name: name.trim(),
-        age: parseInt(age),
+        age: parsedAge,
         username: username.toLowerCase().trim(),
         password: hashedPassword,
         avatarColor: avatarColor || "#FFD93D",
@@ -10649,7 +10655,13 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       }
       const updateData: any = {};
       if (req.body.name) updateData.name = req.body.name.trim();
-      if (req.body.age) updateData.age = parseInt(req.body.age);
+      if (req.body.age !== undefined && req.body.age !== null && String(req.body.age).trim() !== "") {
+        const parsedAge = Number.parseInt(String(req.body.age), 10);
+        if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
+          return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+        }
+        updateData.age = parsedAge;
+      }
       if (req.body.avatarColor) updateData.avatarColor = req.body.avatarColor;
       if (req.body.password) {
         updateData.password = await bcrypt.hash(req.body.password, 10);

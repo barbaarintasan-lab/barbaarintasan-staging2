@@ -27,6 +27,10 @@ interface ChildProgress {
 
 const AVATAR_COLORS = ["#FFD93D", "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8"];
 
+function sanitizeAgeInput(value: string): string {
+  return value.replace(/[^0-9]/g, "");
+}
+
 export function ChildrenManager() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -121,10 +125,17 @@ export function ChildrenManager() {
       toast.error("Buuxi magaca, da'da, iyo username");
       return;
     }
+
+    const ageValue = parseInt(formData.age, 10);
+    if (!Number.isInteger(ageValue) || ageValue < 3 || ageValue > 15) {
+      toast.error("Da'da waa inay noqotaa 3 ilaa 15");
+      return;
+    }
+
     if (editingId) {
       const updateData: any = {
         name: formData.name,
-        age: formData.age,
+        age: String(ageValue),
         avatarColor: formData.avatarColor,
         username: formData.username,
       };
@@ -135,7 +146,7 @@ export function ChildrenManager() {
         toast.error("Password waa lagama maarmaan");
         return;
       }
-      createMutation.mutate(formData);
+      createMutation.mutate({ ...formData, age: String(ageValue) });
     }
   };
 
@@ -194,7 +205,7 @@ export function ChildrenManager() {
               <input
                 type="number"
                 value={formData.age}
-                onChange={(e) => setFormData(f => ({ ...f, age: e.target.value }))}
+                onChange={(e) => setFormData(f => ({ ...f, age: sanitizeAgeInput(e.target.value) }))}
                 placeholder="7"
                 min="3"
                 max="15"

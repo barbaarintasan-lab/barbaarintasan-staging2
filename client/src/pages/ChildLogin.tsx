@@ -6,6 +6,10 @@ import { toast } from "sonner";
 
 const AVATAR_COLORS = ["#FFD93D", "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8"];
 
+function sanitizeAgeInput(value: string): string {
+  return value.replace(/[^0-9]/g, "");
+}
+
 interface ChildProfile {
   id: string;
   parentId: string;
@@ -99,13 +103,20 @@ export default function ChildLogin() {
       toast.error("Buuxi dhammaan meelaha");
       return;
     }
+
+    const ageValue = parseInt(newChild.age, 10);
+    if (!Number.isInteger(ageValue) || ageValue < 3 || ageValue > 15) {
+      toast.error("Da'da waa inay noqotaa 3 ilaa 15");
+      return;
+    }
+
     setCreatingChild(true);
     try {
       const res = await fetch("/api/children", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(newChild),
+        body: JSON.stringify({ ...newChild, age: String(ageValue) }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -280,7 +291,7 @@ export default function ChildLogin() {
                       <input
                         type="number"
                         value={newChild.age}
-                        onChange={(e) => setNewChild(p => ({ ...p, age: e.target.value }))}
+                        onChange={(e) => setNewChild(p => ({ ...p, age: sanitizeAgeInput(e.target.value) }))}
                         placeholder="Da'da (3-15)"
                         min="3"
                         max="15"
