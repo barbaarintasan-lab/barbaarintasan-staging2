@@ -1,0 +1,71 @@
+name: Run Initial Translation
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Number of items per content type to translate (default: 50)'
+        required: false
+        default: '50'
+        type: string
+
+jobs:
+  translate:
+    name: Initial Translation Job
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run initial translation script
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_INTEGRATIONS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "🌐 Starting Initial Translation for Barbaarintasan Academy"
+          echo "📋 Configuration:"
+          echo "   - Batch size: ${{ inputs.batch_size || '50' }}"
+          echo "   - Target language: English"
+          echo "   - Source language: Somali"
+          echo ""
+          npm run translate:initial
+      
+      - name: Translation job summary
+        if: always()
+        run: |
+          echo "## Translation Job Completed 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait for OpenAI to process the batch jobs (up to 24 hours)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Monitor job status via API: \`POST /api/admin/batch-jobs/check-all-status\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check translation coverage: \`GET /api/admin/batch-jobs/translation-coverage\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Test the language switcher in the UI once translations complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Content Types Translated:" >> $GITHUB_STEP_SUMMARY
+          echo "- Courses (title, description, comingSoonMessage)" >> $GITHUB_STEP_SUMMARY
+          echo "- Modules (title)" >> $GITHUB_STEP_SUMMARY
+          echo "- Lessons (title, description, textContent)" >> $GITHUB_STEP_SUMMARY
+          echo "- Quiz Questions (question, options, explanation)" >> $GITHUB_STEP_SUMMARY
+          echo "- Parent Messages (title, content, keyPoints)" >> $GITHUB_STEP_SUMMARY
+          echo "- Bedtime Stories (title, content, moralLesson)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Troubleshooting:" >> $GITHUB_STEP_SUMMARY
+          echo "If the workflow failed:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Verify DATABASE_URL secret is set correctly" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Verify OPENAI_API_KEY secret is set correctly" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Check that database is accessible and has content" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Verify OpenAI API key has Batch API access" >> $GITHUB_STEP_SUMMARY

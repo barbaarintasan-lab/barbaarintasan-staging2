@@ -1,0 +1,79 @@
+[
+  {
+    "id": 1,
+    "question": "Misaanka caadiga ah ee ilmaha 5-bilood jirka ah waa imisa?",
+    "options": [
+      "3 ilaa 5 Kiilo",
+      "6 ilaa 8.5 Kiilo",
+      "9 ilaa 12 Kiilo",
+      "15 Kiilo iyo ka badan"
+    ],
+    "correctAnswer": "6 ilaa 8.5 Kiilo"
+  },
+  {
+    "id": 2,
+    "question": "Ilmaha 5-bilood jirka ah ma fariisan karaa?",
+    "options": [
+      "Maya, weli ma fariisan karo",
+      "Haa, keligiis ayuu si fiican u fariisan karaa",
+      "Haa, isagoo la taageerayo oo dhabarka la xajinayo",
+      "Haa, wuu istaagi karaa xitaa"
+    ],
+    "correctAnswer": "Haa, isagoo la taageerayo oo dhabarka la xajinayo"
+  },
+  {
+    "id": 3,
+    "question": "Maxaa lagu gartaa aragga ilmaha 5-bilood jirka ah?",
+    "options": [
+      "Wuxuu jecel yahay midabada madow iyo caddaan kaliya",
+      "Wuxuu jecel yahay midabada dhalaalaya",
+      "Waxba ma arki karo weli",
+      "Wuxuu arkaa kaliya walxaha aadka u dhow"
+    ],
+    "correctAnswer": "Wuxuu jecel yahay midabada dhalaalaya"
+  },
+  {
+    "id": 4,
+    "question": "Goorma ayaa lagu talinayaa in ilmaha la baro cuntada adag?",
+    "options": [
+      "4 bilood markuu jiro",
+      "5 bilood markuu jiro",
+      "6 bilood markuu gaaro",
+      "Markuu dhashaba"
+    ],
+    "correctAnswer": "6 bilood markuu gaaro"
+  },
+  {
+    "id": 5,
+    "question": "Imisa saacadood ayuu badanaa seexdaa ilmaha 5-bilood jirka ah maalintii?",
+    "options": [
+      "8 ilaa 10 saacadood",
+      "12 ilaa 16 saacadood",
+      "18 ilaa 20 saacadood",
+      "24 saacadood"
+    ],
+    "correctAnswer": "12 ilaa 16 saacadood"
+  },
+  {
+    "id": 6,
+    "question": "Erayada uu ku hadaaqo ilmaha 5-bilood jirka ah waxaa ka mid ah?",
+    "options": [
+      "Baba, Mama (oo macno buuxa leh)",
+      "Baa, Maa, Gaa (Hadaaq)",
+      "Jumlad buuxda ayuu ku hadlaa",
+      "Weli wax cod ah ma sameeyo"
+    ],
+    "correctAnswer": "Baa, Maa, Gaa (Hadaaq)"
+  },
+  {
+    "id": 7,
+    "question": "Haddii ilmuhu habeenkii tooso, maxaa habboon in la sameeyo?",
+    "options": [
+      "In lala ciyaaro oo la qosliyo",
+      "In nalka loo daaro oo lala sheekaysto",
+      "In telefishin loo shido",
+      "In aan lala sheekaysan, nalkana la daarin, laguna celiyo hurdada"
+    ],
+    "correctAnswer": "In aan lala sheekaysan, nalkana la daarin, laguna celiyo hurdada"
+  }
+]

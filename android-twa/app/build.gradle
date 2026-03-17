@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.barbaarintasan.academy'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.barbaarintasan.academy"
+        minSdk 21
+        targetSdk 35
+        versionCode 10
+        versionName "2.0.0"
+
+        manifestPlaceholders = [
+            hostName: "appbarbaarintasan.com",
+            defaultUrl: "https://appbarbaarintasan.com/",
+            launcherName: "BSA",
+            assetStatements: '[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": { "namespace": "web", "site": "https://appbarbaarintasan.com" } }]'
+        ]
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../barbaarintasan.keystore")
+            storePassword "barbaarintasan2026"
+            keyAlias "barbaarintasan"
+            keyPassword "barbaarintasan2026"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

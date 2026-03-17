@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BSA &amp; Sheeko</string>
+    <style name="Theme.LauncherActivity" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#1e40af</item>
+        <item name="android:statusBarColor">#1e40af</item>
+        <item name="android:navigationBarColor">#1e40af</item>
+    </style>
+</resources>

@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/xml_filepaths.xml.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/xml/filepaths.xml"
+    },
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.barbaarintasan.academy.app-merged_res-22:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.barbaarintasan.academy.app-main-23:/mipmap-mdpi/ic_launcher.png"
+    }
+]

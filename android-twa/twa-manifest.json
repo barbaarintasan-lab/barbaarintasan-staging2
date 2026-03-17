@@ -1,0 +1,43 @@
+{
+  "packageId": "com.barbaarintasan.academy",
+  "host": "appbarbaarintasan.com",
+  "name": "BSA & Sheeko - Barbaarintasan Academy",
+  "launcherName": "BSA & Sheeko",
+  "display": "standalone",
+  "themeColor": "#1e40af",
+  "themeColorDark": "#1e3a8a",
+  "navigationColor": "#1e40af",
+  "navigationColorDark": "#1e3a8a",
+  "navigationDividerColor": "#1e40af",
+  "navigationDividerColorDark": "#1e3a8a",
+  "backgroundColor": "#1e40af",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://appbarbaarintasan.com/icon-512.png",
+  "maskableIconUrl": "https://appbarbaarintasan.com/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./barbaarintasan.keystore",
+    "alias": "barbaarintasan"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://appbarbaarintasan.com/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "enableSiteSettingsShortcut": "enabled",
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://appbarbaarintasan.com/",
+  "minSdkVersion": 21,
+  "fingerprints": [
+    {
+      "name": "barbaarintasan",
+      "value": "01:EE:60:F0:E1:0D:8D:C4:B5:EE:C2:B1:F5:50:33:B1:D0:6B:A0:C5:95:E4:36:E4:80:7C:BB:EB:E8:AF:DD:C5"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
