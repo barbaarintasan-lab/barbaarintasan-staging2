@@ -72,6 +72,7 @@ export default function QuranLesson() {
   const [showReciterPicker, setShowReciterPicker] = useState(false);
 
   const [listenCount, setListenCount] = useState(0);
+  const [isAyahHidden, setIsAyahHidden] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const preloadRef = useRef<HTMLAudioElement | null>(null);
@@ -113,6 +114,7 @@ export default function QuranLesson() {
     setCheckResult(null);
     setListenCount(0);
     setAudioFailed(false);
+    setIsAyahHidden(false);
   }, [currentAyahIndex]);
 
   const currentAyah = surah?.ayahs?.[currentAyahIndex];
@@ -329,6 +331,7 @@ export default function QuranLesson() {
       const result: CheckResult = await response.json();
 
       setCheckResult(result);
+      setIsAyahHidden(false);
       const wasAlreadyCompleted = ayahProgress[currentAyah.number]?.completed || false;
       const updatedProgress = {
         ...ayahProgress,
@@ -376,7 +379,8 @@ export default function QuranLesson() {
 
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
-  const canRecord = hasListened || isCurrentCompleted;
+  const canStartHiddenRecite = hasListened && !isCurrentCompleted;
+  const canRecordHidden = isCurrentCompleted || (hasListened && isAyahHidden);
 
   if (authLoading || surahLoading) {
     return (
@@ -560,9 +564,16 @@ export default function QuranLesson() {
               </div>
 
               <div className="text-right mb-6" dir="rtl">
-                <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]" data-testid="text-ayah-arabic">
-                  {currentAyah.text}
-                </p>
+                {isAyahHidden && !isCurrentCompleted ? (
+                  <div className="rounded-2xl border border-dashed border-[#FFD93D]/40 bg-[#FFD93D]/5 p-4 text-center" data-testid="text-ayah-hidden">
+                    <p className="text-[#FFD93D] text-sm font-semibold">Aayadda waa qarsoon tahay</p>
+                    <p className="text-white/50 text-xs mt-1">AI ayaa ku dhageysanaysa adigoo xifdi ka akhrinaya</p>
+                  </div>
+                ) : (
+                  <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]" data-testid="text-ayah-arabic">
+                    {currentAyah.text}
+                  </p>
+                )}
               </div>
 
               {!isCurrentCompleted && (
@@ -572,11 +583,24 @@ export default function QuranLesson() {
                     Dhagayso
                   </div>
                   <div className="flex-1 h-px bg-white/10" />
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${canRecord ? "bg-[#FFD93D]/20 text-[#FFD93D]" : "bg-white/5 text-white/20"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${canRecord ? "bg-[#FFD93D]/30" : "bg-white/10"}`}>2</span>
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${canRecordHidden ? "bg-[#FFD93D]/20 text-[#FFD93D]" : "bg-white/5 text-white/20"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${canRecordHidden ? "bg-[#FFD93D]/30" : "bg-white/10"}`}>2</span>
                     Akhri
                   </div>
                 </div>
+              )}
+
+              {canStartHiddenRecite && !isAyahHidden && (
+                <button
+                  onClick={() => {
+                    setIsAyahHidden(true);
+                    setCheckResult(null);
+                  }}
+                  className="w-full mb-4 py-3 rounded-2xl bg-[#FFD93D]/15 text-[#FFD93D] border border-[#FFD93D]/35 font-bold text-sm hover:bg-[#FFD93D]/25 transition-all active:scale-95"
+                  data-testid="button-hide-ayah-ready"
+                >
+                  Diyaar haddaad tahay riix - Aayadda qari
+                </button>
               )}
 
               <div className="flex items-center justify-center gap-5">
@@ -593,11 +617,11 @@ export default function QuranLesson() {
                 </button>
 
                 <button onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isChecking || isPlaying || !canRecord}
+                  disabled={isChecking || isPlaying || !canRecordHidden}
                   className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                     isRecording ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50 scale-110" :
                     isChecking ? "bg-white/10 text-white/30" :
-                    !canRecord ? "bg-white/10 text-white/20 border-2 border-white/5 cursor-not-allowed" :
+                    !canRecordHidden ? "bg-white/10 text-white/20 border-2 border-white/5 cursor-not-allowed" :
                     "bg-gradient-to-br from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] shadow-lg shadow-[#FFD93D]/30 hover:shadow-[#FFD93D]/50"
                   }`}
                   data-testid="button-record"
@@ -608,7 +632,7 @@ export default function QuranLesson() {
                     </div>
                   ) :
                     isRecording ? <MicOff className="w-8 h-8" /> :
-                    !canRecord ? <Lock className="w-6 h-6" /> :
+                    !canRecordHidden ? <Lock className="w-6 h-6" /> :
                     <Mic className="w-8 h-8" />}
                 </button>
 
@@ -647,9 +671,9 @@ export default function QuranLesson() {
                 </div>
               )}
 
-              {!canRecord && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && (
+              {!canRecordHidden && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && (
                 <p className="text-center text-[#4ECDC4]/70 text-sm mt-4">
-                  Marka hore dhagayso Sheekha, kadibna akhri
+                  Marka hore dhagayso Sheekha, kadibna riix badhanka qari aayad
                 </p>
               )}
 
@@ -702,6 +726,7 @@ export default function QuranLesson() {
                 <div className="text-6xl mb-3">&#x2705;</div>
                 <h3 className="text-green-300 font-bold text-2xl mb-2">Sax!</h3>
                 <p className="text-white/80 text-lg mb-4" data-testid="text-feedback">{checkResult.message}</p>
+                <p className="text-white/70 text-sm mb-4">Hambalyo! Aayadda xigta u gudub.</p>
                 <div className="flex justify-center gap-2 mb-5">
                   {[1, 2, 3].map(i => (
                     <Star key={i} className="w-8 h-8 text-[#FFD93D] fill-[#FFD93D] animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
