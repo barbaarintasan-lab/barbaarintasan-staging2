@@ -10823,16 +10823,6 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       if (!parent) {
         return res.status(403).json({ error: "Akoonka waalidka lama helin" });
       }
-      const activeEnrollments = await db.select().from(enrollments).where(
-        and(
-          eq(enrollments.parentId, child.parentId),
-          eq(enrollments.status, "active")
-        )
-      );
-      const validEnrollments = activeEnrollments.filter(e => !e.accessEnd || new Date(e.accessEnd) > new Date());
-      if (validEnrollments.length === 0) {
-        return res.status(403).json({ error: "Waalidkaaga wali koorso ma iska diiwaangelinin. Weydiiso inuu koorsada bilaabo." });
-      }
       await db.update(childSessions).set({ isActive: false }).where(
         and(eq(childSessions.childId, child.id), eq(childSessions.isActive, true))
       );
@@ -10875,19 +10865,6 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         delete req.session.childId;
         delete req.session.childSessionToken;
         return res.status(401).json({ error: "Session-ka waa dhacay" });
-      }
-      const activeEnrollments = await db.select().from(enrollments).where(
-        and(
-          eq(enrollments.parentId, activeSession.parentId),
-          eq(enrollments.status, "active")
-        )
-      );
-      const validEnrollments = activeEnrollments.filter(e => !e.accessEnd || new Date(e.accessEnd) > new Date());
-      if (validEnrollments.length === 0) {
-        await db.update(childSessions).set({ isActive: false }).where(eq(childSessions.id, activeSession.id));
-        delete req.session.childId;
-        delete req.session.childSessionToken;
-        return res.status(403).json({ error: "Waalidkaaga subscription-kiisii waa dhacay" });
       }
       const child = await storage.getChild(req.session.childId);
       if (!child) {
