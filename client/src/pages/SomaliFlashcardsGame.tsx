@@ -43,10 +43,34 @@ export default function SomaliFlashcardsGame() {
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return;
 
+    const femaleHints = [
+      "female", "woman", "girl", "f", "zira", "samantha", "linda", "eva", "aria", "neural2-f", "wavenet-f",
+    ];
+    const maleHints = ["male", "man", "boy", "m", "david", "mark", "guy", "wavenet-m", "neural2-m"];
+
+    const scoreVoice = (voice: SpeechSynthesisVoice): number => {
+      const lang = (voice.lang || "").toLowerCase();
+      const name = (voice.name || "").toLowerCase();
+      const hay = `${name} ${lang}`;
+
+      let score = 0;
+
+      if (/^so(-|_)/i.test(lang) || /somali/i.test(hay)) score += 100;
+      if (/neural|wavenet|natural|premium|online|cloud|enhanced/i.test(hay)) score += 25;
+      if (voice.localService === false) score += 10;
+
+      if (femaleHints.some((h) => hay.includes(h))) score += 30;
+      if (maleHints.some((h) => hay.includes(h))) score -= 30;
+
+      return score;
+    };
+
+    const somaliCandidates = voices.filter(
+      (v) => /^so(-|_)/i.test(v.lang) || /somali/i.test(v.name) || /somali/i.test(v.lang),
+    );
+
     const preferred =
-      voices.find((v) => /^so(-|_)/i.test(v.lang)) ||
-      voices.find((v) => /somali/i.test(v.name) || /somali/i.test(v.lang)) ||
-      null;
+      somaliCandidates.sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] || null;
 
     setSomaliVoice(preferred);
   }, []);
