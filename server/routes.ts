@@ -49,7 +49,7 @@ const SOMALI_FLASHCARD_POOL = [
   { somali: "Hooyo", english: "Mother", emoji: "👩", example: "Hooyo waa naxariis badan." },
   { somali: "Aabe", english: "Father", emoji: "👨", example: "Aabe wuxuu na baraa adab." },
   { somali: "Ilmo", english: "Child", emoji: "🧒", example: "Ilmo wanaagsan buu yahay." },
-  { somali: "Qoys", english: "Family", emoji: "👨‍👩‍👧", example: "Qoyska waa niyad degen." },
+  { somali: "Qoys", english: "Family", emoji: "👨‍👩‍👧", example: "Qoyska waa muhiim." },
   { somali: "Dugsi", english: "School", emoji: "🏫", example: "Dugsi ayaan subax kasta aadnaa." },
   { somali: "Macalin", english: "Teacher", emoji: "👩‍🏫", example: "Macalin fiican baa jooga." },
   { somali: "Quraan", english: "Quran", emoji: "📖", example: "Quraan ayaan maalin kasta akhriyaa." },
