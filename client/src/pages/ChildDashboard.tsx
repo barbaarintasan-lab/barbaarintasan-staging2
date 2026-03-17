@@ -152,7 +152,7 @@ export default function ChildDashboard() {
           <div className="w-16 h-16 rounded-full border-4 border-[#FFD93D]/20 border-t-[#FFD93D] animate-spin" />
           <Star className="w-6 h-6 text-[#FFD93D] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
         </div>
-        <p className="text-white/60 text-sm animate-pulse">Waa soo socda...</p>
+        <p className="text-white/60 text-sm animate-pulse">Waa la soo dajinayaa Sug!...</p>
       </div>
     );
   }
