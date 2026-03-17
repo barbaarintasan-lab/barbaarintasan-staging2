@@ -1,4 +1,4 @@
-import { users, courses, lessons, quizzes, quizQuestions, paymentMethods, paymentSubmissions, enrollments, parents, testimonials, testimonialReactions, assignmentSubmissions, supportMessages, lessonProgress, assignments, modules, dailyTips, dailyTipSchedules, milestones, milestoneProgress, badges, badgeAwards, certificates, resources, communityThreads, communityPosts, communityLikes, liveEvents, eventRsvps, courseReviews, pushSubscriptions, assessmentQuestions, parentAssessments, assessmentResponses, aiAssessmentInsights, learningPathRecommendations, passwordResetTokens, homeworkConversations, homeworkMessages, homeworkUsage, parentingConversations, parentingMessages, parentingUsage, telegramReferrals, aiGeneratedTips, appointments, availabilitySlots, calendarAvailability, announcements, homepageSections, parentCommunitySettings, lessonImages, flashcardCategories, flashcards, flashcardProgress, expenses, receiptFingerprints, receiptAttempts, lessonBookmarks, lessonExercises, exerciseProgress, conversations, messages, userPresence, bankTransfers, quranReciters, hadiths, parentNotifications, parentPrayerSettings, voiceRooms, voiceParticipants, voiceRoomMessages, voiceRoomRsvps, voiceRecordings, voiceRoomBans, hostFollows, sheekoFollows, sheekoAppreciations, contentReports, moderationActions, userConsent, aiModerationReports, bedtimeStories, parentMessages, contentReactions, contentComments, commentReactions, parentFollows, directMessages, socialNotifications, parentPosts, parentPostImages, coursePromotions, parentPostReactions, parentPostComments, parentPostCommentImages, parentPostCommentReactions, userBlocks, googleMeetEvents, type User, type InsertUser, type VoiceRoom, type InsertVoiceRoom, type VoiceParticipant, type InsertVoiceParticipant, type VoiceRoomMessage, type InsertVoiceRoomMessage, type VoiceRoomRsvp, type InsertVoiceRoomRsvp, type VoiceRecording, type InsertVoiceRecording, type VoiceRoomBan, type InsertVoiceRoomBan, type HostFollow, type InsertHostFollow, type SheekoFollow, type InsertSheekoFollow, type SheekoAppreciation, type InsertSheekoAppreciation, type ContentReport, type InsertContentReport, type ModerationAction, type InsertModerationAction, type UserConsent, type InsertUserConsent, type CoursePromotion, type InsertCoursePromotion, type ParentPostReaction, type InsertParentPostReaction, type ParentPostComment, type InsertParentPostComment, type AiModerationReport, type InsertAiModerationReport, type BedtimeStory, type InsertBedtimeStory, type ParentMessage, type InsertParentMessage, type ContentReaction, type InsertContentReaction, type ContentComment, type InsertContentComment, type CommentReaction, type InsertCommentReaction, type ParentFollow, type InsertParentFollow, type DirectMessage, type InsertDirectMessage, type SocialNotification, type InsertSocialNotification, type ParentPost, type InsertParentPost, type ParentPostImage, type InsertParentPostImage, type Course, type InsertCourse, type Lesson, type InsertLesson, type Quiz, type InsertQuiz, type QuizQuestion, type InsertQuizQuestion, type PaymentMethod, type InsertPaymentMethod, type PaymentSubmission, type InsertPaymentSubmission, type Enrollment, type InsertEnrollment, type Parent, type InsertParent, type Testimonial, type InsertTestimonial, type AssignmentSubmission, type InsertAssignmentSubmission, type SupportMessage, type InsertSupportMessage, type LessonProgress, type InsertLessonProgress, type Assignment, type InsertAssignment, type Module, type InsertModule, type DailyTip, type InsertDailyTip, type DailyTipSchedule, type InsertDailyTipSchedule, type Milestone, type InsertMilestone, type MilestoneProgress, type InsertMilestoneProgress, type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward, type Certificate, type InsertCertificate, type Resource, type InsertResource, type CommunityThread, type InsertCommunityThread, type CommunityPost, type InsertCommunityPost, type QuranReciter, type InsertQuranReciter, type Hadith, type InsertHadith, type ParentNotification, type InsertParentNotification, type ParentPrayerSettings, type InsertParentPrayerSettings, type CommunityLike, type InsertCommunityLike, type BankTransfer, type InsertBankTransfer, type LiveEvent, type InsertLiveEvent, type EventRsvp, type InsertEventRsvp, type CourseReview, type InsertCourseReview, type Expense, type InsertExpense, type PushSubscription, type InsertPushSubscription, type FlashcardCategory, type InsertFlashcardCategory, type Flashcard, type InsertFlashcard, type FlashcardProgress, type InsertFlashcardProgress, type AssessmentQuestion, type InsertAssessmentQuestion, type ParentAssessment, type InsertParentAssessment, type AssessmentResponse, type InsertAssessmentResponse, type AiAssessmentInsight, type InsertAiAssessmentInsight, type LearningPathRecommendation, type InsertLearningPathRecommendation, type HomeworkConversation, type InsertHomeworkConversation, type HomeworkMessage, type InsertHomeworkMessage, type HomeworkUsage, type InsertHomeworkUsage, type ParentingConversation, type InsertParentingConversation, type ParentingMessage, type InsertParentingMessage, type ParentingUsage, type InsertParentingUsage, type TelegramReferral, type InsertTelegramReferral, type AiGeneratedTip, type InsertAiGeneratedTip, type Appointment, type InsertAppointment, type AvailabilitySlot, type InsertAvailabilitySlot, type CalendarAvailability, type InsertCalendarAvailability, type Announcement, type InsertAnnouncement, type HomepageSection, type InsertHomepageSection, type ParentCommunitySetting, type InsertParentCommunitySetting, type LessonImage, type InsertLessonImage, type ReceiptFingerprint, type InsertReceiptFingerprint, type ReceiptAttempt, type InsertReceiptAttempt, type LessonBookmark, type InsertLessonBookmark, type LessonExercise, type InsertLessonExercise, type ExerciseProgress, type InsertExerciseProgress, type ParentPostCommentImage, type InsertParentPostCommentImage, pricingPlans, type PricingPlan, type InsertPricingPlan, contentProgress, type ContentProgress, type GoogleMeetEvent, type InsertGoogleMeetEvent, parentTips, type ParentTip, type InsertParentTip, type Child, type InsertChild, children } from "@shared/schema";
+import { users, courses, lessons, quizzes, quizQuestions, paymentMethods, paymentSubmissions, enrollments, parents, testimonials, testimonialReactions, assignmentSubmissions, supportMessages, lessonProgress, assignments, modules, dailyTips, dailyTipSchedules, milestones, milestoneProgress, badges, badgeAwards, certificates, resources, communityThreads, communityPosts, communityLikes, liveEvents, eventRsvps, courseReviews, pushSubscriptions, assessmentQuestions, parentAssessments, assessmentResponses, aiAssessmentInsights, learningPathRecommendations, passwordResetTokens, homeworkConversations, homeworkMessages, homeworkUsage, parentingConversations, parentingMessages, parentingUsage, telegramReferrals, aiGeneratedTips, appointments, availabilitySlots, calendarAvailability, announcements, homepageSections, parentCommunitySettings, lessonImages, flashcardCategories, flashcards, flashcardProgress, expenses, receiptFingerprints, receiptAttempts, lessonBookmarks, lessonExercises, exerciseProgress, conversations, messages, userPresence, bankTransfers, quranReciters, hadiths, parentNotifications, parentPrayerSettings, voiceRooms, voiceParticipants, voiceRoomMessages, voiceRoomRsvps, voiceRecordings, voiceRoomBans, hostFollows, sheekoFollows, sheekoAppreciations, contentReports, moderationActions, userConsent, aiModerationReports, bedtimeStories, parentMessages, contentReactions, contentComments, commentReactions, parentFollows, directMessages, socialNotifications, parentPosts, parentPostImages, coursePromotions, parentPostReactions, parentPostComments, parentPostCommentImages, parentPostCommentReactions, userBlocks, googleMeetEvents, type User, type InsertUser, type VoiceRoom, type InsertVoiceRoom, type VoiceParticipant, type InsertVoiceParticipant, type VoiceRoomMessage, type InsertVoiceRoomMessage, type VoiceRoomRsvp, type InsertVoiceRoomRsvp, type VoiceRecording, type InsertVoiceRecording, type VoiceRoomBan, type InsertVoiceRoomBan, type HostFollow, type InsertHostFollow, type SheekoFollow, type InsertSheekoFollow, type SheekoAppreciation, type InsertSheekoAppreciation, type ContentReport, type InsertContentReport, type ModerationAction, type InsertModerationAction, type UserConsent, type InsertUserConsent, type CoursePromotion, type InsertCoursePromotion, type ParentPostReaction, type InsertParentPostReaction, type ParentPostComment, type InsertParentPostComment, type AiModerationReport, type InsertAiModerationReport, type BedtimeStory, type InsertBedtimeStory, type ParentMessage, type InsertParentMessage, type ContentReaction, type InsertContentReaction, type ContentComment, type InsertContentComment, type CommentReaction, type InsertCommentReaction, type ParentFollow, type InsertParentFollow, type DirectMessage, type InsertDirectMessage, type SocialNotification, type InsertSocialNotification, type ParentPost, type InsertParentPost, type ParentPostImage, type InsertParentPostImage, type Course, type InsertCourse, type Lesson, type InsertLesson, type Quiz, type InsertQuiz, type QuizQuestion, type InsertQuizQuestion, type PaymentMethod, type InsertPaymentMethod, type PaymentSubmission, type InsertPaymentSubmission, type Enrollment, type InsertEnrollment, type Parent, type InsertParent, type Testimonial, type InsertTestimonial, type AssignmentSubmission, type InsertAssignmentSubmission, type SupportMessage, type InsertSupportMessage, type LessonProgress, type InsertLessonProgress, type Assignment, type InsertAssignment, type Module, type InsertModule, type DailyTip, type InsertDailyTip, type DailyTipSchedule, type InsertDailyTipSchedule, type Milestone, type InsertMilestone, type MilestoneProgress, type InsertMilestoneProgress, type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward, type Certificate, type InsertCertificate, type Resource, type InsertResource, type CommunityThread, type InsertCommunityThread, type CommunityPost, type InsertCommunityPost, type QuranReciter, type InsertQuranReciter, type Hadith, type InsertHadith, type ParentNotification, type InsertParentNotification, type ParentPrayerSettings, type InsertParentPrayerSettings, type CommunityLike, type InsertCommunityLike, type BankTransfer, type InsertBankTransfer, type LiveEvent, type InsertLiveEvent, type EventRsvp, type InsertEventRsvp, type CourseReview, type InsertCourseReview, type Expense, type InsertExpense, type PushSubscription, type InsertPushSubscription, type FlashcardCategory, type InsertFlashcardCategory, type Flashcard, type InsertFlashcard, type FlashcardProgress, type InsertFlashcardProgress, type AssessmentQuestion, type InsertAssessmentQuestion, type ParentAssessment, type InsertParentAssessment, type AssessmentResponse, type InsertAssessmentResponse, type AiAssessmentInsight, type InsertAiAssessmentInsight, type LearningPathRecommendation, type InsertLearningPathRecommendation, type HomeworkConversation, type InsertHomeworkConversation, type HomeworkMessage, type InsertHomeworkMessage, type HomeworkUsage, type InsertHomeworkUsage, type ParentingConversation, type InsertParentingConversation, type ParentingMessage, type InsertParentingMessage, type ParentingUsage, type InsertParentingUsage, type TelegramReferral, type InsertTelegramReferral, type AiGeneratedTip, type InsertAiGeneratedTip, type Appointment, type InsertAppointment, type AvailabilitySlot, type InsertAvailabilitySlot, type CalendarAvailability, type InsertCalendarAvailability, type Announcement, type InsertAnnouncement, type HomepageSection, type InsertHomepageSection, type ParentCommunitySetting, type InsertParentCommunitySetting, type LessonImage, type InsertLessonImage, type ReceiptFingerprint, type InsertReceiptFingerprint, type ReceiptAttempt, type InsertReceiptAttempt, type LessonBookmark, type InsertLessonBookmark, type LessonExercise, type InsertLessonExercise, type ExerciseProgress, type InsertExerciseProgress, type ParentPostCommentImage, type InsertParentPostCommentImage, pricingPlans, type PricingPlan, type InsertPricingPlan, contentProgress, type ContentProgress, type GoogleMeetEvent, type InsertGoogleMeetEvent, parentTips, type ParentTip, type InsertParentTip } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, lte, gte, gt, sql, asc, ilike, or, not, isNull, inArray } from "drizzle-orm";
 
@@ -85,7 +85,7 @@ export interface IStorage {
   createParent(parent: InsertParent): Promise<Parent>;
   updateParentLastLogin(id: string): Promise<void>;
   updateParentPassword(id: string, hashedPassword: string): Promise<Parent | undefined>;
-  updateParent(id: string, data: { name?: string; picture?: string; phone?: string; country?: string; city?: string; whatsappOptin?: boolean; whatsappNumber?: string; telegramOptin?: boolean; telegramChatId?: string; dailyReminderEnabled?: boolean; dailyReminderTime?: string; activeSessionId?: string; lastLoginIp?: string; lastLoginDevice?: string; googleId?: string; stripeCustomerId?: string; stripeSubscriptionId?: string; aiPlan?: string; aiTrialStartedAt?: Date | null; aiTrialEndsAt?: Date | null; aiGoldExpiresAt?: Date | null }): Promise<Parent | undefined>;
+  updateParent(id: string, data: { name?: string; picture?: string; phone?: string; country?: string; city?: string; whatsappOptin?: boolean; whatsappNumber?: string; telegramOptin?: boolean; telegramChatId?: string; dailyReminderEnabled?: boolean; dailyReminderTime?: string; activeSessionId?: string; lastLoginIp?: string; lastLoginDevice?: string; googleId?: string; aiPlan?: string; aiTrialStartedAt?: Date | null; aiTrialEndsAt?: Date | null; aiGoldExpiresAt?: Date | null }): Promise<Parent | undefined>;
   getAllParents(): Promise<Parent[]>;
   deleteParent(id: string): Promise<void>;
   setParentAdmin(id: string, isAdmin: boolean): Promise<Parent | undefined>;
@@ -459,8 +459,8 @@ export interface IStorage {
 
   // Bedtime Stories (Maaweelada Caruurta)
   createBedtimeStory(story: InsertBedtimeStory): Promise<BedtimeStory>;
-  getBedtimeStories(): Promise<BedtimeStory[]>;
-  getAllBedtimeStories(): Promise<BedtimeStory[]>;
+  getBedtimeStories(limit?: number, offset?: number): Promise<BedtimeStory[]>;
+  getAllBedtimeStories(limit?: number, offset?: number): Promise<BedtimeStory[]>;
   getBedtimeStory(id: string): Promise<BedtimeStory | undefined>;
   getTodayBedtimeStory(): Promise<BedtimeStory | undefined>;
   getBedtimeStoryByDate(date: string): Promise<BedtimeStory | undefined>;
@@ -470,8 +470,8 @@ export interface IStorage {
 
   // Parent Messages (Dhambaalka Waalidka)
   createParentMessage(message: InsertParentMessage): Promise<ParentMessage>;
-  getParentMessages(limit?: number): Promise<ParentMessage[]>;
-  getAllParentMessages(limit?: number): Promise<ParentMessage[]>;
+  getParentMessages(limit?: number, offset?: number): Promise<ParentMessage[]>;
+  getAllParentMessages(limit?: number, offset?: number): Promise<ParentMessage[]>;
   getParentMessage(id: string): Promise<ParentMessage | undefined>;
   getTodayParentMessage(): Promise<ParentMessage | undefined>;
   getParentMessageByDate(date: string): Promise<ParentMessage | undefined>;
@@ -483,6 +483,8 @@ export interface IStorage {
   createParentTip(tip: InsertParentTip): Promise<ParentTip>;
   getParentTipsByStage(stage: string, limit?: number): Promise<ParentTip[]>;
   getAllParentTips(limit?: number): Promise<ParentTip[]>;
+  getArchivedParentTips(stage?: string, limit?: number, hoursAgo?: number): Promise<ParentTip[]>;
+  getHomepageActiveParentTips(limit?: number, hoursAgo?: number): Promise<ParentTip[]>;
   getParentTip(id: string): Promise<ParentTip | undefined>;
   getParentTipsByDate(date: string): Promise<ParentTip[]>;
   getRecentParentTips(hoursAgo: number): Promise<ParentTip[]>;
@@ -595,14 +597,6 @@ export interface IStorage {
   updateGoogleMeetEvent(id: string, data: Partial<InsertGoogleMeetEvent>): Promise<GoogleMeetEvent | undefined>;
   archiveGoogleMeetEvent(id: string): Promise<GoogleMeetEvent | undefined>;
   deleteGoogleMeetEvent(id: string): Promise<void>;
-
-  // Children operations (Quran learning child accounts)
-  getChildrenByParentId(parentId: string): Promise<Child[]>;
-  getChild(id: string): Promise<Child | undefined>;
-  getChildByUsername(username: string): Promise<Child | undefined>;
-  createChild(child: InsertChild): Promise<Child>;
-  updateChild(id: string, data: Partial<{ name: string; age: number; password: string; avatarColor: string }>): Promise<Child | undefined>;
-  deleteChild(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -979,7 +973,7 @@ export class DatabaseStorage implements IStorage {
     code?: string;
   }> {
     const MAX_PER_DAY = 2;
-    const MAX_PER_WEEK = 4;
+    const MAX_PER_WEEK = 3;
     
     // Only apply scheduling limits to "0-6 Bilood" course - look up course by UUID to check title
     const course = await this.getCourse(courseId);
@@ -1074,7 +1068,7 @@ export class DatabaseStorage implements IStorage {
     if (!enrollment) return { success: false, error: "NO_ENROLLMENT" };
     
     const MAX_PER_DAY = 2;
-    const MAX_PER_WEEK = 4;
+    const MAX_PER_WEEK = 3;
     
     // Use Somalia timezone (UTC+3) for consistent day/week boundaries
     const getSomaliDate = () => {
@@ -1280,7 +1274,7 @@ export class DatabaseStorage implements IStorage {
     return parent || undefined;
   }
 
-  async updateParent(id: string, data: { name?: string; picture?: string; phone?: string; country?: string; city?: string; whatsappOptin?: boolean; whatsappNumber?: string; telegramOptin?: boolean; telegramChatId?: string; dailyReminderEnabled?: boolean; dailyReminderTime?: string; activeSessionId?: string; lastLoginIp?: string; lastLoginDevice?: string; googleId?: string; stripeCustomerId?: string; stripeSubscriptionId?: string; aiPlan?: string; aiTrialStartedAt?: Date | null; aiTrialEndsAt?: Date | null; aiGoldExpiresAt?: Date | null }): Promise<Parent | undefined> {
+  async updateParent(id: string, data: { name?: string; picture?: string; phone?: string; country?: string; city?: string; whatsappOptin?: boolean; whatsappNumber?: string; telegramOptin?: boolean; telegramChatId?: string; dailyReminderEnabled?: boolean; dailyReminderTime?: string; activeSessionId?: string; lastLoginIp?: string; lastLoginDevice?: string; googleId?: string; aiPlan?: string; aiTrialStartedAt?: Date | null; aiTrialEndsAt?: Date | null; aiGoldExpiresAt?: Date | null }): Promise<Parent | undefined> {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.picture !== undefined) updateData.picture = data.picture;
@@ -1297,8 +1291,6 @@ export class DatabaseStorage implements IStorage {
     if (data.lastLoginIp !== undefined) updateData.lastLoginIp = data.lastLoginIp;
     if (data.lastLoginDevice !== undefined) updateData.lastLoginDevice = data.lastLoginDevice;
     if (data.googleId !== undefined) updateData.googleId = data.googleId;
-    if (data.stripeCustomerId !== undefined) updateData.stripeCustomerId = data.stripeCustomerId;
-    if (data.stripeSubscriptionId !== undefined) updateData.stripeSubscriptionId = data.stripeSubscriptionId;
     if (data.aiPlan !== undefined) updateData.aiPlan = data.aiPlan;
     if (data.aiTrialStartedAt !== undefined) updateData.aiTrialStartedAt = data.aiTrialStartedAt;
     if (data.aiTrialEndsAt !== undefined) updateData.aiTrialEndsAt = data.aiTrialEndsAt;
@@ -1483,7 +1475,7 @@ export class DatabaseStorage implements IStorage {
           // Return structured error with code
           const messages: Record<string, string> = {
             "DAILY_LIMIT_REACHED": "Maanta waxaad dhamaysay 2 cashar. Berri ku soo laabo.",
-            "WEEKLY_LIMIT_REACHED": "Usbuucan waxaad dhamaysay 4 cashar. Usbuuca dambe ku soo laabo.",
+            "WEEKLY_LIMIT_REACHED": "Usbuucan waxaad dhamaysay 3 cashar. Usbuuca dambe ku soo laabo.",
             "NO_ENROLLMENT": "Ma lihid diiwaan gal koorsadan."
           };
           return { 
@@ -1701,6 +1693,7 @@ export class DatabaseStorage implements IStorage {
       return { dripEnabled: false, lessonsPerWeek: 0, totalUnlocked: allLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: allLessons.map(l => l.id), started: true };
     }
 
+    let usedAllAccessFallback = false;
     let enrollment = await db.select().from(enrollments)
       .where(and(eq(enrollments.parentId, parentId), eq(enrollments.courseId, courseId), eq(enrollments.status, 'active')))
       .then(r => r[0]);
@@ -1711,6 +1704,7 @@ export class DatabaseStorage implements IStorage {
         enrollment = await db.select().from(enrollments)
           .where(and(eq(enrollments.parentId, parentId), eq(enrollments.courseId, allAccessCourse.id), eq(enrollments.status, 'active')))
           .then(r => r[0]);
+        usedAllAccessFallback = !!enrollment;
       }
     }
 
@@ -1723,15 +1717,45 @@ export class DatabaseStorage implements IStorage {
       return { dripEnabled: true, lessonsPerWeek: course.dripLessonsPerWeek, totalUnlocked: freeLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: freeLessons.map(l => l.id), started: false };
     }
 
-    const startDate = enrollment.firstLessonAt || enrollment.accessStart;
+    const [firstActivity] = await db
+      .select({ firstActivityAt: sql<Date | null>`MIN(COALESCE(${lessonProgress.completedAt}, ${lessonProgress.lastViewedAt}))` })
+      .from(lessonProgress)
+      .where(and(
+        eq(lessonProgress.parentId, parentId),
+        eq(lessonProgress.courseId, courseId),
+        sql`COALESCE(${lessonProgress.completedAt}, ${lessonProgress.lastViewedAt}) IS NOT NULL`
+      ));
+
+    let startDate: Date | null = null;
+    if (!usedAllAccessFallback) {
+      startDate = enrollment.firstLessonAt || enrollment.accessStart || null;
+    } else if (firstActivity?.firstActivityAt) {
+      startDate = new Date(firstActivity.firstActivityAt);
+    }
+
     if (!startDate) {
       const freeLessons = allLessons.filter((_, i) => i < 5);
       return { dripEnabled: true, lessonsPerWeek: course.dripLessonsPerWeek, totalUnlocked: freeLessons.length, totalLessons: allLessons.length, nextUnlockDate: null, daysUntilNextUnlock: 0, unlockedLessonIds: freeLessons.map(l => l.id), started: false };
     }
 
+    // Use Somalia day boundaries (UTC+3) so unlock dates don't drift by server/user timezone.
+    const DAY_MS = 1000 * 60 * 60 * 24;
+    const SOMALIA_OFFSET_MS = 3 * 60 * 60 * 1000;
+    const toSomaliaDayIndex = (date: Date) => Math.floor((date.getTime() + SOMALIA_OFFSET_MS) / DAY_MS);
+    const formatSomaliaIsoDate = (dayIndex: number) => {
+      const utcDate = new Date(dayIndex * DAY_MS - SOMALIA_OFFSET_MS);
+      const somaliaDate = new Date(utcDate.getTime() + SOMALIA_OFFSET_MS);
+      const y = somaliaDate.getUTCFullYear();
+      const m = String(somaliaDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(somaliaDate.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     const now = new Date();
-    const msElapsed = now.getTime() - new Date(startDate).getTime();
-    const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);
+    const start = new Date(startDate);
+    const nowDayIndex = toSomaliaDayIndex(now);
+    const startDayIndex = toSomaliaDayIndex(start);
+    const daysElapsed = Math.max(0, nowDayIndex - startDayIndex);
     const weeksElapsed = Math.floor(daysElapsed / 7);
     const maxUnlockedIndex = (weeksElapsed + 1) * course.dripLessonsPerWeek;
 
@@ -1746,10 +1770,9 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const nextWeekStart = new Date(startDate);
-    nextWeekStart.setDate(nextWeekStart.getDate() + (weeksElapsed + 1) * 7);
-    const daysUntilNextUnlock = Math.max(0, Math.ceil((nextWeekStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-    const nextUnlockDate = maxUnlockedIndex >= allLessons.length ? null : nextWeekStart.toISOString().split('T')[0];
+    const nextUnlockDayIndex = startDayIndex + (weeksElapsed + 1) * 7;
+    const daysUntilNextUnlock = Math.max(0, nextUnlockDayIndex - nowDayIndex);
+    const nextUnlockDate = maxUnlockedIndex >= allLessons.length ? null : formatSomaliaIsoDate(nextUnlockDayIndex);
 
     return {
       dripEnabled: true,
@@ -4952,7 +4975,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getBedtimeStories(): Promise<BedtimeStory[]> {
+  async getBedtimeStories(limit: number = 100, offset: number = 0): Promise<BedtimeStory[]> {
     // Return thumbnailUrl for list view (lightweight), exclude base64 images array
     const results = await db.select({
       id: bedtimeStories.id,
@@ -4973,14 +4996,18 @@ export class DatabaseStorage implements IStorage {
     })
       .from(bedtimeStories)
       .where(eq(bedtimeStories.isPublished, true))
-      .orderBy(desc(bedtimeStories.storyDate));
+      .orderBy(desc(bedtimeStories.storyDate))
+      .limit(limit)
+      .offset(offset);
     return results as BedtimeStory[];
   }
 
-  async getAllBedtimeStories(): Promise<BedtimeStory[]> {
+  async getAllBedtimeStories(limit: number = 100, offset: number = 0): Promise<BedtimeStory[]> {
     return await db.select()
       .from(bedtimeStories)
-      .orderBy(desc(bedtimeStories.generatedAt));
+      .orderBy(desc(bedtimeStories.generatedAt))
+      .limit(limit)
+      .offset(offset);
   }
 
   async getBedtimeStory(id: string): Promise<BedtimeStory | undefined> {
@@ -5038,7 +5065,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getParentMessages(limit: number = 30): Promise<ParentMessage[]> {
+  async getParentMessages(limit: number = 100, offset: number = 0): Promise<ParentMessage[]> {
     // Return thumbnailUrl for list view (lightweight), exclude base64 images array
     const results = await db.select({
       id: parentMessages.id,
@@ -5058,15 +5085,17 @@ export class DatabaseStorage implements IStorage {
       .from(parentMessages)
       .where(eq(parentMessages.isPublished, true))
       .orderBy(desc(parentMessages.messageDate))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
     return results as ParentMessage[];
   }
 
-  async getAllParentMessages(limit: number = 30): Promise<ParentMessage[]> {
+  async getAllParentMessages(limit: number = 100, offset: number = 0): Promise<ParentMessage[]> {
     return await db.select()
       .from(parentMessages)
       .orderBy(desc(parentMessages.generatedAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   }
 
   async getParentMessage(id: string): Promise<ParentMessage | undefined> {
@@ -5133,6 +5162,31 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(parentTips)
       .where(eq(parentTips.isPublished, true))
       .orderBy(desc(parentTips.tipDate))
+      .limit(limit);
+  }
+
+  async getArchivedParentTips(stage?: string, limit: number = 80, hoursAgo: number = 3): Promise<ParentTip[]> {
+    const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    const conditions = [eq(parentTips.isPublished, true), lte(parentTips.generatedAt, cutoff)];
+
+    if (stage && stage !== "all") {
+      conditions.push(eq(parentTips.stage, stage));
+    }
+
+    return await db.select().from(parentTips)
+      .where(and(...conditions))
+      .orderBy(desc(parentTips.tipDate), desc(parentTips.generatedAt))
+      .limit(limit);
+  }
+
+  async getHomepageActiveParentTips(limit: number = 3, hoursAgo: number = 3): Promise<ParentTip[]> {
+    const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    return await db.select().from(parentTips)
+      .where(and(
+        eq(parentTips.isPublished, true),
+        gt(parentTips.generatedAt, cutoff)
+      ))
+      .orderBy(desc(parentTips.generatedAt))
       .limit(limit);
   }
 
@@ -6055,35 +6109,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGoogleMeetEvent(id: string): Promise<void> {
     await db.delete(googleMeetEvents).where(eq(googleMeetEvents.id, id));
-  }
-
-  // Children operations
-  async getChildrenByParentId(parentId: string): Promise<Child[]> {
-    return await db.select().from(children).where(eq(children.parentId, parentId)).orderBy(asc(children.createdAt));
-  }
-
-  async getChild(id: string): Promise<Child | undefined> {
-    const [child] = await db.select().from(children).where(eq(children.id, id));
-    return child || undefined;
-  }
-
-  async getChildByUsername(username: string): Promise<Child | undefined> {
-    const [child] = await db.select().from(children).where(eq(children.username, username));
-    return child || undefined;
-  }
-
-  async createChild(child: InsertChild): Promise<Child> {
-    const [created] = await db.insert(children).values(child).returning();
-    return created;
-  }
-
-  async updateChild(id: string, data: Partial<{ name: string; age: number; password: string; avatarColor: string }>): Promise<Child | undefined> {
-    const [updated] = await db.update(children).set(data).where(eq(children.id, id)).returning();
-    return updated || undefined;
-  }
-
-  async deleteChild(id: string): Promise<void> {
-    await db.delete(children).where(eq(children.id, id));
   }
 }
 

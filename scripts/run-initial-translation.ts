@@ -26,11 +26,24 @@
  */
 
 import { createComprehensiveTranslationBatchJob } from '../server/batch-api/worker';
+import { pool } from '../server/db';
 
 // Default configuration
 const DEFAULT_BATCH_SIZE = 50; // Process up to 50 items per content type
 
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const asAny = error as any;
+    if (typeof asAny.message === 'string' && asAny.message.length > 0) return asAny.message;
+    if (asAny.error && typeof asAny.error.message === 'string') return asAny.error.message;
+  }
+  return String(error);
+}
+
 async function main() {
+  let hadError = false;
+
   console.log('='.repeat(70));
   console.log('🌐 INITIAL BATCH TRANSLATION - BARBAARINTASAN ACADEMY');
   console.log('='.repeat(70));
@@ -43,13 +56,15 @@ async function main() {
   if (!openaiKey) {
     console.error('❌ ERROR: OpenAI API key not found!');
     console.error('   Please set OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   
   if (!databaseUrl) {
     console.error('❌ ERROR: Database URL not found!');
     console.error('   Please set DATABASE_URL environment variable');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   
   console.log('✅ Environment variables verified');
@@ -105,8 +120,11 @@ async function main() {
     
     console.log('='.repeat(70));
     console.log();
+
+    process.exitCode = 0;
     
   } catch (error) {
+    hadError = true;
     console.error();
     console.error('='.repeat(70));
     console.error('❌ ERROR: Failed to create translation batch jobs');
@@ -124,7 +142,7 @@ async function main() {
         console.error();
       }
     } else {
-      console.error('Unknown error:', error);
+      console.error('Unknown error:', formatUnknownError(error));
       console.error();
     }
     
@@ -135,7 +153,16 @@ async function main() {
     console.error('   4. Check server logs for more details');
     console.error();
     
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    try {
+      await pool.end();
+    } catch {
+      // Ignore pool shutdown errors during CLI exit.
+    }
+    if (!hadError && process.exitCode !== 1) {
+      process.exitCode = 0;
+    }
   }
 }
 

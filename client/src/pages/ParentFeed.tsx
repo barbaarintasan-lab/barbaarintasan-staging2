@@ -289,7 +289,7 @@ export default function ParentFeed() {
     },
   });
 
-  const bannerImageUrl = communitySettings?.banner_image_url || "/attached_assets/waalidka_1768927285032.png";
+  const bannerImageUrl = communitySettings?.banner_image_url || "/images/somali_parents_community_gathering.png";
   const bannerTitle = communitySettings?.banner_title || "Baraha Waalidiinta";
   const bannerSubtitle = communitySettings?.banner_subtitle || "Bulsho Hagaasan oo Soomaali ah";
 
@@ -1048,13 +1048,13 @@ function PostCard({ post, currentParentId, onSelect, onEdit, onBlockUser, onRepo
           
           {post.images && post.images.length > 0 && (
             <div 
-              className="relative rounded-lg overflow-hidden mb-3 cursor-pointer"
+              className="relative rounded-lg overflow-hidden mb-3 cursor-pointer bg-muted/30 aspect-[4/3] flex items-center justify-center"
               onClick={onSelect}
             >
               <img 
                 src={post.images[0].imageUrl} 
                 alt={post.images[0].altText || post.title}
-                className="w-full h-48 object-cover"
+                className="w-full h-full object-contain"
               />
               {post.images.length > 1 && (
                 <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
@@ -1228,20 +1228,36 @@ function CreatePostDialog({ open, onClose }: CreatePostDialogProps) {
         credentials: 'include',
         body: formData,
       });
-      
-      if (res.ok) {
-        const data = await res.json();
-        uploadedUrls.push(data.imageUrl);
-        
-        await fetch(`/api/social-posts/${postId}/images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            imageUrl: data.imageUrl,
-            displayOrder: uploadedUrls.length - 1
-          }),
-        });
+
+      if (!res.ok) {
+        let message = 'Sawirka lama upload-gareyn karin';
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const data = await res.json();
+      uploadedUrls.push(data.imageUrl);
+
+      const saveRes = await fetch(`/api/social-posts/${postId}/images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          imageUrl: data.imageUrl,
+          displayOrder: uploadedUrls.length - 1
+        }),
+      });
+
+      if (!saveRes.ok) {
+        let message = 'Sawirka post-ka laguma xiri karin';
+        try {
+          const errData = await saveRes.json();
+          if (errData?.error) message = errData.error;
+        } catch {}
+        throw new Error(message);
       }
     }
     
@@ -1273,7 +1289,8 @@ function CreatePostDialog({ open, onClose }: CreatePostDialogProps) {
         try {
           await uploadImages(post.id);
         } catch (err) {
-          console.error("Image upload error:", err);
+          const message = err instanceof Error ? err.message : 'Sawirrada qaar lama galin';
+          toast.error(message);
         }
       }
       setIsUploading(false);
@@ -1542,18 +1559,34 @@ function EditPostDialog({ post, onClose }: EditPostDialogProps) {
         credentials: 'include',
         body: formData,
       });
-      
-      if (res.ok) {
-        const data = await res.json();
-        await fetch(`/api/social-posts/${postId}/images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            imageUrl: data.imageUrl,
-            displayOrder: existingImages.length + selectedImages.indexOf(file)
-          }),
-        });
+
+      if (!res.ok) {
+        let message = 'Sawirka lama upload-gareyn karin';
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const data = await res.json();
+      const saveRes = await fetch(`/api/social-posts/${postId}/images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          imageUrl: data.imageUrl,
+          displayOrder: existingImages.length + selectedImages.indexOf(file)
+        }),
+      });
+
+      if (!saveRes.ok) {
+        let message = 'Sawirka post-ka laguma xiri karin';
+        try {
+          const errData = await saveRes.json();
+          if (errData?.error) message = errData.error;
+        } catch {}
+        throw new Error(message);
       }
     }
   };
@@ -1578,7 +1611,8 @@ function EditPostDialog({ post, onClose }: EditPostDialogProps) {
         try {
           await uploadImages(post.id);
         } catch (err) {
-          console.error("Image upload error:", err);
+          const message = err instanceof Error ? err.message : 'Sawirrada qaar lama galin';
+          toast.error(message);
         }
         setIsUploading(false);
       }
@@ -1661,7 +1695,9 @@ function EditPostDialog({ post, onClose }: EditPostDialogProps) {
               <div className="grid grid-cols-2 gap-2">
                 {existingImages.map((img) => (
                   <div key={img.id} className="relative rounded-lg overflow-hidden">
-                    <img src={img.imageUrl} alt="" className="w-full h-24 object-cover" />
+                    <div className="w-full h-24 bg-muted/30 flex items-center justify-center">
+                      <img src={img.imageUrl} alt="" className="w-full h-full object-contain" />
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeExistingImage(img.id)}
@@ -1679,7 +1715,9 @@ function EditPostDialog({ post, onClose }: EditPostDialogProps) {
               <div className="grid grid-cols-2 gap-2">
                 {imagePreviews.map((preview, index) => (
                   <div key={index} className="relative rounded-lg overflow-hidden border-2 border-dashed border-blue-300">
-                    <img src={preview} alt="" className="w-full h-24 object-cover" />
+                    <div className="w-full h-24 bg-muted/30 flex items-center justify-center">
+                      <img src={preview} alt="" className="w-full h-full object-contain" />
+                    </div>
                     <span className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">Cusub</span>
                     <button
                       type="button"
@@ -1800,9 +1838,6 @@ function PostDetailModal({
                   {getVisibilityIcon(post.visibility)}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="w-5 h-5" />
-              </Button>
             </div>
           </div>
 

@@ -57,7 +57,7 @@ const content = {
         },
         {
           title: "Data Controller",
-          content: "The app is operated by an EU-based nonprofit organization, acting as the Data Controller under GDPR."
+          content: "The app is operated by Barbaarintasan Academy (Legal name: Musse Said Aw-Musse), an EU-registered nonprofit organization, acting as the Data Controller under GDPR."
         },
         {
           title: "Data We Collect",
@@ -139,7 +139,7 @@ const content = {
         },
         {
           title: "Xog-haye",
-          content: "App-kan waxaa maamula hay'ad EU ku diiwaangashan, taas oo ah xog-hayaha masuulka ka ah xogta."
+          content: "App-kan waxaa maamula Barbaarintasan Academy (Legal name: Musse Said Aw-Musse), hay'ad EU ku diiwaangashan, taas oo ah xog-hayaha masuulka ka ah xogta."
         },
         {
           title: "Xogta Aan Ururinno",
@@ -285,8 +285,10 @@ export default function Legal() {
         </Card>
         
         <div className="mt-6 text-center text-xs text-gray-500">
-          <p>© 2026 Barbaarintasan Academy. All rights reserved.</p>
+          <p>© 2026 BSA. All rights reserved.</p>
           <p className="mt-1">EU-registered nonprofit organization</p>
+          <p className="mt-1">App Name: BSA</p>
+          <p>Developer: Barbaarintasan Academy (Legal name: Musse Said Aw-Musse)</p>
         </div>
       </div>
     </div>

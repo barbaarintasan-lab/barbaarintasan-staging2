@@ -58,7 +58,6 @@ import { ChatRoom } from "@/components/ChatRoom";
 import { Switch } from "@/components/ui/switch";
 import { SocialNotifications } from "@/components/SocialNotifications";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
-import { ChildrenManager } from "@/components/ChildrenManager";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
@@ -2081,15 +2080,6 @@ export default function Profile() {
       
       {/* Daily Reminder Settings */}
       <DailyReminderSettings />
-
-      {/* Children Manager (Quraanka Caruurta) */}
-      <div className="px-4 mt-4">
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-4">
-            <ChildrenManager />
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Messenger Button Card */}
       <div className="px-4 mt-4">

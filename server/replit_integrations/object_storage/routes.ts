@@ -141,10 +141,12 @@ export function registerObjectStorageRoutes(app: Express): void {
           if (fs.existsSync(mappingPath)) {
             const mapping = JSON.parse(fs.readFileSync(mappingPath, "utf-8"));
             const driveFileId = mapping.mappings?.[uuid];
+            const publicRoot = process.env.NODE_ENV === "production"
+              ? path.join(process.cwd(), "dist", "public")
+              : path.join(process.cwd(), "client", "public");
             
             if (driveFileId && driveFileId.length > 0) {
-              // Serve from local course-images folder
-              const imagePath = path.join(process.cwd(), "attached_assets", "course-images", driveFileId);
+              const imagePath = path.join(publicRoot, "course-images", driveFileId);
               if (fs.existsSync(imagePath)) {
                 res.setHeader('Content-Type', 'image/png');
                 res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -156,8 +158,11 @@ export function registerObjectStorageRoutes(app: Express): void {
           console.error("Error reading course image mapping:", e);
         }
         
-        // Fallback: serve logo image
-        const logoPath = path.join(process.cwd(), "attached_assets", "NEW_LOGO-BSU_1_1768990258338.png");
+        // Fallback: serve public logo image
+        const publicRoot = process.env.NODE_ENV === "production"
+          ? path.join(process.cwd(), "dist", "public")
+          : path.join(process.cwd(), "client", "public");
+        const logoPath = path.join(publicRoot, "bsa-logo.png");
         if (fs.existsSync(logoPath)) {
           res.setHeader("Content-Type", "image/png");
           res.setHeader("Cache-Control", "public, max-age=3600");

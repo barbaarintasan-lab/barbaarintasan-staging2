@@ -226,6 +226,7 @@ export default function PrayerTimes({ onBack }: PrayerTimesProps) {
       });
 
       const { latitude, longitude } = position.coords;
+      console.log("Got coordinates:", latitude, longitude);
 
       let cityName = "Your Location";
       let countryName = "";
@@ -240,6 +241,7 @@ export default function PrayerTimes({ onBack }: PrayerTimesProps) {
           countryName = geoData.countryName || "";
         }
       } catch (geoError) {
+        console.log("Geocoding failed, using coordinates only:", geoError);
       }
 
       await updateSettingsMutation.mutateAsync({

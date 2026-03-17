@@ -35,7 +35,7 @@ export const courses = pgTable("courses", {
   contentReady: boolean("content_ready").notNull().default(false), // Admin sets true when content is uploaded
   comingSoonMessage: text("coming_soon_message"),
   dripEnabled: boolean("drip_enabled").notNull().default(false),
-  dripLessonsPerWeek: integer("drip_lessons_per_week").notNull().default(2),
+  dripLessonsPerWeek: integer("drip_lessons_per_week").notNull().default(3),
 });
 
 // Modules table (sections within a course)
@@ -314,9 +314,9 @@ export const enrollments = pgTable("enrollments", {
   upgradeBannerLastShown: timestamp("upgrade_banner_last_shown"), // When banner was last shown
   upgradeBannerCount: integer("upgrade_banner_count").notNull().default(0), // Times shown in current period (max 3)
   upgradeBannerLastWindow: integer("upgrade_banner_last_window"), // Last window index shown (-1 or null = none, 0/1/2 = window)
-  // Scheduling fields for "0-6 Months" course (max 2 lessons/day, max 4 lessons/week)
+  // Scheduling fields for "0-6 Months" course (max 2 lessons/day, max 3 lessons/week)
   firstLessonAt: timestamp("first_lesson_at"), // When parent started first lesson
-  lessonsThisWeek: integer("lessons_this_week").notNull().default(0), // Lessons completed this week (max 4)
+  lessonsThisWeek: integer("lessons_this_week").notNull().default(0), // Lessons completed this week (max 3)
   weekStartDate: timestamp("week_start_date"), // Start of current tracking week
   lessonsToday: integer("lessons_today").notNull().default(0), // Lessons completed today (max 2)
   lastLessonDate: timestamp("last_lesson_date"), // Date of last lesson completion
@@ -2191,138 +2191,6 @@ export const promoVideos = pgTable("promo_videos", {
 export const insertPromoVideoSchema = createInsertSchema(promoVideos).omit({ id: true, createdAt: true });
 export type InsertPromoVideo = z.infer<typeof insertPromoVideoSchema>;
 export type PromoVideo = typeof promoVideos.$inferSelect;
-
-// Children table (child accounts under parent for Quran learning)
-export const children = pgTable("children", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  parentId: varchar("parent_id").notNull().references(() => parents.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  age: integer("age").notNull(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  avatarColor: text("avatar_color").notNull().default("#FFD93D"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertChildSchema = createInsertSchema(children).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertChild = z.infer<typeof insertChildSchema>;
-export type Child = typeof children.$inferSelect;
-
-export const childSessions = pgTable("child_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  parentId: varchar("parent_id").notNull().references(() => parents.id, { onDelete: "cascade" }),
-  sessionToken: text("session_token").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  expiresAt: timestamp("expires_at"),
-  isActive: boolean("is_active").notNull().default(true),
-});
-
-export type ChildSession = typeof childSessions.$inferSelect;
-
-export const childProgress = pgTable("child_progress", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  surahNumber: integer("surah_number").notNull(),
-  surahName: text("surah_name").notNull(),
-  completed: boolean("completed").notNull().default(false),
-  accuracy: integer("accuracy").default(0),
-  timeSpentSeconds: integer("time_spent_seconds").default(0),
-  starsEarned: integer("stars_earned").default(0),
-  completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export type ChildProgressRecord = typeof childProgress.$inferSelect;
-
-export const quranLessonProgress = pgTable("quran_lesson_progress", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  surahNumber: integer("surah_number").notNull(),
-  ayahNumber: integer("ayah_number").notNull(),
-  attempts: integer("attempts").notNull().default(0),
-  bestScore: integer("best_score").notNull().default(0),
-  lastScore: integer("last_score").default(0),
-  completed: boolean("completed").notNull().default(false),
-  completedAt: timestamp("completed_at"),
-  lastAttemptAt: timestamp("last_attempt_at"),
-  dailyAttempts: integer("daily_attempts").notNull().default(0),
-  dailyAttemptDate: text("daily_attempt_date"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => [
-  uniqueIndex("idx_quran_progress_unique").on(table.childId, table.surahNumber, table.ayahNumber),
-]);
-
-export type QuranLessonProgress = typeof quranLessonProgress.$inferSelect;
-
-export const childGameScores = pgTable("child_game_scores", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  gameType: text("game_type").notNull(),
-  surahNumber: integer("surah_number").notNull(),
-  score: integer("score").notNull().default(0),
-  maxScore: integer("max_score").notNull().default(0),
-  coinsEarned: integer("coins_earned").notNull().default(0),
-  timeSpentSeconds: integer("time_spent_seconds").default(0),
-  completedAt: timestamp("completed_at").notNull().defaultNow(),
-});
-
-export type ChildGameScore = typeof childGameScores.$inferSelect;
-
-export const childBadges = pgTable("child_badges", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  badgeKey: text("badge_key").notNull(),
-  badgeName: text("badge_name").notNull(),
-  badgeIcon: text("badge_icon").notNull(),
-  badgeColor: text("badge_color").notNull().default("#FFD93D"),
-  earnedAt: timestamp("earned_at").notNull().defaultNow(),
-}, (table) => [
-  uniqueIndex("idx_child_badge_unique").on(table.childId, table.badgeKey),
-]);
-
-export type ChildBadge = typeof childBadges.$inferSelect;
-
-export const childGameUnlocks = pgTable("child_game_unlocks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  surahNumber: integer("surah_number").notNull(),
-  gameType: text("game_type").notNull(),
-  unlockedAt: timestamp("unlocked_at").notNull().defaultNow(),
-  unlockSource: text("unlock_source").notNull().default("surah_completion"),
-}, (table) => [
-  uniqueIndex("idx_child_game_unlock_unique").on(table.childId, table.surahNumber, table.gameType),
-]);
-
-export type ChildGameUnlock = typeof childGameUnlocks.$inferSelect;
-
-export const childRewardBalances = pgTable("child_reward_balances", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }).unique(),
-  totalCoins: integer("total_coins").notNull().default(0),
-  totalStars: integer("total_stars").notNull().default(0),
-  totalTokens: integer("total_tokens").notNull().default(0),
-  tokensUsed: integer("tokens_used").notNull().default(0),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export type ChildRewardBalance = typeof childRewardBalances.$inferSelect;
-
-export const childRewardLedger = pgTable("child_reward_ledger", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
-  type: text("type").notNull(),
-  amount: integer("amount").notNull(),
-  source: text("source").notNull(),
-  sourceId: text("source_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export type ChildRewardLedgerEntry = typeof childRewardLedger.$inferSelect;
 
 export const ssoTokens = pgTable("sso_tokens", {
   id: serial("id").primaryKey(),

@@ -1362,7 +1362,7 @@ function GroupsListView({
             ))
           ) : (
             <div className="text-center py-16">
-              <Users className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+              <Users className="w-12 h-12 text-blue-500 mx-auto mb-3" />
               <p className="text-gray-500">
                 Wali guruub la ma samayn. Noqo kii ugu horreeya!
               </p>
@@ -1409,7 +1409,7 @@ function GroupsListView({
           ))
         ) : (
           <div className="text-center py-16">
-            <Users className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+            <Users className="w-12 h-12 text-blue-500 mx-auto mb-3" />
             <p className="text-gray-500">
               Wali guruub kuma jirtid. Ku biir mid ama samee mid cusub!
             </p>
@@ -1631,7 +1631,7 @@ function PostItem({
                     key={r.emoji}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all ${
                       optimisticMyReactions.includes(r.emoji)
-                        ? "bg-blue-600/50 border border-blue-400 text-white"
+                        ? "bg-blue-100 border border-blue-300 text-blue-800"
                         : "bg-gray-100 border border-gray-200/40 text-gray-500 hover:bg-gray-200"
                     }`}
                     onClick={() => reactionMutation.mutate(r.emoji)}
@@ -1647,8 +1647,8 @@ function PostItem({
               <button
                 className={`flex items-center gap-1.5 text-xs transition-colors ${
                   post.isLiked
-                    ? "text-red-400"
-                    : "text-gray-500 hover:text-red-400"
+                    ? "text-red-500"
+                    : "text-gray-500 hover:text-red-500"
                 }`}
                 onClick={() => likeMutation.mutate()}
                 disabled={likeMutation.isPending}
@@ -2123,17 +2123,17 @@ function GroupDashboard({
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <TabsList className="w-full bg-gray-100 border border-gray-200 grid grid-cols-4">
+            <TabsList className="w-full bg-gray-100 border border-gray-200 grid grid-cols-4 p-1 gap-1 rounded-lg">
               <TabsTrigger
                 value="posts"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-gray-700 text-xs font-medium"
                 data-testid="tab-posts"
               >
                 Posts
               </TabsTrigger>
               <TabsTrigger
                 value="messages"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-gray-700 text-xs font-medium"
                 data-testid="tab-messages"
               >
                 <Mail className="w-3.5 h-3.5 mr-1" />
@@ -2141,14 +2141,14 @@ function GroupDashboard({
               </TabsTrigger>
               <TabsTrigger
                 value="members"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-gray-700 text-xs font-medium"
                 data-testid="tab-members"
               >
                 Xubnaha
               </TabsTrigger>
               <TabsTrigger
                 value="progress"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-600 text-xs"
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-gray-700 text-xs font-medium"
                 data-testid="tab-progress"
               >
                 Horumarka
@@ -2293,7 +2293,7 @@ function GroupDashboard({
                   {hasMorePosts && (
                     <Button
                       variant="outline"
-                      className="w-full border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-white"
+                      className="w-full border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                       onClick={loadMorePosts}
                       disabled={loadingMorePosts}
                       data-testid="button-load-more-posts"
@@ -2346,7 +2346,7 @@ function GroupDashboard({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">
+                        <p className="text-gray-900 text-sm font-semibold truncate">
                           {member.name || "Aan la aqoon"}
                           {isSelf && <span className="text-gray-500 text-xs ml-1">(Adiga)</span>}
                         </p>
@@ -2368,8 +2368,8 @@ function GroupDashboard({
                       <Badge
                         className={
                           member.role === "admin"
-                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                            : "bg-blue-100 text-gray-500 border-blue-500/30"
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : "bg-blue-100 text-blue-800 border-blue-300"
                         }
                       >
                         {member.role === "admin" ? (
@@ -2423,18 +2423,18 @@ function GroupDashboard({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <span className="text-white text-sm font-semibold block truncate">
+                          <span className="text-gray-900 text-sm font-semibold block truncate">
                             {member.name || "Aan la aqoon"}
                           </span>
                           <div className="flex items-center gap-3 mt-0.5">
                             {member.currentStreak > 0 && (
-                              <span className="flex items-center gap-1 text-orange-400 text-xs">
+                              <span className="flex items-center gap-1 text-orange-700 text-xs">
                                 <Flame className="w-3.5 h-3.5" />
                                 {member.currentStreak} maalin
                               </span>
                             )}
                             {isContentMember && contentData && (
-                              <span className={`flex items-center gap-1 text-xs ${member.contentType === 'dhambaal' ? 'text-teal-400' : 'text-purple-400'}`}>
+                              <span className={`flex items-center gap-1 text-xs ${member.contentType === 'dhambaal' ? 'text-teal-700' : 'text-purple-700'}`}>
                                 <BookOpen className="w-3.5 h-3.5" />
                                 {contentData.readCount || 0} la akhriyay
                               </span>
@@ -2448,9 +2448,9 @@ function GroupDashboard({
                           </div>
                         </div>
                         {member.longestStreak > 0 && (
-                          <div className="text-center px-2 py-1 bg-orange-900/30 border border-orange-800/40 rounded-lg">
-                            <Trophy className="w-3.5 h-3.5 text-orange-400 mx-auto" />
-                            <span className="text-orange-300 text-[10px] block">{member.longestStreak}</span>
+                          <div className="text-center px-2 py-1 bg-orange-100 border border-orange-300 rounded-lg">
+                            <Trophy className="w-3.5 h-3.5 text-orange-700 mx-auto" />
+                            <span className="text-orange-800 text-[10px] block">{member.longestStreak}</span>
                           </div>
                         )}
                       </div>
@@ -2460,16 +2460,16 @@ function GroupDashboard({
                           {member.badges.map((badge: any, idx: number) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-1 px-2 py-1 bg-amber-900/30 border border-amber-700/40 rounded-full"
+                              className="flex items-center gap-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded-full"
                               title={badge.description || badge.name}
                               data-testid={`badge-${member.userId}-${idx}`}
                             >
                               {badge.imageUrl ? (
                                 <img src={badge.imageUrl} alt={badge.name} className="w-4 h-4 rounded-full" />
                               ) : (
-                                <Award className="w-3.5 h-3.5 text-amber-400" />
+                                <Award className="w-3.5 h-3.5 text-amber-700" />
                               )}
-                              <span className="text-amber-200 text-[11px] font-medium">{badge.name}</span>
+                              <span className="text-amber-800 text-[11px] font-medium">{badge.name}</span>
                             </div>
                           ))}
                         </div>
@@ -2505,12 +2505,12 @@ function GroupDashboard({
                               return (
                                 <div key={`content-${idx}`}>
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-blue-500' : isDhambaal ? 'text-teal-300' : 'text-purple-300'}`}>
+                                    <span className={`text-xs flex items-center gap-1 ${isComplete ? 'text-blue-600' : isDhambaal ? 'text-teal-700' : 'text-purple-700'}`}>
                                       <BookOpen className="w-3 h-3" />
                                       {label}
-                                      {isComplete && <span className="text-blue-500 text-[10px] ml-1">✓ Dhammaystay</span>}
+                                      {isComplete && <span className="text-blue-600 text-[10px] ml-1">✓ Dhammaystay</span>}
                                     </span>
-                                    <span className={`text-xs ${isComplete ? 'text-blue-500 font-semibold' : isDhambaal ? 'text-teal-400' : 'text-purple-400'}`}>
+                                    <span className={`text-xs ${isComplete ? 'text-blue-600 font-semibold' : isDhambaal ? 'text-teal-700' : 'text-purple-700'}`}>
                                       {course.readCount}/{course.totalCount}
                                     </span>
                                   </div>

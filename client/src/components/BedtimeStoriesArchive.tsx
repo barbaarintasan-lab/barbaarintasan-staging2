@@ -48,8 +48,8 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
   const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: allStories = [], isLoading } = useQuery<BedtimeStory[]>({
-    queryKey: ["/api/bedtime-stories"],
-    queryFn: () => fetch("/api/bedtime-stories").then(r => r.json()),
+    queryKey: ["/api/bedtime-stories?limit=200"],
+    queryFn: () => fetch("/api/bedtime-stories?limit=200").then(r => r.json()),
     staleTime: 60000,
   });
 

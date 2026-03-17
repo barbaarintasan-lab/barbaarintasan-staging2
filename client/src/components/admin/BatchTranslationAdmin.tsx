@@ -96,11 +96,11 @@ export default function BatchTranslationAdmin() {
     refetchInterval: 10000,
   });
 
-  const { data: coverageReport, isLoading: coverageLoading } = useQuery({
+  const { data: coverageReport, isLoading: coverageLoading } = useQuery<Record<string, any>>({
     queryKey: ["/api/admin/batch-jobs/translation-coverage"],
   });
 
-  const { data: directStats, isLoading: directStatsLoading } = useQuery({
+  const { data: directStats, isLoading: directStatsLoading } = useQuery<any>({
     queryKey: ["/api/admin/direct-translate/stats"],
     refetchInterval: 30000,
   });

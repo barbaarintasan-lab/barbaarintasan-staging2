@@ -1,10 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
 
 export default function TermsConditions() {
-  const { i18n } = useTranslation();
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b">
@@ -15,7 +12,7 @@ export default function TermsConditions() {
             </button>
           </Link>
           <h1 className="text-xl font-bold">
-            Terms & Conditions / Shuruudaha & Xaaladdaha
+            Terms & Conditions / Shuruudaha & Xaaladaha
           </h1>
         </div>
       </div>
@@ -26,7 +23,7 @@ export default function TermsConditions() {
           <div className="border-b md:border-b-0 md:border-r md:pr-8 pb-8 md:pb-0">
             <h2 className="text-xl font-bold mb-4 text-blue-800 underline decoration-blue-200 underline-offset-8">English Version</h2>
             <p className="text-gray-500 text-xs mb-6 font-mono uppercase tracking-wider">Effective Date: January 2026</p>
-            
+
             <div className="space-y-6 text-gray-800 leading-relaxed">
               <section>
                 <h3 className="font-bold text-lg border-b border-gray-100 pb-1 mb-2 text-gray-900">1. Eligibility</h3>

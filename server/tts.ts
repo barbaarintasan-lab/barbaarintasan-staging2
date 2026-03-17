@@ -32,7 +32,7 @@ const MAX_CHARS_PER_REQUEST = 4000; // Azure allows up to 10,000 chars, use 4000
 const CAMB_MAX_CHARS = 450; // Camb AI free plan limit
 const GEMINI_TTS_MAX_CHARS = 4000; // Gemini TTS chunk size
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
 
 function getGeminiAI(): GoogleGenAI | null {
   if (!GEMINI_API_KEY) return null;
@@ -152,6 +152,7 @@ interface TTSOptions {
   gender?: number;
   age?: number;
   azureVoice?: string; // Azure voice name (e.g., AZURE_VOICE_MUUSE or AZURE_VOICE_UBAX)
+  provider?: "auto" | "gemini" | "azure";
 }
 
 interface TTSTaskResponse {
@@ -393,6 +394,44 @@ export async function synthesizeSpeech(
   const voiceName = options.azureVoice || AZURE_VOICE_MUUSE;
   const voiceLabel = voiceName === AZURE_VOICE_UBAX ? "Ubax" : "Muuse";
   const isBedtimeStory = voiceName === AZURE_VOICE_UBAX;
+  const provider = options.provider || "auto";
+
+  if (provider === "gemini") {
+    if (!useGemini) {
+      throw new Error("Gemini TTS provider selected but Gemini API key is not configured");
+    }
+    console.log(`[TTS] Using Gemini TTS (forced provider) for ${text.length} characters...`);
+    return await synthesizeWithGemini(text);
+  }
+
+  if (provider === "azure") {
+    if (!useAzure) {
+      throw new Error("Azure TTS provider selected but Azure Speech credentials are not configured");
+    }
+    console.log(`[TTS] Using Azure Speech (forced provider, ${voiceLabel} voice) for ${text.length} characters`);
+
+    const chunks = splitTextIntoChunks(text, MAX_CHARS_PER_REQUEST);
+    console.log(`[TTS] Split into ${chunks.length} chunks`);
+
+    const audioBuffers: Buffer[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      console.log(`[TTS] Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`);
+      const buffer = await synthesizeWithAzure(chunks[i], voiceName);
+      audioBuffers.push(buffer);
+      if (i < chunks.length - 1) {
+        await sleep(100);
+      }
+    }
+
+    if (audioBuffers.length === 1) {
+      console.log(`[TTS] Generated ${audioBuffers[0].length} bytes of MP3 audio (Azure - ${voiceLabel})`);
+      return audioBuffers[0];
+    }
+
+    const combinedBuffer = await concatenateAudioFiles(audioBuffers, "mp3");
+    console.log(`[TTS] Generated ${combinedBuffer.length} bytes of MP3 audio (Azure - ${voiceLabel})`);
+    return combinedBuffer;
+  }
 
   if (useGemini && isBedtimeStory) {
     try {
@@ -489,7 +528,8 @@ export async function generateAndUploadAudio(
 export async function generateBedtimeStoryAudio(
   storyContent: string,
   moralLesson: string | null,
-  storyId: string
+  storyId: string,
+  provider: "auto" | "gemini" | "azure" = "auto"
 ): Promise<string> {
   let fullText = storyContent;
   if (moralLesson) {
@@ -497,15 +537,16 @@ export async function generateBedtimeStoryAudio(
   }
   
   const timestamp = Date.now();
-  return generateAndUploadAudio(fullText, `sheeko-${storyId}-${timestamp}`, "tts-audio/sheekooyin", { azureVoice: AZURE_VOICE_UBAX }, 'sheeko');
+  return generateAndUploadAudio(fullText, `sheeko-${storyId}-${timestamp}`, "tts-audio/sheekooyin", { azureVoice: AZURE_VOICE_UBAX, provider }, 'sheeko');
 }
 
 export async function generateParentMessageAudio(
   messageContent: string,
-  messageId: string
+  messageId: string,
+  provider: "auto" | "gemini" | "azure" = "auto"
 ): Promise<string> {
   const timestamp = Date.now();
-  return generateAndUploadAudio(messageContent, `dhambaal-${messageId}-${timestamp}`, "tts-audio/dhambaalka", { azureVoice: AZURE_VOICE_MUUSE }, 'dhambaal');
+  return generateAndUploadAudio(messageContent, `dhambaal-${messageId}-${timestamp}`, "tts-audio/dhambaalka", { azureVoice: AZURE_VOICE_MUUSE, provider }, 'dhambaal');
 }
 
 // Generate audio and return as base64 data URL (works on Fly.io without Google Drive)
@@ -528,19 +569,21 @@ export async function generateAudioAsBase64(
 
 export async function generateBedtimeStoryAudioBase64(
   storyContent: string,
-  moralLesson: string | null
+  moralLesson: string | null,
+  provider: "auto" | "gemini" | "azure" = "auto"
 ): Promise<string> {
   let fullText = storyContent;
   if (moralLesson) {
     fullText += `\n\nCasharka Muhiimka ah: ${moralLesson}`;
   }
   // Use Ubax (female voice) for bedtime stories
-  return generateAudioAsBase64(fullText, { azureVoice: AZURE_VOICE_UBAX });
+  return generateAudioAsBase64(fullText, { azureVoice: AZURE_VOICE_UBAX, provider });
 }
 
 export async function generateParentMessageAudioBase64(
-  messageContent: string
+  messageContent: string,
+  provider: "auto" | "gemini" | "azure" = "auto"
 ): Promise<string> {
   // Use Muuse (male voice) for parent messages
-  return generateAudioAsBase64(messageContent, { azureVoice: AZURE_VOICE_MUUSE });
+  return generateAudioAsBase64(messageContent, { azureVoice: AZURE_VOICE_MUUSE, provider });
 }

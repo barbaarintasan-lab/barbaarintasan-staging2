@@ -13,11 +13,33 @@
  *   - DATABASE_URL: PostgreSQL connection string
  */
 
-import { db } from '../server/db';
+import { db, pool } from '../server/db';
 import { translations, batchJobs } from '../shared/schema';
 import { sql, eq, and, desc } from 'drizzle-orm';
 
+function parseMetadata(metadata: string | null): Record<string, unknown> {
+  if (!metadata) return {};
+  try {
+    const parsed = JSON.parse(metadata);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const asAny = error as any;
+    if (typeof asAny.message === 'string' && asAny.message.length > 0) return asAny.message;
+    if (asAny.error && typeof asAny.error.message === 'string') return asAny.error.message;
+  }
+  return String(error);
+}
+
 async function main() {
+  let hadError = false;
+
   console.log('='.repeat(70));
   console.log('📊 TRANSLATION STATUS CHECK - BARBAARINTASAN ACADEMY');
   console.log('='.repeat(70));
@@ -29,13 +51,15 @@ async function main() {
   if (!databaseUrl) {
     console.error('❌ ERROR: Database URL not found!');
     console.error('   Please set DATABASE_URL environment variable');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   
-  console.log('✅ Database connection verified');
-  console.log();
-  
   try {
+    await db.execute(sql`select 1`);
+    console.log('✅ Database connection verified');
+    console.log();
+
     // Get translation counts by entity type
     console.log('📈 Translation Coverage:');
     console.log('-'.repeat(70));
@@ -84,15 +108,15 @@ async function main() {
     
     const recentJobs = await db.select({
       id: batchJobs.id,
-      jobType: batchJobs.jobType,
+      type: batchJobs.type,
       status: batchJobs.status,
-      totalItems: batchJobs.totalItems,
-      description: batchJobs.description,
+      totalRequests: batchJobs.totalRequests,
+      metadata: batchJobs.metadata,
       createdAt: batchJobs.createdAt,
       completedAt: batchJobs.completedAt
     })
     .from(batchJobs)
-    .where(eq(batchJobs.jobType, 'translation'))
+    .where(eq(batchJobs.type, 'translation'))
     .orderBy(desc(batchJobs.createdAt))
     .limit(5);
     
@@ -100,9 +124,16 @@ async function main() {
       console.log('  No translation batch jobs found');
     } else {
       recentJobs.forEach((job, index) => {
+        const metadata = parseMetadata(job.metadata);
+        const description = typeof metadata.description === 'string' ? metadata.description : 'N/A';
+        const entityType = typeof metadata.entityType === 'string' ? metadata.entityType : 'N/A';
+
         console.log(`  ${index + 1}. Job: ${job.id.substring(0, 20)}...`);
+        console.log(`     Type: ${job.type}`);
         console.log(`     Status: ${job.status}`);
-        console.log(`     Description: ${job.description}`);
+        console.log(`     Entity: ${entityType}`);
+        console.log(`     Requests: ${job.totalRequests}`);
+        console.log(`     Description: ${description}`);
         console.log(`     Created: ${job.createdAt.toISOString()}`);
         if (job.completedAt) {
           console.log(`     Completed: ${job.completedAt.toISOString()}`);
@@ -132,8 +163,11 @@ async function main() {
     
     console.log('='.repeat(70));
     console.log();
+
+    process.exitCode = 0;
     
   } catch (error) {
+    hadError = true;
     console.error();
     console.error('='.repeat(70));
     console.error('❌ ERROR: Failed to check translation status');
@@ -142,7 +176,7 @@ async function main() {
     
     if (error instanceof Error) {
       console.error('Error details:');
-      console.error(error.message);
+      console.error(formatUnknownError(error));
       console.error();
       
       if (error.stack) {
@@ -151,11 +185,20 @@ async function main() {
         console.error();
       }
     } else {
-      console.error('Unknown error:', error);
+      console.error('Unknown error:', formatUnknownError(error));
       console.error();
     }
     
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    try {
+      await pool.end();
+    } catch {
+      // Ignore pool shutdown errors during CLI exit.
+    }
+    if (!hadError && process.exitCode !== 1) {
+      process.exitCode = 0;
+    }
   }
 }
 

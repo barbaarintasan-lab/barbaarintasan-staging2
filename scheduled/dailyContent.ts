@@ -24,8 +24,33 @@ import { resolve } from "path";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID;
 const TELEGRAM_GROUP_CHAT_ID_2 = process.env.TELEGRAM_GROUP_CHAT_ID_2;
+const TELEGRAM_GROUP_CHAT_IDS = process.env.TELEGRAM_GROUP_CHAT_IDS;
+const TELEGRAM_BAHDa_GROUP_CHAT_ID = process.env.TELEGRAM_BAHDA_GROUP_CHAT_ID;
+const TELEGRAM_ACADEMY_GROUP_CHAT_ID = process.env.TELEGRAM_ACADEMY_GROUP_CHAT_ID;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 10000; // 10 seconds between retries
+
+function getUniqueTelegramGroupIds(): string[] {
+  const raw = [
+    TELEGRAM_GROUP_CHAT_ID,
+    TELEGRAM_GROUP_CHAT_ID_2,
+    TELEGRAM_BAHDa_GROUP_CHAT_ID,
+    TELEGRAM_ACADEMY_GROUP_CHAT_ID,
+    ...(TELEGRAM_GROUP_CHAT_IDS || "").split(","),
+  ];
+
+  const normalized = raw
+    .map((id) => (id || "").trim())
+    .filter((id) => id.length > 0);
+
+  const unique = Array.from(new Set(normalized));
+
+  if (normalized.length !== unique.length) {
+    console.warn(`[Telegram] Duplicate group IDs found in env; deduped ${normalized.length} -> ${unique.length}`);
+  }
+
+  return unique;
+}
 
 async function sendToTelegramGroup(chatId: string, message: string): Promise<boolean> {
   try {
@@ -57,7 +82,7 @@ async function sendTelegramNotification(message: string): Promise<boolean> {
     return false;
   }
 
-  const groupIds = [TELEGRAM_GROUP_CHAT_ID, TELEGRAM_GROUP_CHAT_ID_2].filter(Boolean) as string[];
+  const groupIds = getUniqueTelegramGroupIds();
   
   if (groupIds.length === 0) {
     console.log("[Telegram] No group chat IDs configured - skipping notification");

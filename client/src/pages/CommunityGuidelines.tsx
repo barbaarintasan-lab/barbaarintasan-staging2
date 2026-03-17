@@ -1,10 +1,7 @@
 import { ArrowLeft, Shield, Ban, Users, Scale, FileCheck } from "lucide-react";
 import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
 
 export default function CommunityGuidelines() {
-  const { i18n } = useTranslation();
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b">

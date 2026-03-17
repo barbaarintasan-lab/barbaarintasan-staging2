@@ -44,6 +44,30 @@ interface ParentTip {
   stage: string;
 }
 
+interface ParentTipListItem {
+  id: string;
+  title: string;
+  topic: string;
+  images: string[];
+  audioUrl: string | null;
+  tipDate: string;
+  stage: string;
+}
+
+function toPlaceholderTip(item: ParentTipListItem): ParentTip {
+  return {
+    id: item.id,
+    title: item.title,
+    content: "",
+    topic: item.topic,
+    keyPoints: null,
+    images: item.images,
+    audioUrl: item.audioUrl,
+    tipDate: item.tipDate,
+    stage: item.stage,
+  };
+}
+
 const DEV_STAGES = [
   { id: "all", label: "Dhammaan", icon: "📚" },
   { id: "newborn-0-3m", label: "Murjux (0-3 bilood)", icon: "👶" },
@@ -68,6 +92,7 @@ export default function ParentTips() {
   const queryClient = useQueryClient();
   const [selectedStage, setSelectedStage] = useState("all");
   const [selectedTip, setSelectedTip] = useState<ParentTip | null>(null);
+  const [isTipDetailLoading, setIsTipDetailLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
@@ -96,7 +121,7 @@ export default function ParentTips() {
     onSuccess: (updated) => {
       setSelectedTip(updated);
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: [`/api/parent-tips?stage=${selectedStage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-tips?stage=${selectedStage}&scope=archive&view=list`] });
     },
   });
 
@@ -112,7 +137,7 @@ export default function ParentTips() {
     },
     onSuccess: (updated) => {
       setSelectedTip(updated);
-      queryClient.invalidateQueries({ queryKey: [`/api/parent-tips?stage=${selectedStage}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/parent-tips?stage=${selectedStage}&scope=archive&view=list`] });
     },
   });
 
@@ -136,9 +161,37 @@ export default function ParentTips() {
     audioMutation.mutate({ id: selectedTip.id, voiceName: selectedVoice });
   };
 
-  const { data: tips = [], isLoading } = useQuery<ParentTip[]>({
-    queryKey: [`/api/parent-tips?stage=${selectedStage}`],
+  const { data: tips = [], isLoading } = useQuery<ParentTipListItem[]>({
+    queryKey: [`/api/parent-tips?stage=${selectedStage}&scope=archive&view=list`],
   });
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadTipDetail = async () => {
+      if (!selectedTip || selectedTip.content) return;
+      try {
+        setIsTipDetailLoading(true);
+        const res = await fetch(`/api/parent-tips/${selectedTip.id}`);
+        if (!res.ok) return;
+        const fullTip = await res.json();
+        if (isActive) {
+          setSelectedTip(fullTip);
+        }
+      } catch {
+        // Keep lightweight item visible even if detail fetch fails.
+      } finally {
+        if (isActive) {
+          setIsTipDetailLoading(false);
+        }
+      }
+    };
+
+    loadTipDetail();
+    return () => {
+      isActive = false;
+    };
+  }, [selectedTip?.id]);
 
   const paragraphs = useMemo(() => {
     if (!selectedTip) return [];
@@ -146,7 +199,7 @@ export default function ParentTips() {
       .split(/\n\n+/)
       .map(p => p.trim())
       .filter(p => p.length > 0);
-  }, [selectedTip?.id]);
+  }, [selectedTip?.id, selectedTip?.content]);
 
   useEffect(() => {
     if (!isPlaying || paragraphs.length === 0 || !audioDuration) return;
@@ -216,7 +269,7 @@ export default function ParentTips() {
     setActiveParagraph(0);
     const currentIndex = tips.findIndex(t => t.id === selectedTip?.id);
     if (currentIndex >= 0 && currentIndex < tips.length - 1) {
-      setTimeout(() => setSelectedTip(tips[currentIndex + 1]), 1500);
+      setTimeout(() => setSelectedTip(toPlaceholderTip(tips[currentIndex + 1])), 1500);
     }
   }, [tips, selectedTip?.id]);
 
@@ -234,7 +287,7 @@ export default function ParentTips() {
     const idx = tips.findIndex(t => t.id === selectedTip?.id);
     if (idx > 0) {
       audioRef.current?.pause();
-      setSelectedTip(tips[idx - 1]);
+      setSelectedTip(toPlaceholderTip(tips[idx - 1]));
     }
   }, [tips, selectedTip?.id]);
 
@@ -242,7 +295,7 @@ export default function ParentTips() {
     const idx = tips.findIndex(t => t.id === selectedTip?.id);
     if (idx >= 0 && idx < tips.length - 1) {
       audioRef.current?.pause();
-      setSelectedTip(tips[idx + 1]);
+      setSelectedTip(toPlaceholderTip(tips[idx + 1]));
     }
   }, [tips, selectedTip?.id]);
 
@@ -430,24 +483,33 @@ export default function ParentTips() {
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-4 leading-tight">{selectedTip.title}</h2>
 
-              <div className="space-y-3" data-testid="tip-content-paragraphs">
-                {paragraphs.map((paragraph, idx) => (
-                  <p
-                    key={idx}
-                    ref={el => { paragraphRefs.current[idx] = el; }}
-                    className={`text-[15px] leading-relaxed transition-all duration-500 rounded-lg px-3 py-2 ${
-                      isPlaying && idx === activeParagraph
-                        ? "bg-orange-100 text-orange-900 font-medium border-l-4 border-orange-500 shadow-sm"
-                        : isPlaying && idx < activeParagraph
-                        ? "text-gray-400"
-                        : "text-gray-700"
-                    }`}
-                    data-testid={`tip-paragraph-${idx}`}
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+              {isTipDetailLoading ? (
+                <div className="space-y-2" data-testid="tip-detail-loading">
+                  <div className="h-4 w-full rounded bg-orange-100 animate-pulse" />
+                  <div className="h-4 w-11/12 rounded bg-orange-100 animate-pulse" />
+                  <div className="h-4 w-10/12 rounded bg-orange-100 animate-pulse" />
+                  <div className="h-4 w-9/12 rounded bg-orange-100 animate-pulse" />
+                </div>
+              ) : (
+                <div className="space-y-3" data-testid="tip-content-paragraphs">
+                  {paragraphs.map((paragraph, idx) => (
+                    <p
+                      key={idx}
+                      ref={el => { paragraphRefs.current[idx] = el; }}
+                      className={`text-[15px] leading-relaxed transition-all duration-500 rounded-lg px-3 py-2 ${
+                        isPlaying && idx === activeParagraph
+                          ? "bg-orange-100 text-orange-900 font-medium border-l-4 border-orange-500 shadow-sm"
+                          : isPlaying && idx < activeParagraph
+                          ? "text-gray-400"
+                          : "text-gray-700"
+                      }`}
+                      data-testid={`tip-paragraph-${idx}`}
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
@@ -479,7 +541,7 @@ export default function ParentTips() {
               onEnded={handleAudioEnded}
               preload="metadata"
             />
-            <div className="fixed bottom-[76px] left-2 right-2 z-[60]">
+            <div className="fixed bottom-4 left-2 right-2 z-[60]">
               <div className="max-w-2xl mx-auto bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl shadow-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <button
@@ -557,7 +619,7 @@ export default function ParentTips() {
             <Lightbulb className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-lg font-bold text-gray-900">Maraaxisha Da'da Ilmaha</h2>
-          <p className="text-gray-500 text-sm mt-1">Dooro marxaladda ilmahaaga si aad u hesho talooyin cilmi ku salaysan</p>
+          <p className="text-gray-500 text-sm mt-1">Talooyinka hore ee bogga hore ayaa si toos ah halkan loogu kaydiyaa marka waqtigooda homepage-ku dhamaado.</p>
         </div>
 
         <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide mb-5">
@@ -608,7 +670,7 @@ export default function ParentTips() {
             {tips.map((tip) => (
               <button
                 key={tip.id}
-                onClick={() => setSelectedTip(tip)}
+                onClick={() => setSelectedTip(toPlaceholderTip(tip))}
                 className="w-full text-left bg-white rounded-2xl border border-orange-100 shadow-sm p-4 flex items-center gap-3 active:scale-[0.98] transition-all hover:shadow-md hover:border-orange-200"
                 data-testid={`tip-card-${tip.id}`}
               >

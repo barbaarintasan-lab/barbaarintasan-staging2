@@ -113,7 +113,9 @@ export default function CourseDetail() {
     mutationFn: async (enrollmentId: string) => {
       const res = await fetch(`/api/enrollments/${enrollmentId}/start`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ courseId: course?.id }),
       });
       if (!res.ok) throw new Error("Failed to start");
       return res.json();
@@ -121,7 +123,7 @@ export default function CourseDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dripStatus", course?.id] });
       queryClient.invalidateQueries({ queryKey: ["courseAccess", course?.id] });
-      toast.success("Koorsada waa la bilaabay! 2 cashar ayaa kuu furan.");
+      toast.success("Koorsada waa la bilaabay! Casharradaada ayaa diyaar ah.");
     },
   });
 

@@ -1,8 +1,9 @@
-import pg from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import * as schema from "@shared/schema";
 
-const { Pool } = pg;
+neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -12,11 +13,20 @@ if (!process.env.DATABASE_URL) {
 
 function validateDatabaseUrl(url: string): void {
   try {
+    if (/[<>]/.test(url)) {
+      throw new Error('DATABASE_URL contains angle bracket placeholders (<...>). Use real values without < or >.');
+    }
+
     if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
       throw new Error('DATABASE_URL must start with postgres:// or postgresql://');
     }
     
     const urlObj = new URL(url);
+
+    const username = decodeURIComponent(urlObj.username || '').toLowerCase();
+    const password = decodeURIComponent(urlObj.password || '').toLowerCase();
+    const hostname = (urlObj.hostname || '').toLowerCase();
+    const dbName = (urlObj.pathname || '').replace(/^\//, '').toLowerCase();
     
     if (!urlObj.hostname || urlObj.hostname.trim() === '') {
       throw new Error('DATABASE_URL must contain a valid hostname');
@@ -24,6 +34,18 @@ function validateDatabaseUrl(url: string): void {
     
     if (!urlObj.pathname || urlObj.pathname === '/') {
       throw new Error('DATABASE_URL must contain a database name in the path');
+    }
+
+    // Guard against example placeholders accidentally used as real credentials.
+    if (
+      hostname === 'host' ||
+      username === 'user' ||
+      password === 'password' ||
+      dbName === 'db'
+    ) {
+      throw new Error(
+        'DATABASE_URL appears to use placeholder values (USER/PASSWORD/HOST/DB). Replace with your real Neon/Postgres connection string.',
+      );
     }
     
     if (process.env.NODE_ENV !== 'production') {
@@ -49,10 +71,6 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-pool.on('connect', (client) => {
-  client.query('SET search_path TO public');
-});
-
 pool.on('error', (err) => {
   console.error('[DB Pool] Unexpected error on idle client:', err.message);
 });
@@ -64,13 +82,12 @@ async function warmupPool() {
     client.release();
     console.log('[DB Pool] Connection warmed up successfully');
   } catch (err: unknown) {
-    console.error('[DB Pool] Warmup failed:', err);
-    throw err;
+    console.error('[DB Pool] Warmup failed (non-fatal):', err);
   }
 }
 warmupPool();
 
-setInterval(async () => {
+const keepAliveInterval = setInterval(async () => {
   try {
     const client = await pool.connect();
     await client.query('SELECT 1');
@@ -78,5 +95,7 @@ setInterval(async () => {
   } catch (err) {
   }
 }, 300000);
+
+keepAliveInterval.unref();
 
 export const db = drizzle(pool, { schema });

@@ -5,10 +5,6 @@ import express, { type Express, type Request, Response, NextFunction } from "exp
 import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { startCronJobs } from "./cron";
-// STRIPE DISABLED - not needed for this app
-// import { runMigrations } from 'stripe-replit-sync';
-// import { getStripeSync } from './stripeClient';
-// import { WebhookHandlers } from './webhookHandlers';
 
 
 export function log(message: string, source = "express") {
@@ -38,8 +34,6 @@ app.use(compression({
 const staticCacheOptions = { maxAge: '7d', immutable: false };
 const hashedAssetCache = { maxAge: '1y', immutable: true };
 
-app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets'), staticCacheOptions));
-
 const courseImagesPath = process.env.NODE_ENV === 'production'
   ? path.join(process.cwd(), 'dist', 'public', 'course-images')
   : path.join(process.cwd(), 'client', 'public', 'course-images');
@@ -48,8 +42,6 @@ app.use('/course-images', express.static(courseImagesPath, staticCacheOptions));
 if (process.env.NODE_ENV === 'production') {
   app.use('/assets', express.static(path.join(process.cwd(), 'dist', 'public', 'assets'), hashedAssetCache));
 }
-
-// STRIPE DISABLED - all Stripe functionality removed
 
 declare module 'http' {
   interface IncomingMessage {

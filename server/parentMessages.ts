@@ -23,6 +23,9 @@ const openai = new OpenAI({
   ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
 });
 
+const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = "gemini-2.0-flash";
+
 const PARENTING_TOPICS = [
   { topic: "Dulqaadka iyo Samirka", description: "Patience and perseverance in parenting" },
   { topic: "Diinta iyo Tarbiyada", description: "Religious upbringing and Islamic values" },
@@ -61,9 +64,207 @@ async function selectTopicForToday(): Promise<{ topic: string; description: stri
   return availableTopics[Math.floor(Math.random() * availableTopics.length)];
 }
 
-async function generateMessageText(topic: { topic: string; description: string }): Promise<{ title: string; content: string; keyPoints: string }> {
+function parseGeneratedMessageJson(rawText: string): { title: string; content: string; keyPoints: string } {
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Could not parse message JSON");
+  }
+
+  // Helper function to escape newlines only inside string values
+  function escapeNewlinesInStrings(json: string): string {
+    let result = '';
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < json.length; i++) {
+      const char = json[i];
+
+      if (escape) {
+        result += char;
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        result += char;
+        escape = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        result += char;
+        continue;
+      }
+
+      if (inString && char === '\n') {
+        result += '\\n';
+      } else if (inString && char === '\r') {
+        result += '\\r';
+      } else if (inString && char === '\t') {
+        result += '\\t';
+      } else {
+        result += char;
+      }
+    }
+
+    return result;
+  }
+
+  // Try multiple JSON cleanup strategies
+  const strategies = [
+    // Strategy 1: Escape newlines inside string values properly
+    () => {
+      const cleaned = escapeNewlinesInStrings(jsonMatch[0]);
+      return JSON.parse(cleaned);
+    },
+    // Strategy 2: Replace all newlines with escaped versions
+    () => {
+      const cleaned = jsonMatch[0]
+        .replace(/[\x00-\x1F\x7F]/g, ' ')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      return JSON.parse(cleaned);
+    },
+    // Strategy 3: Simple control char replacement
+    () => {
+      const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F\n\r\t]/g, ' ');
+      return JSON.parse(cleaned);
+    },
+    // Strategy 4: Extract fields using flexible regex
+    () => {
+      const titleMatch = jsonMatch[0].match(/"title"\s*:\s*"([^"]+)"/);
+      // More flexible content extraction - look for content field and extract until keyPoints
+      let contentMatch = jsonMatch[0].match(/"content"\s*:\s*"([\s\S]*?)"\s*,\s*"keyPoints"/);
+      if (!contentMatch) {
+        const contentStart = jsonMatch[0].indexOf('"content"');
+        const keyPointsStart = jsonMatch[0].indexOf('"keyPoints"');
+        if (contentStart !== -1 && keyPointsStart !== -1) {
+          const contentSection = jsonMatch[0].slice(contentStart, keyPointsStart);
+          const valueMatch = contentSection.match(/"content"\s*:\s*"([\s\S]*)"\s*,?\s*$/);
+          if (valueMatch) {
+            contentMatch = [valueMatch[0], valueMatch[1]];
+          }
+        }
+      }
+      // Try multiple patterns for keyPoints - could have newlines or other issues
+      let keyPointsMatch = jsonMatch[0].match(/"keyPoints"\s*:\s*"([^"]+)"/);
+      if (!keyPointsMatch) {
+        const keyPointsStart = jsonMatch[0].indexOf('"keyPoints"');
+        if (keyPointsStart !== -1) {
+          const keyPointsSection = jsonMatch[0].slice(keyPointsStart);
+          const valueMatch = keyPointsSection.match(/"keyPoints"\s*:\s*"([\s\S]*?)"\s*\}/);
+          if (valueMatch) {
+            keyPointsMatch = [valueMatch[0], valueMatch[1].replace(/[\n\r]/g, ' ')];
+          }
+        }
+      }
+
+      if (!titleMatch || !contentMatch) {
+        console.log("[Parent Messages] Regex extraction failed - title:", !!titleMatch, "content:", !!contentMatch);
+        throw new Error("Could not extract title or content");
+      }
+
+      return {
+        title: titleMatch[1],
+        content: contentMatch[1].replace(/\\n/g, '\n').replace(/[\x00-\x1F\x7F]/g, ' '),
+        keyPoints: keyPointsMatch ? keyPointsMatch[1].replace(/[\n\r]/g, ' ') : "Talo muhiim ah waalidka"
+      };
+    },
+  ];
+
+  for (let i = 0; i < strategies.length; i++) {
+    try {
+      const result = strategies[i]();
+      if (result.title && result.content) {
+        console.log(`[Parent Messages] JSON parsed with strategy ${i + 1}`);
+        if (!result.keyPoints) {
+          result.keyPoints = "Talo muhiim ah waalidka";
+        }
+        return result;
+      }
+    } catch (e) {
+      console.log(`[Parent Messages] Strategy ${i + 1} failed:`, (e as Error).message);
+    }
+  }
+
+  throw new Error("Could not parse message JSON after all strategies");
+}
+
+async function generateMessageTextWithGemini(prompt: string): Promise<{ title: string; content: string; keyPoints: string }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("Google Gemini API key not configured");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 3500,
+          responseMimeType: "application/json",
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!textContent) {
+    throw new Error("No message content generated from Gemini");
+  }
+
+  return parseGeneratedMessageJson(textContent);
+}
+
+async function generateMessageTextWithOpenAI(prompt: string): Promise<{ title: string; content: string; keyPoints: string }> {
   if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
     throw new Error("OpenAI API key not configured");
+  }
+
+  console.log("[Parent Messages] Generating text with GPT-4o fallback...");
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: "You are a Somali parenting expert who writes educational content for Somali parents. Always respond with valid JSON."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.8,
+    max_tokens: 3000,
+    response_format: { type: "json_object" }
+  });
+
+  const textContent = response.choices?.[0]?.message?.content;
+  if (!textContent) {
+    throw new Error("No message content generated");
+  }
+
+  return parseGeneratedMessageJson(textContent);
+}
+
+async function generateMessageText(topic: { topic: string; description: string }): Promise<{ title: string; content: string; keyPoints: string }> {
+  if (!GEMINI_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
+    throw new Error("No AI key configured (Gemini/OpenAI)");
   }
 
   const prompt = `Waxaad tahay qoraa Soomaaliyeed oo ku xeel dheer waalidnimada iyo tarbiyada caruurta. Qor blog post (dhambaal) waalidka Soomaaliyeed loogu talagalay oo ku saabsan: "${topic.topic}" (${topic.description}).
@@ -94,167 +295,16 @@ Ka jawaab JSON sax ah:
   "keyPoints": "Qodobka 1, Qodobka 2, Qodobka 3"
 }`;
 
-  console.log("[Parent Messages] Generating text with GPT-4o...");
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: "You are a Somali parenting expert who writes educational content for Somali parents. Always respond with valid JSON."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    temperature: 0.8,
-    max_tokens: 3000,
-    response_format: { type: "json_object" }
-  });
-
-  const textContent = response.choices?.[0]?.message?.content;
-  
-  if (!textContent) {
-    throw new Error("No message content generated");
-  }
-  
-  console.log("[Parent Messages] GPT-4o response received");
-
-  const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Could not parse message JSON");
-  }
-
-  // Helper function to escape newlines only inside string values
-  function escapeNewlinesInStrings(json: string): string {
-    let result = '';
-    let inString = false;
-    let escape = false;
-    
-    for (let i = 0; i < json.length; i++) {
-      const char = json[i];
-      
-      if (escape) {
-        result += char;
-        escape = false;
-        continue;
-      }
-      
-      if (char === '\\') {
-        result += char;
-        escape = true;
-        continue;
-      }
-      
-      if (char === '"') {
-        inString = !inString;
-        result += char;
-        continue;
-      }
-      
-      if (inString && char === '\n') {
-        result += '\\n';
-      } else if (inString && char === '\r') {
-        result += '\\r';
-      } else if (inString && char === '\t') {
-        result += '\\t';
-      } else {
-        result += char;
-      }
-    }
-    
-    return result;
-  }
-
-  // Try multiple JSON cleanup strategies
-  const strategies = [
-    // Strategy 1: Escape newlines inside string values properly
-    () => {
-      const cleaned = escapeNewlinesInStrings(jsonMatch[0]);
-      return JSON.parse(cleaned);
-    },
-    // Strategy 2: Replace all newlines with escaped versions
-    () => {
-      const cleaned = jsonMatch[0]
-        .replace(/[\x00-\x1F\x7F]/g, ' ')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-      return JSON.parse(cleaned);
-    },
-    // Strategy 3: Simple control char replacement
-    () => {
-      const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F\n\r\t]/g, ' ');
-      return JSON.parse(cleaned);
-    },
-    // Strategy 3: Extract fields using flexible regex  
-    () => {
-      const titleMatch = jsonMatch[0].match(/"title"\s*:\s*"([^"]+)"/);
-      // More flexible content extraction - look for content field and extract until keyPoints
-      let contentMatch = jsonMatch[0].match(/"content"\s*:\s*"([\s\S]*?)"\s*,\s*"keyPoints"/);
-      if (!contentMatch) {
-        // Try extracting content between "content": " and keyPoints
-        const contentStart = jsonMatch[0].indexOf('"content"');
-        const keyPointsStart = jsonMatch[0].indexOf('"keyPoints"');
-        if (contentStart !== -1 && keyPointsStart !== -1) {
-          const contentSection = jsonMatch[0].slice(contentStart, keyPointsStart);
-          const valueMatch = contentSection.match(/"content"\s*:\s*"([\s\S]*)"\s*,?\s*$/);
-          if (valueMatch) {
-            contentMatch = [valueMatch[0], valueMatch[1]];
-          }
-        }
-      }
-      // Try multiple patterns for keyPoints - could have newlines or other issues
-      let keyPointsMatch = jsonMatch[0].match(/"keyPoints"\s*:\s*"([^"]+)"/);
-      if (!keyPointsMatch) {
-        // Try extracting from keyPoints to end of JSON
-        const keyPointsStart = jsonMatch[0].indexOf('"keyPoints"');
-        if (keyPointsStart !== -1) {
-          const keyPointsSection = jsonMatch[0].slice(keyPointsStart);
-          // Extract value between quotes after keyPoints:
-          const valueMatch = keyPointsSection.match(/"keyPoints"\s*:\s*"([\s\S]*?)"\s*\}/);
-          if (valueMatch) {
-            keyPointsMatch = [valueMatch[0], valueMatch[1].replace(/[\n\r]/g, ' ')];
-          }
-        }
-      }
-      
-      if (!titleMatch || !contentMatch) {
-        console.log("[Parent Messages] Regex extraction failed - title:", !!titleMatch, "content:", !!contentMatch);
-        throw new Error("Could not extract title or content");
-      }
-      
-      return {
-        title: titleMatch[1],
-        content: contentMatch[1].replace(/\\n/g, '\n').replace(/[\x00-\x1F\x7F]/g, ' '),
-        keyPoints: keyPointsMatch ? keyPointsMatch[1].replace(/[\n\r]/g, ' ') : "Talo muhiim ah waalidka"
-      };
-    },
-    // Strategy 4: Log raw JSON for debugging
-    () => {
-      console.log("[Parent Messages] Raw JSON sample:", jsonMatch[0].substring(0, 500));
-      throw new Error("Manual inspection needed");
-    }
-  ];
-
-  for (let i = 0; i < strategies.length; i++) {
+  if (GEMINI_API_KEY) {
     try {
-      const result = strategies[i]();
-      if (result.title && result.content) {
-        console.log(`[Parent Messages] JSON parsed with strategy ${i + 1}`);
-        // Ensure keyPoints has a default if missing
-        if (!result.keyPoints) {
-          result.keyPoints = "Talo muhiim ah waalidka";
-        }
-        return result;
-      }
-    } catch (e) {
-      console.log(`[Parent Messages] Strategy ${i + 1} failed:`, (e as Error).message);
+      console.log("[Parent Messages] Generating text with Gemini...");
+      return await generateMessageTextWithGemini(prompt);
+    } catch (geminiError) {
+      console.warn("[Parent Messages] Gemini generation failed, falling back to OpenAI:", (geminiError as Error).message);
     }
   }
-  
-  throw new Error("Could not parse message JSON after all strategies");
+
+  return generateMessageTextWithOpenAI(prompt);
 }
 
 async function generateMessageImage(topic: string, sceneDescription: string): Promise<string> {
@@ -326,9 +376,8 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
 }
 
 export async function generateAndSaveParentMessage(): Promise<void> {
+  const today = getSomaliaToday();
   try {
-    const today = getSomaliaToday();
-    
     const existingMessage = await storage.getParentMessageByDate(today);
     if (existingMessage) {
       console.log(`[Parent Messages] Message already exists for ${today}`);
@@ -358,28 +407,20 @@ export async function generateAndSaveParentMessage(): Promise<void> {
 
     try {
       console.log(`[Parent Messages] Generating audio (Muuse voice)...`);
-      const { generateAndUploadAudio } = await import("./tts");
-      const audioUrl = await generateAndUploadAudio(
-        saved.content,
-        `dhambaal-${saved.id}`,
-        "tts-audio/dhambaalka",
-        { azureVoice: "so-SO-MuuseNeural" },
-        'dhambaal'
-      );
+      const audioUrl = await generateParentMessageAudio(saved.content, saved.id);
       await storage.updateParentMessage(saved.id, { audioUrl });
-      console.log(`[Parent Messages] Audio generated and saved to R2: ${audioUrl}`);
+      console.log(`[Parent Messages] Audio generated and saved`);
     } catch (audioError) {
       console.error(`[Parent Messages] Audio generation failed (content saved without audio):`, audioError);
     }
     
-    /* Google Drive backup disabled as per user request
+    // Backup to Google Drive
     try {
       await saveDhambaalToGoogleDrive(message.title, message.content, today);
       console.log(`[Parent Messages] Backed up to Google Drive`);
     } catch (driveError) {
       console.error(`[Parent Messages] Google Drive backup failed:`, driveError);
     }
-    */
   } catch (error: any) {
     if (error?.code === '23505' || error?.message?.includes('unique') || error?.message?.includes('duplicate')) {
       console.log(`[Parent Messages] Message already exists for ${today} (caught duplicate insert)`);
@@ -427,13 +468,13 @@ export async function fixMissingThumbnails(): Promise<number> {
   return fixed;
 }
 
+// Cache for admin parent messages (module-level for clearing)
 let parentMessagesCache: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL = 30000;
-const todayCache = new Map<string, { data: any; expiry: number }>();
+const CACHE_TTL = 30000; // 30 seconds
 
 export function clearParentMessagesCache(): void {
   parentMessagesCache = null;
-  todayCache.clear();
+  console.log("[Parent Messages] Cache cleared");
 }
 
 async function applyTranslationsToMessages<T extends Record<string, any> & { id: string }>(
@@ -465,21 +506,25 @@ async function applyTranslationsToMessages<T extends Record<string, any> & { id:
 
   return messages.map(message => {
     const messageTranslations = translationsByMessage.get(message.id) || [];
-    const translated = { ...message };
+    const translated: Record<string, any> = { ...message };
     for (const t of messageTranslations) {
       if (['title', 'content', 'keyPoints'].includes(t.fieldName)) {
         translated[t.fieldName] = t.translatedText;
       }
     }
-    return translated;
+    return translated as typeof message;
   });
 }
 
 export function registerParentMessageRoutes(app: Express): void {
   app.get("/api/parent-messages", async (req: Request, res: Response) => {
     try {
+      const parsedLimit = parseInt(req.query.limit as string, 10);
+      const parsedOffset = parseInt(req.query.offset as string, 10);
+      const limit = Math.min(Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 100, 500);
+      const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
       const lang = req.query.lang as string;
-      let messages = await storage.getParentMessages(30);
+      let messages = await storage.getParentMessages(limit, offset);
       messages = await applyTranslationsToMessages(messages, lang);
       res.json(messages);
     } catch (error) {
@@ -490,12 +535,22 @@ export function registerParentMessageRoutes(app: Express): void {
   
   app.get("/api/admin/parent-messages", async (req: Request, res: Response) => {
     try {
+      const parsedLimit = parseInt(req.query.limit as string, 10);
+      const parsedOffset = parseInt(req.query.offset as string, 10);
+      const limit = Math.min(Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 200, 1000);
+      const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+
       const now = Date.now();
-      if (parentMessagesCache && (now - parentMessagesCache.timestamp) < CACHE_TTL) {
+      const useDefaultPage = offset === 0 && limit === 200;
+
+      if (useDefaultPage && parentMessagesCache && (now - parentMessagesCache.timestamp) < CACHE_TTL) {
         return res.json(parentMessagesCache.data);
       }
-      const messages = await storage.getAllParentMessages(30);
-      parentMessagesCache = { data: messages, timestamp: now };
+
+      const messages = await storage.getAllParentMessages(limit, offset);
+      if (useDefaultPage) {
+        parentMessagesCache = { data: messages, timestamp: now };
+      }
       res.json(messages);
     } catch (error) {
       console.error("Error fetching all parent messages:", error);
@@ -517,19 +572,12 @@ export function registerParentMessageRoutes(app: Express): void {
   app.get("/api/parent-messages/today", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;
-      const cacheKey = `pm-today-${lang || 'so'}`;
-      const cached = todayCache.get(cacheKey);
-      if (cached && Date.now() < cached.expiry) {
-        return res.json(cached.data);
-      }
       let message = await storage.getTodayParentMessage();
       if (!message) {
         return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
       }
       const translated = await applyTranslationsToMessages([message], lang);
-      const result = translated[0];
-      todayCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
-      res.json(result);
+      res.json(translated[0]);
     } catch (error) {
       console.error("Error fetching today's message:", error);
       res.status(500).json({ error: "Failed to fetch message" });
@@ -643,13 +691,15 @@ export function registerParentMessageRoutes(app: Express): void {
       }
 
       const { id } = req.params;
+      const requestedProvider = req.body?.ttsProvider as string | undefined;
+      const ttsProvider = requestedProvider === "gemini" || requestedProvider === "azure" ? requestedProvider : "auto";
       const message = await storage.getParentMessage(id);
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
       }
 
-      console.log(`[TTS] Generating audio for message: ${message.title}`);
-      const audioUrl = await generateParentMessageAudio(message.content, message.id);
+      console.log(`[TTS] Generating audio for message: ${message.title} (provider: ${ttsProvider})`);
+      const audioUrl = await generateParentMessageAudio(message.content, message.id, ttsProvider);
       
       const updated = await storage.updateParentMessage(id, { audioUrl });
       console.log(`[TTS] Audio generated and saved for message ${id}`);
