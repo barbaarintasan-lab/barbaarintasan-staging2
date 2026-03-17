@@ -5,6 +5,7 @@ import express, { type Express, type Request, Response, NextFunction } from "exp
 import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { startCronJobs } from "./cron";
+import { runMigrations } from "./migrations";
 // STRIPE DISABLED - not needed for this app
 // import { runMigrations } from 'stripe-replit-sync';
 // import { getStripeSync } from './stripeClient';
@@ -97,6 +98,14 @@ app.use((req, res, next) => {
 export default async function runApp(
   setup: (app: Express, server: Server) => Promise<void>,
 ) {
+  // Run database migrations first
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error('[APP] Migration failed, aborting startup:', err);
+    process.exit(1);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
