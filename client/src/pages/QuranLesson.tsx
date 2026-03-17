@@ -263,7 +263,10 @@ export default function QuranLesson() {
         credentials: "include",
         body: formData,
       });
-      if (!response.ok) throw new Error("Check failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Check failed");
+      }
       const result: CheckResult = await response.json();
 
       if (result.outcome === "daily_limit") {
@@ -294,8 +297,12 @@ export default function QuranLesson() {
           setTimeout(() => setShowCelebration(false), 5000);
         }
       }
-    } catch {
-      setCheckResult({ outcome: "needs_retry", completed: false, message: "Khalad ayaa dhacay. Isku day mar kale!" });
+    } catch (error: any) {
+      setCheckResult({
+        outcome: "needs_retry",
+        completed: false,
+        message: error?.message || "Khalad ayaa dhacay. Isku day mar kale!"
+      });
     }
     setIsChecking(false);
   }, [currentAyah, surahNumber, totalAyahs, ayahProgress]);

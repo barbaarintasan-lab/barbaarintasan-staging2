@@ -90,6 +90,15 @@ const postImageUpload = multer({
   }
 });
 
+function resolveQuranJsonPath(fileName: string): string {
+  const distPath = path.join(process.cwd(), "dist", "public", "quran", fileName);
+  if (fs.existsSync(distPath)) {
+    return distPath;
+  }
+
+  return path.join(process.cwd(), "client", "public", "quran", fileName);
+}
+
 function getOpenAIClient(): OpenAI {
   const replitKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   const directKey = process.env.OPENAI_API_KEY;
@@ -11042,8 +11051,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       const aNum = parseInt(ayahNumber);
       const paddedNum = sNum.toString().padStart(3, "0");
       const fs = await import("fs");
-      const path = await import("path");
-      const quranFilePath = path.default.join(process.cwd(), "client", "public", "quran", `${paddedNum}.json`);
+      const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
       let correctText: string;
       try {
         const fileContent = fs.default.readFileSync(quranFilePath, "utf-8");
@@ -11438,7 +11446,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
       const paddedNum = sNum.toString().padStart(3, "0");
       const fsModule = await import("fs");
       const pathModule = await import("path");
-      const quranFilePath = pathModule.default.join(process.cwd(), "client", "public", "quran", `${paddedNum}.json`);
+      const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
 
       let surahData: any;
       try {
@@ -11542,7 +11550,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
           const otherSurah = completedSurahs.find(s => s.surahNumber !== sNum);
           if (otherSurah) {
             const otherPadded = otherSurah.surahNumber.toString().padStart(3, "0");
-            const otherPath = pathModule.default.join(process.cwd(), "client", "public", "quran", `${otherPadded}.json`);
+            const otherPath = resolveQuranJsonPath(`${otherPadded}.json`);
             try {
               const otherContent = fsModule.default.readFileSync(otherPath, "utf-8");
               const otherData = JSON.parse(otherContent);
