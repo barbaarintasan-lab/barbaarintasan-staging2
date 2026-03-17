@@ -8586,7 +8586,7 @@ Return a JSON object with:
       res.json({
         success: true,
         uploaded: results.length,
-        errors: errors.length,
+        errorCount: errors.length,
         results,
         errors: errors
       });
@@ -11537,6 +11537,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
     try {
       const { gameType, surahNumber } = req.params;
       const sNum = parseInt(surahNumber);
+      const childId = req.session.childId!;
 
       const paddedNum = sNum.toString().padStart(3, "0");
       const fsModule = await import("fs");
