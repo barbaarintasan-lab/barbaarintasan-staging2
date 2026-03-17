@@ -17,6 +17,7 @@ COPY package*.json ./
 RUN npm install --omit=dev --ignore-scripts && npm ls stripe 2>/dev/null || npm install stripe
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/migrations ./migrations
 
 RUN mkdir -p /app/dist/public/course-images
 

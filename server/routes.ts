@@ -582,6 +582,11 @@ async function checkCourseAccess(parentId: string, courseId: string): Promise<{ 
 async function runMigrations() {
   try {
     const migrationsDir = path.join(process.cwd(), "migrations");
+    if (!fs.existsSync(migrationsDir)) {
+      console.log("[Migrations] No migrations directory found, skipping startup migrations");
+      return;
+    }
+
     const files = fs
       .readdirSync(migrationsDir)
       .filter((f) => f.endsWith(".sql"))
