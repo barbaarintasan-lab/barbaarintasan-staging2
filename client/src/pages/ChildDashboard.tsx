@@ -74,12 +74,14 @@ const GAME_INFO: Record<string, { icon: string; label: string; color: string; em
   word_puzzle: { icon: "puzzle", label: "Xarafaha Aayada", color: "#4ECDC4", emoji: "🧩" },
   memory_match: { icon: "brain", label: "Aayah Xusuus", color: "#A855F7", emoji: "🃏" },
   surah_quiz: { icon: "zap", label: "Surah Quiz", color: "#FF6B6B", emoji: "⚡" },
+  somali_flashcards: { icon: "cards", label: "Af-Soomaali Cards", color: "#22C55E", emoji: "🗂️" },
 };
 
 const GAME_ROUTES: Record<string, string> = {
   word_puzzle: "/quran-game/word-puzzle",
   memory_match: "/quran-game/memory-match",
   surah_quiz: "/quran-game/surah-quiz",
+  somali_flashcards: "/quran-game/somali-flashcards",
 };
 
 export default function ChildDashboard() {

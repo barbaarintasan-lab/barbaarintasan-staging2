@@ -73,6 +73,7 @@ const QuranLesson = lazy(() => import("@/pages/QuranLesson"));
 const QuranWordPuzzle = lazy(() => import("@/pages/QuranWordPuzzle"));
 const QuranMemoryMatch = lazy(() => import("@/pages/QuranMemoryMatch"));
 const QuranSurahQuiz = lazy(() => import("@/pages/QuranSurahQuiz"));
+const SomaliFlashcardsGame = lazy(() => import("@/pages/SomaliFlashcardsGame"));
 const BottomNav = lazy(() => import("@/components/BottomNav"));
 const ChatSupport = lazy(() => import("@/components/ChatSupport"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -205,6 +206,7 @@ function Router() {
     "/child-login",
     "/child-dashboard",
     "/quran-lesson",
+    "/quran-game/",
   ];
   
   const hiddenNavExactPaths = [
@@ -282,6 +284,7 @@ function Router() {
             <Route path="/quran-game/word-puzzle/:surahNumber" component={QuranWordPuzzle} />
             <Route path="/quran-game/memory-match/:surahNumber" component={QuranMemoryMatch} />
             <Route path="/quran-game/surah-quiz/:surahNumber" component={QuranSurahQuiz} />
+            <Route path="/quran-game/somali-flashcards/:surahNumber" component={SomaliFlashcardsGame} />
             <Route component={NotFound} />
           </Switch>
         </Suspense>

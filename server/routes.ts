@@ -45,6 +45,39 @@ const recordingUpload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }
 });
 
+const SOMALI_FLASHCARD_POOL = [
+  { somali: "Hooyo", english: "Mother", emoji: "👩", example: "Hooyo waa naxariis badan." },
+  { somali: "Aabe", english: "Father", emoji: "👨", example: "Aabe wuxuu na baraa adab." },
+  { somali: "Ilmo", english: "Child", emoji: "🧒", example: "Ilmo wanaagsan buu yahay." },
+  { somali: "Qoys", english: "Family", emoji: "👨‍👩‍👧", example: "Qoyska waa niyad degen." },
+  { somali: "Dugsi", english: "School", emoji: "🏫", example: "Dugsi ayaan subax kasta aadnaa." },
+  { somali: "Macalin", english: "Teacher", emoji: "👩‍🏫", example: "Macalin fiican baa jooga." },
+  { somali: "Quraan", english: "Quran", emoji: "📖", example: "Quraan ayaan maalin kasta akhriyaa." },
+  { somali: "Salaad", english: "Prayer", emoji: "🤲", example: "Salaaddu waa waajib." },
+  { somali: "Masjid", english: "Mosque", emoji: "🕌", example: "Masjidka ayaan galnay." },
+  { somali: "Biyo", english: "Water", emoji: "💧", example: "Biyo nadiif ah cab." },
+  { somali: "Cunto", english: "Food", emoji: "🍽️", example: "Cunto caafimaad leh cun." },
+  { somali: "Qorrax", english: "Sun", emoji: "☀️", example: "Qorraxdu way ifaysaa." },
+  { somali: "Dayax", english: "Moon", emoji: "🌙", example: "Dayax qurux badan baa jira." },
+  { somali: "Xiddig", english: "Star", emoji: "⭐", example: "Xiddigaha habeenkii way muuqdaan." },
+  { somali: "Geed", english: "Tree", emoji: "🌳", example: "Geed cagaaran ayuu beeray." },
+  { somali: "Ubax", english: "Flower", emoji: "🌸", example: "Ubaxu wuu carfayaa." },
+  { somali: "Buug", english: "Book", emoji: "📚", example: "Buug cusub ayaan hayaa." },
+  { somali: "Qalin", english: "Pen", emoji: "🖊️", example: "Qalin ku qor casharka." },
+  { somali: "Waqti", english: "Time", emoji: "⏰", example: "Waqtiga ilaali." },
+  { somali: "Saaxiib", english: "Friend", emoji: "🤝", example: "Saaxiib wanaagsan dooro." },
+  { somali: "Farxad", english: "Happiness", emoji: "😊", example: "Farxad ayaan dareemayaa." },
+  { somali: "Nabad", english: "Peace", emoji: "🕊️", example: "Nabad iyo jacayl ha jiro." },
+  { somali: "Iftiin", english: "Light", emoji: "💡", example: "Iftiin ayaa qolka galay." },
+  { somali: "Qalbiga", english: "Heart", emoji: "❤️", example: "Qalbigaaga nadiifi." },
+  { somali: "Akhlaaq", english: "Good manners", emoji: "🌟", example: "Akhlaaq wanaagsan yeelo." },
+  { somali: "Sabir", english: "Patience", emoji: "🧘", example: "Sabirku waa qurux." },
+  { somali: "Mahad", english: "Gratitude", emoji: "🙏", example: "Allah mahad u naq." },
+  { somali: "Raxmad", english: "Mercy", emoji: "🤍", example: "Raxmaddu waa deeq." },
+  { somali: "Daacad", english: "Honest", emoji: "✅", example: "Daacadnimo ku hadal." },
+  { somali: "Nadiif", english: "Clean", emoji: "🧼", example: "Gacmahaaga nadiifi." },
+];
+
 const postImageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -11160,7 +11193,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
                 } catch {}
               }
 
-              for (const gt of ["word_puzzle", "memory_match", "surah_quiz"]) {
+              for (const gt of ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"]) {
                 try {
                   await db.insert(childGameUnlocks).values({
                     childId, surahNumber: parseInt(surahNumber), gameType: gt, unlockSource: "surah_completion"
@@ -11531,6 +11564,17 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
         }
 
         res.json({ surahName: surahData.name, englishName: surahData.englishName, questions });
+      } else if (gameType === "somali_flashcards") {
+        const cardCount = 10;
+        const start = (sNum * 3) % SOMALI_FLASHCARD_POOL.length;
+        const cards = Array.from({ length: cardCount }).map((_, i) => {
+          const card = SOMALI_FLASHCARD_POOL[(start + i) % SOMALI_FLASHCARD_POOL.length];
+          return {
+            id: `${sNum}-${i}`,
+            ...card,
+          };
+        });
+        res.json({ surahName: surahData.name, englishName: surahData.englishName, cards });
       } else {
         res.status(400).json({ error: "Game type aan la aqoon" });
       }
@@ -11549,7 +11593,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
         return res.status(400).json({ error: "Xogta game-ka buuxi" });
       }
 
-      if (!["word_puzzle", "memory_match", "surah_quiz"].includes(gameType)) {
+      if (!["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"].includes(gameType)) {
         return res.status(400).json({ error: "Game type aan la aqoon" });
       }
 
