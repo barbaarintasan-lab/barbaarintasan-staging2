@@ -134,6 +134,40 @@ const SOMALI_FLASHCARD_POOL = [
   { somali: "Samir", english: "Endurance", emoji: "⏳", example: "Samirku waa furaha guusha." },
   { somali: "Niyad", english: "Spirit", emoji: "🌈", example: "Niyad wanaagsan yeelo." },
   { somali: "Horumar", english: "Progress", emoji: "📈", example: "Maalin kasta horumar samee." },
+
+  // Qayb cusub: Alaabta Guriga
+  { somali: "Miis", english: "Table", emoji: "🪑", example: "Miiska casharka ku samee." },
+  { somali: "Kursi", english: "Chair", emoji: "🪑", example: "Kursiga si fiican u fariiso." },
+  { somali: "Sariir", english: "Bed", emoji: "🛏️", example: "Sariirtaada hagaaji subax kasta." },
+  { somali: "Barkin", english: "Pillow", emoji: "🛌", example: "Barkinka sariirta saar." },
+  { somali: "Buste", english: "Blanket", emoji: "🧣", example: "Buste diiran habeenkii qaado." },
+  { somali: "Albaab", english: "Door", emoji: "🚪", example: "Albaabka si tartiib ah u xidh." },
+  { somali: "Daaqad", english: "Window", emoji: "🪟", example: "Daaqadda fur si hawo u soo gasho." },
+  { somali: "Daah", english: "Curtain", emoji: "🪟", example: "Daahyada daaqadda ka laali." },
+  { somali: "Nal", english: "Lamp", emoji: "🛋️", example: "Nalalka qolka shid." },
+  { somali: "Fadhi", english: "Sofa", emoji: "🛋️", example: "Fadhiga qoyska waa raaxo." },
+  { somali: "Rug", english: "Carpet", emoji: "🧶", example: "Rugta qolka ku gogol." },
+  { somali: "Kabadh", english: "Cupboard", emoji: "🗄️", example: "Kabadhka saxamada hagaaji." },
+  { somali: "Armaajo", english: "Wardrobe", emoji: "🚪", example: "Dharka armaajada geli." },
+  { somali: "Qaboojiye", english: "Fridge", emoji: "🧊", example: "Qaboojiyaha cunto ku kaydi." },
+  { somali: "Foornno", english: "Oven", emoji: "🔥", example: "Foornada rooti ku dub." },
+  { somali: "Shoolad", english: "Stove", emoji: "🍳", example: "Shooladda dusheeda cunto ku kari." },
+  { somali: "Dheri", english: "Pot", emoji: "🍲", example: "Dheriga maraq ku samee." },
+  { somali: "Qaaddo", english: "Spoon", emoji: "🥄", example: "Qaaddo ku cun cuntada." },
+  { somali: "Fargeeto", english: "Fork", emoji: "🍴", example: "Fargeeto ku cun baastada." },
+  { somali: "Mindi", english: "Knife", emoji: "🔪", example: "Mindi si taxadar leh u isticmaal." },
+  { somali: "Dhalo", english: "Bottle", emoji: "🧴", example: "Dhalada biyaha buuxi." },
+  { somali: "Furaha", english: "Key", emoji: "🔑", example: "Furaha albaabka ha lumin." },
+  { somali: "Muraayad", english: "Mirror", emoji: "🪞", example: "Muraayadda hortooda istaag." },
+  { somali: "Saacad", english: "Clock", emoji: "🕰️", example: "Saacadda darbiga fiiri." },
+  { somali: "Telefishin", english: "Television", emoji: "📺", example: "Telefishinka waqti yar daawo." },
+  { somali: "Raadiye", english: "Radio", emoji: "📻", example: "Raadiyaha wararka ka dhagayso." },
+  { somali: "Maro", english: "Towel", emoji: "🧻", example: "Marada qubayska meel qalalan dhig." },
+  { somali: "Saabuun", english: "Soap", emoji: "🧼", example: "Saabuun ku dhaq gacmaha." },
+  { somali: "Baaldi", english: "Bucket", emoji: "🪣", example: "Baaldi biyo ka buuxi." },
+  { somali: "Xaaqin", english: "Broom", emoji: "🧹", example: "Xaaqinka qolka ku nadiifi." },
+  { somali: "Qashin-qub", english: "Trash bin", emoji: "🗑️", example: "Qashinka qashin-qubka ku rid." },
+  { somali: "Makiinad", english: "Washing machine", emoji: "🧺", example: "Makiinadda dharka ku dhaq." },
 ];
 
 const postImageUpload = multer({
@@ -11634,7 +11668,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
 
         res.json({ surahName: surahData.name, englishName: surahData.englishName, questions });
       } else if (gameType === "somali_flashcards") {
-        const cardCount = Math.min(18, SOMALI_FLASHCARD_POOL.length);
+        const cardCount = Math.min(28, SOMALI_FLASHCARD_POOL.length);
         const start = (sNum * 3) % SOMALI_FLASHCARD_POOL.length;
         const cards = Array.from({ length: cardCount }).map((_, i) => {
           const card = SOMALI_FLASHCARD_POOL[(start + i) % SOMALI_FLASHCARD_POOL.length];

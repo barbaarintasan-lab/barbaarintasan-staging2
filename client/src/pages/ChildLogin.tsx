@@ -154,14 +154,16 @@ export default function ChildLogin() {
         ))}
       </div>
 
-      <a
-        href="/"
-        className="absolute top-4 left-4 z-10 text-white/60 hover:text-white flex items-center gap-1 text-sm"
+      <button
+        type="button"
+        onClick={() => setLocation("/")}
+        className="fixed left-3 z-[100] text-white/70 hover:text-white flex items-center gap-1.5 text-sm bg-black/25 px-3 py-2 rounded-xl border border-white/10 backdrop-blur-sm"
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
         data-testid="link-back-home"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Guriga</span>
-      </a>
+      </button>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
         <div className="mb-5">
