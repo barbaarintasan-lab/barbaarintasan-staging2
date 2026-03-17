@@ -409,7 +409,7 @@ export default function ChildDashboard() {
                 <Gamepad2 className="w-5 h-5 text-[#A855F7]" />
                 Ciyaaraha Farxad leh
               </h3>
-              <p className="text-white/40 text-xs">Ciyaaruhu way furan yihiin marka surah la dhammeeyo. Xanibaad dambe ma jirto.</p>
+              <p className="text-white/40 text-xs">Ciyaaruhu waxay kuu furan yihiin markaa hal surah si fiican u barato oo dhammasyo. Xanibaad dambe ma jirto.</p>
             </div>
 
             <div className="mb-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-4">
@@ -425,8 +425,8 @@ export default function ChildDashboard() {
             {unlockedGames.length === 0 ? (
               <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
                 <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                <h4 className="text-white/60 font-semibold mb-2">Weli ma muuqato surah la dhammeeyey</h4>
-                <p className="text-white/30 text-sm">Marka hal surah la dhammeeyo, dhammaan ciyaaraha surah-kaas si toos ah bay u muuqanayaan.</p>
+                <h4 className="text-white/60 font-semibold mb-2">Weli ma muuqato surad aad dhammaysay</h4>
+                <p className="text-white/30 text-sm">Marka hal surah la dhammeeyo, dhammaan ciyaaraha surad-daas si toos ah bay u muuqanayaan.</p>
                 <button
                   onClick={() => setActiveTab("quran")}
                   className="mt-4 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-6 py-2 rounded-xl font-bold text-sm active:scale-95 transition-transform"
@@ -547,7 +547,7 @@ export default function ChildDashboard() {
             {rewards?.badges?.length === 0 && (
               <div className="bg-white/5 rounded-2xl p-6 border border-white/10 text-center mb-6">
                 <Award className="w-10 h-10 text-white/15 mx-auto mb-2" />
-                <p className="text-white/40 text-sm">Wali badge ma haysatid. Casharrada iyo ciyaaraha ku hel!</p>
+                <p className="text-white/40 text-sm">Wali abaal-marin ma haysatid. Casharrada iyo ciyaaraha ku hel abaal-marin badan!</p>
               </div>
             )}
 
@@ -599,15 +599,15 @@ export default function ChildDashboard() {
             )}
 
             <div>
-              <h4 className="text-white/60 text-sm font-semibold mb-3">Xogta Guud</h4>
+              <h4 className="text-white/60 text-sm font-semibold mb-3">Wadarta Guud ee dhibcahaaga </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
                   <p className="text-[#FFD93D] text-2xl font-bold">{rewards?.aayahStars || 0}</p>
-                  <p className="text-white/40 text-xs mt-1">Aayah Stars ⭐</p>
+                  <p className="text-white/40 text-xs mt-1">Aayad Xidig baad ku heshay ⭐</p>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
                   <p className="text-[#FF6B6B] text-2xl font-bold">{rewards?.surahTrophies || 0}</p>
-                  <p className="text-white/40 text-xs mt-1">Surah Trophies 🏆</p>
+                  <p className="text-white/40 text-xs mt-1">Suradda Abaal-marin baad ku heshay 🏆</p>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
                   <p className="text-[#4ECDC4] text-2xl font-bold">{rewards?.gameCoins || 0}</p>
