@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { useBrowserLocation } from "@/hooks/useBrowserLocation";
 import { queryClient } from "./lib/queryClient";
@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ParentAuthProvider } from "@/contexts/ParentAuthContext";
 import { NotificationModalProvider } from "@/contexts/NotificationModalContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
+import { ChildAuthProvider } from "@/contexts/ChildAuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RefreshCw, Loader2 } from "lucide-react";
 const logoImage = "/bsa-logo.png";
@@ -66,6 +67,13 @@ const LearningGroups = lazy(() => import("@/pages/LearningGroups"));
 const LearningHub = lazy(() => import("@/pages/LearningHub"));
 const ParentTips = lazy(() => import("@/pages/ParentTips"));
 const MeetWatch = lazy(() => import("@/pages/MeetWatch"));
+const ChildLogin = lazy(() => import("@/pages/ChildLogin"));
+const ChildDashboard = lazy(() => import("@/pages/ChildDashboard"));
+const QuranLesson = lazy(() => import("@/pages/QuranLesson"));
+const QuranWordPuzzle = lazy(() => import("@/pages/QuranWordPuzzle"));
+const QuranMemoryMatch = lazy(() => import("@/pages/QuranMemoryMatch"));
+const QuranSurahQuiz = lazy(() => import("@/pages/QuranSurahQuiz"));
+const SomaliFlashcardsGame = lazy(() => import("@/pages/SomaliFlashcardsGame"));
 const BottomNav = lazy(() => import("@/components/BottomNav"));
 const ChatSupport = lazy(() => import("@/components/ChatSupport"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -96,39 +104,11 @@ function SheekoRoom() {
 
 
 function PullToRefresh() {
-  const [location] = useLocation();
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [startY, setStartY] = useState(0);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
-  const startYRef = useRef(0);
-  const startXRef = useRef(0);
-  const trackingRef = useRef(false);
-
-  const pullToRefreshDisabled = useMemo(() => {
-    const blockedPrefixes = [
-      "/dhambaal",
-      "/maaweelo",
-      "/lesson/",
-      "/quiz",
-      "/assignment/",
-      "/meet-watch/",
-      "/sheeko",
-    ];
-    return blockedPrefixes.some((prefix) => location.startsWith(prefix));
-  }, [location]);
-
-  const hasActiveMediaPlayback = useCallback(() => {
-    const mediaEls = Array.from(document.querySelectorAll("audio, video")) as HTMLMediaElement[];
-    return mediaEls.some((el) => !el.paused && !el.ended && el.readyState >= 2);
-  }, []);
-
-  const shouldIgnoreTouchTarget = useCallback((target: EventTarget | null) => {
-    if (!(target instanceof Element)) return false;
-    return !!target.closest(
-      "input, textarea, select, button, a, audio, video, [role='dialog'], [contenteditable='true'], [data-disable-pull-refresh='true']"
-    );
-  }, []);
   
   useEffect(() => {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -139,50 +119,24 @@ function PullToRefresh() {
   }, []);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
-    if (pullToRefreshDisabled || isRefreshing) return;
-    if (window.scrollY > 0) return;
-    if (hasActiveMediaPlayback()) return;
-    if (shouldIgnoreTouchTarget(e.target)) return;
-
-    startYRef.current = e.touches[0].clientY;
-    startXRef.current = e.touches[0].clientX;
-    trackingRef.current = true;
-  }, [pullToRefreshDisabled, isRefreshing, hasActiveMediaPlayback, shouldIgnoreTouchTarget]);
-
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (!trackingRef.current || window.scrollY > 0) return;
-    
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-    const diffY = currentY - startYRef.current;
-    const diffX = Math.abs(currentX - startXRef.current);
-
-    // Require a clear downward vertical gesture to avoid accidental refreshes.
-    if (diffY <= 0) {
-      setPullDistance(0);
-      return;
-    }
-
-    if (diffX > 24 || diffY < diffX * 1.2) {
-      trackingRef.current = false;
-      setPullDistance(0);
-      return;
-    }
-    
-    if (diffY > 0 && diffY < 160) {
-      setPullDistance(diffY);
+    if (window.scrollY === 0) {
+      setStartY(e.touches[0].clientY);
     }
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
-    const shouldRefresh =
-      trackingRef.current &&
-      pullDistance > 110 &&
-      !isRefreshing &&
-      !pullToRefreshDisabled &&
-      !hasActiveMediaPlayback();
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (startY === 0 || window.scrollY > 0) return;
+    
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY;
+    
+    if (diff > 0 && diff < 150) {
+      setPullDistance(diff);
+    }
+  }, [startY]);
 
-    if (shouldRefresh) {
+  const handleTouchEnd = useCallback(() => {
+    if (pullDistance > 80 && !isRefreshing) {
       setIsRefreshing(true);
       setPullDistance(60);
       
@@ -196,14 +150,11 @@ function PullToRefresh() {
     } else {
       setPullDistance(0);
     }
-
-    startYRef.current = 0;
-    startXRef.current = 0;
-    trackingRef.current = false;
-  }, [pullDistance, isRefreshing, pullToRefreshDisabled, hasActiveMediaPlayback]);
+    setStartY(0);
+  }, [pullDistance, isRefreshing]);
 
   useEffect(() => {
-    if (!isIOS || !isStandalone || pullToRefreshDisabled) return;
+    if (!isIOS || !isStandalone) return;
     
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
     document.addEventListener('touchmove', handleTouchMove, { passive: true });
@@ -214,18 +165,9 @@ function PullToRefresh() {
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isIOS, isStandalone, pullToRefreshDisabled, handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, [isIOS, isStandalone, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
-  useEffect(() => {
-    if (pullToRefreshDisabled) {
-      setPullDistance(0);
-      trackingRef.current = false;
-      startYRef.current = 0;
-      startXRef.current = 0;
-    }
-  }, [pullToRefreshDisabled]);
-
-  if (!isIOS || !isStandalone || pullToRefreshDisabled) return null;
+  if (!isIOS || !isStandalone) return null;
 
   return (
     <>
@@ -261,6 +203,10 @@ function Router() {
     "/waalid/feed",
     "/baraha",
     "/reset-password",
+    "/child-login",
+    "/child-dashboard",
+    "/quran-lesson",
+    "/quran-game/",
   ];
   
   const hiddenNavExactPaths = [
@@ -332,6 +278,13 @@ function Router() {
             <Route path="/legal" component={Legal} />
             <Route path="/share-info" component={ShareInfo} />
             <Route path="/install" component={Install} />
+            <Route path="/child-login" component={ChildLogin} />
+            <Route path="/child-dashboard" component={ChildDashboard} />
+            <Route path="/quran-lesson/:surahNumber" component={QuranLesson} />
+            <Route path="/quran-game/word-puzzle/:surahNumber" component={QuranWordPuzzle} />
+            <Route path="/quran-game/memory-match/:surahNumber" component={QuranMemoryMatch} />
+            <Route path="/quran-game/surah-quiz/:surahNumber" component={QuranSurahQuiz} />
+            <Route path="/quran-game/somali-flashcards/:surahNumber" component={SomaliFlashcardsGame} />
             <Route component={NotFound} />
           </Switch>
         </Suspense>
@@ -353,19 +306,21 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ParentAuthProvider>
-          <OfflineProvider>
-            <NotificationModalProvider>
-              <TooltipProvider>
-                <WouterRouter hook={useBrowserLocation}>
-                  <PullToRefresh />
-                  <Analytics />
-                  <Toaster />
-                  <SonnerToaster position="top-center" richColors />
-                  <Router />
-                </WouterRouter>
-              </TooltipProvider>
-            </NotificationModalProvider>
-          </OfflineProvider>
+          <ChildAuthProvider>
+            <OfflineProvider>
+              <NotificationModalProvider>
+                <TooltipProvider>
+                  <WouterRouter hook={useBrowserLocation}>
+                    <PullToRefresh />
+                    <Analytics />
+                    <Toaster />
+                    <SonnerToaster position="top-center" richColors />
+                    <Router />
+                  </WouterRouter>
+                </TooltipProvider>
+              </NotificationModalProvider>
+            </OfflineProvider>
+          </ChildAuthProvider>
         </ParentAuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

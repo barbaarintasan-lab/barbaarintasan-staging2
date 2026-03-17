@@ -1445,7 +1445,7 @@ export default function LessonView() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xl">📅</span>
-                  <span><strong>Usbuucii:</strong> 3 cashar oo kaliya</span>
+                  <span><strong>Usbuucii:</strong> 4 cashar (2 maalmood × 2 cashar)</span>
                 </div>
               </div>
               

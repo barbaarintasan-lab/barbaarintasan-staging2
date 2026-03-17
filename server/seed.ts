@@ -22,22 +22,6 @@ async function seed() {
     console.log("✓ Admin user already exists");
   }
 
-  // Local course image paths (served from /course-images/ static route)
-  const localCourseImages: Record<string, string> = {
-    "intellect":   "/course-images/caqli-sare.png",
-    "independence":"/course-images/ilmo-is-dabira.png",
-    "father":      "/course-images/aabe-baraarugay.png",
-    "autism":      "/course-images/hadalka-daaho.png",
-    "family":      "/course-images/badqabka-qoyska.png",
-    "free-trial":  "/course-images/0-6-bilood.png",
-    "0-6":         "/course-images/0-6-bilood.png",
-    "6-12":        "/course-images/6-12-bilood.png",
-    "1-2":         "/course-images/1-2-sano.png",
-    "2-4":         "/course-images/2-4-sano.png",
-    "4-7":         "/course-images/4-7-sano.png",
-    "free-general":"/course-images/4-7-sano.png",
-  };
-
   // Check if courses already exist
   const existingCourses = await db.select().from(courses);
   
@@ -48,7 +32,7 @@ async function seed() {
         courseId: "intellect",
         title: "Koorsada Ilmahaaga Caqli Sare u Yeel",
         description: "Make Your Child Highly Intelligent Course",
-        imageUrl: localCourseImages["intellect"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/11/wii-weel-2.png",
         category: "special",
         isLive: true,
         isFree: false,
@@ -59,7 +43,7 @@ async function seed() {
         courseId: "independence",
         title: "Koorsada Ilmo Is-Dabira, Iskuna Filan",
         description: "Self-Reliant and Independent Child Course",
-        imageUrl: localCourseImages["independence"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/11/gabar-weel-dhaqaysa1-1-150x150.png",
         category: "special",
         isLive: true,
         isFree: false,
@@ -70,7 +54,7 @@ async function seed() {
         courseId: "father",
         title: "Koorsada Aabe Baraarugay",
         description: "Fatherhood Excellence Course",
-        imageUrl: localCourseImages["father"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/08/IMG_0152-1024x682.jpg",
         category: "special",
         isLive: false,
         isFree: true,
@@ -81,7 +65,7 @@ async function seed() {
         courseId: "autism",
         title: "Koorsada Ilmaha hadalka ka soo Daaho (Autisimka)",
         description: "Autism and Speech Development Course",
-        imageUrl: localCourseImages["autism"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/11/Gemini_Generated_Image_cdao1kcdao1kcdao-1-150x150.png",
         category: "special",
         isLive: true,
         isFree: false,
@@ -92,7 +76,7 @@ async function seed() {
         courseId: "family",
         title: "Koorsada Xalinta Khilaafka Qoyska",
         description: "Family Conflict Resolution Course",
-        imageUrl: localCourseImages["family"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/11/Nov-15-2025-10_24_38-PM-150x150.png",
         category: "special",
         isLive: false,
         isFree: true,
@@ -103,7 +87,7 @@ async function seed() {
         courseId: "free-trial",
         title: "Koorso Free ah Tijaabi oo Arag Casharadeena",
         description: "Free Trial Course to Experience Our Content",
-        imageUrl: localCourseImages["free-trial"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/09/Designer-5_edited-e1763719365911-150x150.jpg",
         category: "special",
         isLive: false,
         isFree: true,
@@ -118,7 +102,7 @@ async function seed() {
         courseId: "0-6",
         title: "0-6 Bilood Jir Waa Koorsada 1aad",
         description: "First Course: 0-6 Months Old",
-        imageUrl: localCourseImages["0-6"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/10/Generated-Image-October-11-2025-6_22PM-150x150.png",
         category: "general",
         isLive: false,
         isFree: false,
@@ -129,7 +113,7 @@ async function seed() {
         courseId: "6-12",
         title: "6-12 Bilood jir Waa Koorsada 2aad",
         description: "Second Course: 6-12 Months Old",
-        imageUrl: localCourseImages["6-12"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/08/6-months-baby_edited_edited-150x150.jpg",
         category: "general",
         isLive: false,
         isFree: false,
@@ -140,7 +124,7 @@ async function seed() {
         courseId: "1-2",
         title: "1-2 Sano Jir Waa Koorsada 3aad",
         description: "Third Course: 1-2 Years Old",
-        imageUrl: localCourseImages["1-2"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/09/one-year-old-150x150.avif",
         category: "general",
         isLive: false,
         isFree: false,
@@ -151,7 +135,7 @@ async function seed() {
         courseId: "2-4",
         title: "2-4 Sano Jir Waa Koorsada 4aad",
         description: "Fourth Course: 2-4 Years Old",
-        imageUrl: localCourseImages["2-4"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/09/4-years-girl_edited_edited-1-150x150.jpg",
         category: "general",
         isLive: false,
         isFree: false,
@@ -162,7 +146,7 @@ async function seed() {
         courseId: "4-7",
         title: "4-7 Jir Waa Koorsada 5aad",
         description: "Fifth Course: 4-7 Years Old",
-        imageUrl: localCourseImages["4-7"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/08/1200px-Little_Somali_girl_edited-150x150.jpg",
         category: "general",
         isLive: false,
         isFree: false,
@@ -173,7 +157,7 @@ async function seed() {
         courseId: "free-general",
         title: "Koorso Free ah Tijaabi",
         description: "Free Trial Course",
-        imageUrl: localCourseImages["free-general"],
+        imageUrl: "https://barbaarintasan.com/wp-content/uploads/2025/08/somali-mother-e1759866129885-150x150.png",
         category: "general",
         isLive: false,
         isFree: true,
@@ -226,20 +210,7 @@ async function seed() {
       console.log(`✓ Seeded ${sampleLessons.length} sample lessons for course "0-6 Bilood Jir"`);
     }
   } else {
-    // Update existing courses that have external (non-local) image URLs to use local paths
-    let updatedCount = 0;
-    for (const [courseId, localPath] of Object.entries(localCourseImages)) {
-      const course = existingCourses.find(c => c.courseId === courseId);
-      if (course && course.imageUrl && !course.imageUrl.startsWith('/course-images/')) {
-        await db.update(courses).set({ imageUrl: localPath }).where(eq(courses.courseId, courseId));
-        updatedCount++;
-      }
-    }
-    if (updatedCount > 0) {
-      console.log(`✓ Updated ${updatedCount} course images to use local paths`);
-    } else {
-      console.log("✓ Courses already exist");
-    }
+    console.log("✓ Courses already exist");
   }
 
   console.log("Database seed completed!");

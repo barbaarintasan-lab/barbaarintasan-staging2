@@ -20,13 +20,7 @@ const R2_BUCKETS = {
   }
 };
 
-export type R2BucketType = 'dhambaal' | 'sheeko' | 'maaweelo' | 'sawirada' | 'talo';
-
-function resolveR2BucketType(bucketType: R2BucketType): keyof typeof R2_BUCKETS {
-  if (bucketType === 'talo') return 'dhambaal';
-  if (bucketType === 'maaweelo') return 'sheeko';
-  return bucketType;
-}
+export type R2BucketType = 'dhambaal' | 'sheeko' | 'sawirada' | 'talo';
 
 let s3Client: S3Client | null = null;
 
@@ -65,8 +59,9 @@ export async function uploadToR2(
   bucketType: R2BucketType = 'dhambaal'
 ): Promise<{ url: string; key: string }> {
   const client = getR2Client();
-  const actualBucketType = resolveR2BucketType(bucketType);
-  const bucket = R2_BUCKETS[actualBucketType];
+  // Map 'talo' to 'dhambaal' bucket if not specifically defined, or add it
+  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  const bucket = R2_BUCKETS[actualBucketType as keyof typeof R2_BUCKETS];
   const key = `${folder}/${fileName}`;
 
   await client.send(new PutObjectCommand({
@@ -86,8 +81,7 @@ export async function uploadToR2(
 export async function getFromR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<Buffer | null> {
   try {
     const client = getR2Client();
-    const actualBucketType = resolveR2BucketType(bucketType);
-    const bucket = R2_BUCKETS[actualBucketType];
+    const bucket = R2_BUCKETS[bucketType];
     
     const response = await client.send(new GetObjectCommand({
       Bucket: bucket.name,
@@ -109,8 +103,7 @@ export async function getFromR2(key: string, bucketType: R2BucketType = 'dhambaa
 
 export async function deleteFromR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<void> {
   const client = getR2Client();
-  const actualBucketType = resolveR2BucketType(bucketType);
-  const bucket = R2_BUCKETS[actualBucketType];
+  const bucket = R2_BUCKETS[bucketType];
   
   await client.send(new DeleteObjectCommand({
     Bucket: bucket.name,
@@ -122,8 +115,7 @@ export async function deleteFromR2(key: string, bucketType: R2BucketType = 'dham
 export async function existsInR2(key: string, bucketType: R2BucketType = 'dhambaal'): Promise<boolean> {
   try {
     const client = getR2Client();
-    const actualBucketType = resolveR2BucketType(bucketType);
-    const bucket = R2_BUCKETS[actualBucketType];
+    const bucket = R2_BUCKETS[bucketType];
     
     await client.send(new HeadObjectCommand({
       Bucket: bucket.name,
@@ -137,8 +129,7 @@ export async function existsInR2(key: string, bucketType: R2BucketType = 'dhamba
 }
 
 export function getR2PublicUrl(key: string, bucketType: R2BucketType = 'dhambaal'): string {
-  const actualBucketType = resolveR2BucketType(bucketType);
-  const bucket = R2_BUCKETS[actualBucketType];
+  const bucket = R2_BUCKETS[bucketType];
   return `${bucket.publicUrl}/${key}`;
 }
 
@@ -157,8 +148,7 @@ export async function listR2Files(
   maxKeys: number = 200
 ): Promise<R2FileInfo[]> {
   const client = getR2Client();
-  const actualBucketType = resolveR2BucketType(bucketType);
-  const bucket = R2_BUCKETS[actualBucketType];
+  const bucket = R2_BUCKETS[bucketType];
   const files: R2FileInfo[] = [];
   let continuationToken: string | undefined;
 

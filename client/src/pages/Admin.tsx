@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages, BarChart3 } from "lucide-react";
+import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages } from "lucide-react";
 import AIModerationPanel from "@/components/AIModerationPanel";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -186,33 +186,6 @@ function formatSomaliDateTime(dateStr: string): string {
   } catch {
     return dateStr;
   }
-}
-
-interface TarbiyaInsights {
-  topQuestions: Array<{ content: string; count: number }>;
-  retention: {
-    range: { from: string; to: string };
-    activeToday: number;
-    activeLast7: number;
-    returningLast7: number;
-    returningRate: number;
-  };
-  feedback: {
-    up: number;
-    down: number;
-    total: number;
-  };
-  voice: {
-    since: string;
-    transcribeSuccess: number;
-    transcribeFail: number;
-    ttsSuccess: number;
-    ttsFail: number;
-    transcribeTotal: number;
-    ttsTotal: number;
-    transcribeSuccessRate: number;
-    ttsSuccessRate: number;
-  };
 }
 
 function FlashcardManager() {
@@ -730,7 +703,6 @@ export default function Admin() {
   const [editedMoralLesson, setEditedMoralLesson] = useState("");
   const [editedCharacterName, setEditedCharacterName] = useState("");
   const [selectedVoice, setSelectedVoice] = useState<"muuse" | "ubax">("muuse");
-  const [selectedTtsProvider, setSelectedTtsProvider] = useState<"gemini" | "azure">("gemini");
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [generatedAudioBase64, setGeneratedAudioBase64] = useState<string | null>(null);
   const [isSavingContent, setIsSavingContent] = useState(false);
@@ -1224,8 +1196,7 @@ export default function Admin() {
         credentials: "include",
         body: JSON.stringify({
           text: audioText,
-          voiceName: selectedVoice,
-          ttsProvider: selectedTtsProvider,
+          voiceName: selectedVoice
         }),
       });
       const data = await res.json();
@@ -1233,7 +1204,7 @@ export default function Admin() {
       if (res.ok && data.success) {
         setGeneratedAudioBase64(data.audioBase64);
         setContentStep(2);
-        toast.success(`Codka waa la sameeyay! (${data.voice} - ${selectedTtsProvider.toUpperCase()})`);
+        toast.success(`Codka waa la sameeyay! (${data.voice})`);
       } else {
         toast.error(data.error || "Codka lama sameyn karin");
       }
@@ -1661,17 +1632,6 @@ export default function Admin() {
     enabled: isLoggedIn,
   });
 
-  const { data: tarbiyaInsights, refetch: refetchTarbiyaInsights } = useQuery<TarbiyaInsights>({
-    queryKey: ["adminTarbiyaInsights"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/tarbiya-insights", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch tarbiya insights");
-      return res.json();
-    },
-    enabled: isLoggedIn,
-    staleTime: 60_000,
-  });
-
   // Fetch all enrollments for admin
   const { data: enrollmentsList = [], refetch: refetchEnrollments } = useQuery({
     queryKey: ["adminEnrollments"],
@@ -1682,100 +1642,6 @@ export default function Admin() {
     },
     enabled: isLoggedIn,
   });
-
-  const activeParentIdsByCourse = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    (enrollmentsList as any[]).forEach((enrollment: any) => {
-      if (enrollment.status !== "active") return;
-      if (!map.has(enrollment.courseId)) {
-        map.set(enrollment.courseId, new Set<string>());
-      }
-      map.get(enrollment.courseId)!.add(enrollment.parentId);
-    });
-    return map;
-  }, [enrollmentsList]);
-
-  const parentEnrollmentsByParentId = useMemo(() => {
-    const map = new Map<string, any[]>();
-    (enrollmentsList as any[]).forEach((enrollment: any) => {
-      const existing = map.get(enrollment.parentId) || [];
-      existing.push(enrollment);
-      map.set(enrollment.parentId, existing);
-    });
-    return map;
-  }, [enrollmentsList]);
-
-  const parentCountryValues = useMemo(() => {
-    return Array.from(
-      new Set((parentsList as any[]).map((p: any) => normalizeCountry(p.country)).filter(Boolean))
-    ).sort() as string[];
-  }, [parentsList]);
-
-  const parentCountByCountry = useMemo(() => {
-    const map = new Map<string, number>();
-    (parentsList as any[]).forEach((parent: any) => {
-      const country = normalizeCountry(parent.country);
-      if (!country) return;
-      map.set(country, (map.get(country) || 0) + 1);
-    });
-    return map;
-  }, [parentsList]);
-
-  const parentCountInGroup = useMemo(() => {
-    return (parentsList as any[]).filter((p: any) => p.inParentingGroup).length;
-  }, [parentsList]);
-
-  const paidParentOptions = useMemo(() => {
-    const approvedPayments = (paymentSubmissions as any[]).filter((p: any) => p.status === "approved");
-    const uniqueCustomers = new Map<string, any>();
-
-    approvedPayments.forEach((payment: any) => {
-      const identifier = payment.customerEmail || payment.customerPhone;
-      if (!identifier || uniqueCustomers.has(identifier)) return;
-      uniqueCustomers.set(identifier, {
-        name: payment.customerName,
-        email: payment.customerEmail,
-        phone: payment.customerPhone,
-        identifier,
-      });
-    });
-
-    return Array.from(uniqueCustomers.values());
-  }, [paymentSubmissions]);
-
-  const filteredParents = useMemo(() => {
-    const enrolledIds = parentCourseFilter ? activeParentIdsByCourse.get(parentCourseFilter) : null;
-    const query = parentSearchQuery.trim().toLowerCase();
-    const paidFilterLower = paidParentFilter?.toLowerCase();
-
-    return (parentsList as any[]).filter((parent: any) => {
-      if (parentCountryFilter !== "all" && normalizeCountry(parent.country) !== parentCountryFilter) return false;
-      if (parentGroupFilter && !parent.inParentingGroup) return false;
-      if (enrolledIds && !enrolledIds.has(parent.id)) return false;
-
-      if (paidParentFilter) {
-        const matchesEmail = parent.email?.toLowerCase() === paidFilterLower;
-        const matchesPhone = parent.phone === paidParentFilter;
-        const matchesName = parent.name?.toLowerCase() === paidFilterLower;
-        if (!matchesEmail && !matchesPhone && !matchesName) return false;
-      }
-
-      if (!query) return true;
-      return (
-        parent.name?.toLowerCase().includes(query) ||
-        parent.email?.toLowerCase().includes(query) ||
-        parent.phone?.includes(query)
-      );
-    });
-  }, [
-    parentsList,
-    parentCountryFilter,
-    parentGroupFilter,
-    parentCourseFilter,
-    paidParentFilter,
-    parentSearchQuery,
-    activeParentIdsByCourse,
-  ]);
 
   // Fetch all resources for admin (Maktabadda)
   const { data: resourcesList = [], refetch: refetchResources } = useQuery({
@@ -1845,9 +1711,9 @@ export default function Admin() {
 
   // Fetch all parent messages (including unpublished for admin)
   const { data: parentMessages = [], isLoading: isLoadingMessages, refetch: refetchParentMessages } = useQuery<ParentMessage[]>({
-    queryKey: ["/api/admin/parent-messages?limit=500"],
+    queryKey: ["/api/admin/parent-messages"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/parent-messages?limit=500", { credentials: "include" });
+      const res = await fetch("/api/admin/parent-messages", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch parent messages");
       return res.json();
     },
@@ -1858,9 +1724,9 @@ export default function Admin() {
 
   // Fetch all bedtime stories (including unpublished for admin)
   const { data: bedtimeStories = [], isLoading: isLoadingStories, refetch: refetchBedtimeStories } = useQuery<BedtimeStory[]>({
-    queryKey: ["/api/admin/bedtime-stories?limit=500"],
+    queryKey: ["/api/admin/bedtime-stories"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/bedtime-stories?limit=500", { credentials: "include" });
+      const res = await fetch("/api/admin/bedtime-stories", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch bedtime stories");
       return res.json();
     },
@@ -1893,13 +1759,8 @@ export default function Admin() {
 
   // Generate parent message audio mutation
   const generateParentMessageAudioMutation = useMutation({
-    mutationFn: async ({ id, provider }: { id: string; provider: "gemini" | "azure" }) => {
-      const res = await fetch(`/api/parent-messages/${id}/generate-audio`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ttsProvider: provider }),
-      });
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/parent-messages/${id}/generate-audio`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to generate audio");
       return res.json();
     },
@@ -1929,13 +1790,8 @@ export default function Admin() {
 
   // Generate bedtime story audio mutation
   const generateBedtimeStoryAudioMutation = useMutation({
-    mutationFn: async ({ id, provider }: { id: string; provider: "gemini" | "azure" }) => {
-      const res = await fetch(`/api/bedtime-stories/${id}/generate-audio`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ttsProvider: provider }),
-      });
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/bedtime-stories/${id}/generate-audio`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to generate audio");
       return res.json();
     },
@@ -2239,35 +2095,6 @@ ${baseUrl}/maaweelo`;
     },
     onError: () => {
       toast.error("Khalad ayaa dhacay");
-    },
-  });
-
-  // Update course drip settings mutation (admin)
-  const updateCourseDripMutation = useMutation({
-    mutationFn: async (data: { id: string; dripEnabled: boolean; dripLessonsPerWeek: number }) => {
-      const res = await fetch(`/api/admin/courses/${data.id}/drip-settings`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          dripEnabled: data.dripEnabled,
-          dripLessonsPerWeek: data.dripLessonsPerWeek,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to update drip settings");
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast.success("Drip settings waa la keydiyey");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Khalad ayaa dhacay");
     },
   });
 
@@ -4428,7 +4255,7 @@ ${baseUrl}/maaweelo`;
               )}
             </Button>
             <Button
-              variant={["parents", "appointments", "parent-progress", "assessment-insights", "tarbiya-insights"].includes(activeTab) ? "default" : "outline"}
+              variant={["parents", "appointments", "parent-progress", "assessment-insights"].includes(activeTab) ? "default" : "outline"}
               className="flex items-center justify-center gap-1.5 h-10 text-xs sm:text-sm px-2 sm:px-3 rounded-lg shadow-sm hover:shadow-md transition-all relative"
               onClick={() => setActiveTab("parents")}
               data-testid="nav-waalidka"
@@ -4558,7 +4385,7 @@ ${baseUrl}/maaweelo`;
             )}
             
             {/* Waalidka sub-tabs */}
-            {["parents", "appointments", "parent-progress", "assessment-insights", "tarbiya-insights"].includes(activeTab) && (
+            {["parents", "appointments", "parent-progress", "assessment-insights"].includes(activeTab) && (
               <>
                 <Button
                   variant={activeTab === "parents" ? "secondary" : "ghost"}
@@ -4598,15 +4425,6 @@ ${baseUrl}/maaweelo`;
                   data-testid="tab-assessment-insights"
                 >
                   <Brain className="w-3 h-3 mr-1" /> Qiimaynta
-                </Button>
-                <Button
-                  variant={activeTab === "tarbiya-insights" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setActiveTab("tarbiya-insights")}
-                  data-testid="tab-tarbiya-insights"
-                >
-                  <BarChart3 className="w-3 h-3 mr-1" /> Tarbiya AI
                 </Button>
               </>
             )}
@@ -4884,9 +4702,13 @@ ${baseUrl}/maaweelo`;
                                             {submission.planType === "onetime" ? `Hal mar - $${submission.amount}` : 
                                              submission.planType === "monthly" ? `Bilaha - $${submission.amount}` : `Sanada - $${submission.amount}`}
                                           </Badge>
-                                          {submission.paymentSource?.startsWith('wordpress') ? (
+                                          {submission.paymentSource === 'stripe' ? (
+                                            <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
+                                              💳 Stripe
+                                            </Badge>
+                                          ) : submission.paymentSource?.startsWith('wordpress') ? (
                                             <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                                              🌐 WordPress {submission.paymentSource.includes('mobile') ? '(Mobile Money)' : '(Online)'}
+                                              🌐 WordPress {submission.paymentSource.includes('stripe') ? '(Stripe)' : submission.paymentSource.includes('mobile') ? '(Mobile Money)' : ''}
                                             </Badge>
                                           ) : (
                                             <Badge variant="outline">{method?.name || "Unknown Method"}</Badge>
@@ -7615,52 +7437,6 @@ ${baseUrl}/maaweelo`;
                                         <Badge variant="secondary" className="text-[10px]">${course.priceYearly}/sanad</Badge>
                                       )}
                                     </div>
-
-                                    <div className="mt-3 p-2 rounded-lg bg-white border border-gray-200">
-                                      <p className="text-[11px] font-semibold text-gray-700 mb-2">Drip Settings</p>
-                                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                        <div className="flex items-center gap-2">
-                                          <Switch
-                                            checked={!!course.dripEnabled}
-                                            disabled={updateCourseDripMutation.isPending}
-                                            onCheckedChange={(checked) => {
-                                              const currentPerWeek = Number(course.dripLessonsPerWeek || 3);
-                                              const safePerWeek = Math.min(10, Math.max(1, Math.trunc(currentPerWeek)));
-                                              updateCourseDripMutation.mutate({
-                                                id: course.id,
-                                                dripEnabled: !!checked,
-                                                dripLessonsPerWeek: safePerWeek,
-                                              });
-                                            }}
-                                          />
-                                          <span className="text-xs text-gray-700">Drip ON/OFF</span>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs text-gray-600">Cashar/todobaad</span>
-                                          <Select
-                                            value={String(Math.min(10, Math.max(1, Math.trunc(Number(course.dripLessonsPerWeek || 3)))))}
-                                            onValueChange={(value) => {
-                                              updateCourseDripMutation.mutate({
-                                                id: course.id,
-                                                dripEnabled: !!course.dripEnabled,
-                                                dripLessonsPerWeek: parseInt(value),
-                                              });
-                                            }}
-                                            disabled={updateCourseDripMutation.isPending}
-                                          >
-                                            <SelectTrigger className="h-8 w-24" data-testid={`select-drip-per-week-${course.id}`}>
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
-                                                <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                      </div>
-                                    </div>
                                   </div>
 
                                   {/* Actions */}
@@ -8774,7 +8550,7 @@ ${baseUrl}/maaweelo`;
                     onClick={() => { setParentCountryFilter("all"); setParentGroupFilter(false); setParentCourseFilter(null); }}
                   >
                     <CardContent className="p-4 text-center">
-                      <p className="text-3xl font-bold text-orange-700">{parentCountryValues.length}</p>
+                      <p className="text-3xl font-bold text-orange-700">{Array.from(new Set(parentsList.map((p: any) => normalizeCountry(p.country)).filter(Boolean))).length}</p>
                       <p className="text-xs text-orange-600 font-medium">Tirada Wadamada</p>
                     </CardContent>
                   </Card>
@@ -8794,15 +8570,17 @@ ${baseUrl}/maaweelo`;
                     onClick={() => { setParentCountryFilter("all"); setParentGroupFilter(true); setParentCourseFilter(null); }}
                   >
                     <CardContent className="p-4 text-center">
-                      <p className="text-3xl font-bold text-cyan-700">{parentCountInGroup}</p>
+                      <p className="text-3xl font-bold text-cyan-700">{parentsList.filter((p: any) => p.inParentingGroup).length}</p>
                       <p className="text-xs text-cyan-600 font-medium">Guruubka Telegram</p>
                     </CardContent>
                   </Card>
                 </div>
                 {/* 4. Wadan kasta oo tirada leh */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                  {parentCountryValues.map((country) => {
-                      const countryCount = parentCountByCountry.get(country) || 0;
+                  {(Array.from(new Set(parentsList.map((p: any) => normalizeCountry(p.country)).filter(Boolean))) as string[])
+                    .sort()
+                    .map((country) => {
+                      const countryCount = parentsList.filter((p: any) => normalizeCountry(p.country) === country).length;
                       const isSelected = parentCountryFilter === country && !parentCourseFilter;
                       return (
                         <Card 
@@ -8824,7 +8602,8 @@ ${baseUrl}/maaweelo`;
                   <p className="text-sm font-semibold text-gray-700 mb-2">Koorsooyinka & Tirada Waalidiinta:</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {courses.map((course: any) => {
-                      const parentCount = activeParentIdsByCourse.get(course.id)?.size || 0;
+                      const courseEnrollments = enrollmentsList.filter((e: any) => e.courseId === course.id && e.status === "active");
+                      const parentCount = courseEnrollments.length;
                       const isSelected = parentCourseFilter === course.id;
                       return (
                         <Card 
@@ -8900,7 +8679,7 @@ ${baseUrl}/maaweelo`;
                             </SelectTrigger>
                             <SelectContent className="max-h-[300px] overflow-y-auto">
                               <SelectItem value="all">Dhammaan Wadamada</SelectItem>
-                              {parentCountryValues.map((country) => (
+                              {(Array.from(new Set(parentsList.map((p: any) => normalizeCountry(p.country)).filter(Boolean))) as string[]).sort().map((country) => (
                                 <SelectItem key={country} value={country}>
                                   {getCountryLabel(country)}
                                 </SelectItem>
@@ -8916,11 +8695,26 @@ ${baseUrl}/maaweelo`;
                             </SelectTrigger>
                             <SelectContent className="max-h-[300px] overflow-y-auto">
                               <SelectItem value="all">Dhammaan Waalidka</SelectItem>
-                              {paidParentOptions.map((customer: any) => (
-                                <SelectItem key={customer.identifier} value={customer.identifier}>
-                                  {customer.name} ({customer.email || customer.phone})
-                                </SelectItem>
-                              ))}
+                              {Array.isArray(paymentSubmissions) && (() => {
+                                const approvedPayments = paymentSubmissions.filter((p: any) => p.status === "approved");
+                                const uniqueCustomers = new Map();
+                                approvedPayments.forEach((p: any) => {
+                                  const identifier = p.customerEmail || p.customerPhone;
+                                  if (identifier && !uniqueCustomers.has(identifier)) {
+                                    uniqueCustomers.set(identifier, {
+                                      name: p.customerName,
+                                      email: p.customerEmail,
+                                      phone: p.customerPhone,
+                                      identifier
+                                    });
+                                  }
+                                });
+                                return Array.from(uniqueCustomers.values()).map((customer: any) => (
+                                  <SelectItem key={customer.identifier} value={customer.identifier}>
+                                    {customer.name} ({customer.email || customer.phone})
+                                  </SelectItem>
+                                ));
+                              })()}
                             </SelectContent>
                           </Select>
                         </div>
@@ -8994,7 +8788,22 @@ ${baseUrl}/maaweelo`;
                       </div>
                       <div className="flex gap-2 text-sm text-gray-500">
                         <Badge variant="outline">
-                          {filteredParents.length} waalid la helay
+                          {(() => {
+                            const enrolledIds = parentCourseFilter 
+                              ? enrollmentsList.filter((e: any) => e.courseId === parentCourseFilter && e.status === "active").map((e: any) => e.parentId)
+                              : null;
+                            return parentsList.filter((p: any) => {
+                              if (parentCountryFilter !== "all" && normalizeCountry(p.country) !== parentCountryFilter) return false;
+                              if (parentGroupFilter && !p.inParentingGroup) return false;
+                              if (enrolledIds && !enrolledIds.includes(p.id)) return false;
+                              if (paidParentFilter) {
+                                const matchesEmail = p.email?.toLowerCase() === paidParentFilter.toLowerCase();
+                                const matchesPhone = p.phone === paidParentFilter;
+                                if (!matchesEmail && !matchesPhone) return false;
+                              }
+                              return true;
+                            }).length;
+                          })()} waalid la helay
                         </Badge>
                         {parentGroupFilter && (
                           <Badge className="bg-blue-100 text-blue-700">Guruubka Telegram kaliya</Badge>
@@ -9016,8 +8825,33 @@ ${baseUrl}/maaweelo`;
                       {parentsList.length === 0 ? (
                         <p className="text-gray-500 text-center py-8">Weli waalid diiwaangashan ma jirto.</p>
                       ) : (
-                        filteredParents.map((parent: any) => {
-                            const parentEnrollments = parentEnrollmentsByParentId.get(parent.id) || [];
+                        (() => {
+                            const enrolledIds = parentCourseFilter 
+                              ? enrollmentsList.filter((e: any) => e.courseId === parentCourseFilter && e.status === "active").map((e: any) => e.parentId)
+                              : null;
+                            return parentsList.filter((parent: any) => {
+                              if (parentCountryFilter !== "all" && normalizeCountry(parent.country) !== parentCountryFilter) return false;
+                              if (parentGroupFilter && !parent.inParentingGroup) return false;
+                              if (enrolledIds && !enrolledIds.includes(parent.id)) return false;
+                              if (paidParentFilter) {
+                                const matchesEmail = parent.email?.toLowerCase() === paidParentFilter.toLowerCase();
+                                const matchesPhone = parent.phone === paidParentFilter;
+                                const matchesName = parent.name?.toLowerCase() === paidParentFilter.toLowerCase();
+                                if (!matchesEmail && !matchesPhone && !matchesName) return false;
+                              }
+                              if (!parentSearchQuery) return true;
+                              const query = parentSearchQuery.toLowerCase();
+                              return (
+                                parent.name?.toLowerCase().includes(query) ||
+                                parent.email?.toLowerCase().includes(query) ||
+                                parent.phone?.includes(query)
+                              );
+                            });
+                          })()
+                          .map((parent: any) => {
+                            const parentEnrollments = enrollmentsList.filter((e: any) => e.parentId === parent.id);
+                            const activeEnrollments = parentEnrollments.filter((e: any) => e.status === "active");
+                            
                             return (
                               <div 
                                 key={parent.id} 
@@ -10399,104 +10233,6 @@ ${baseUrl}/maaweelo`;
               <AssessmentInsightsTab />
             </TabsContent>
 
-            <TabsContent value="tarbiya-insights">
-              <Card className="border-none shadow-md bg-white">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-orange-600" />
-                      Tarbiya AI Insights
-                    </CardTitle>
-                    <CardDescription>
-                      Top 20 su'aalood, retention, feedback, iyo voice success rates.
-                    </CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => refetchTarbiyaInsights()} data-testid="button-refresh-tarbiya-insights">
-                    <RefreshCw className="w-4 h-4 mr-1" /> Cusboonaysii
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Card className="bg-orange-50 border-orange-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs text-orange-700">Active Maanta</p>
-                        <p className="text-2xl font-bold text-orange-900">{tarbiyaInsights?.retention?.activeToday ?? 0}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-blue-50 border-blue-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs text-blue-700">Returning 7 Maalmood</p>
-                        <p className="text-2xl font-bold text-blue-900">{tarbiyaInsights?.retention?.returningRate ?? 0}%</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-emerald-50 border-emerald-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs text-emerald-700">STT Success</p>
-                        <p className="text-2xl font-bold text-emerald-900">{tarbiyaInsights?.voice?.transcribeSuccessRate ?? 0}%</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-violet-50 border-violet-100">
-                      <CardContent className="p-4">
-                        <p className="text-xs text-violet-700">TTS Success</p>
-                        <p className="text-2xl font-bold text-violet-900">{tarbiyaInsights?.voice?.ttsSuccessRate ?? 0}%</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card className="border border-orange-100">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Top 20 Su'aalood</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 max-h-[380px] overflow-y-auto">
-                          {(tarbiyaInsights?.topQuestions || []).length === 0 ? (
-                            <p className="text-sm text-gray-500">Weli xog su'aalo ah lama helin.</p>
-                          ) : (
-                            (tarbiyaInsights?.topQuestions || []).map((q, idx) => (
-                              <div key={`${q.content}-${idx}`} className="p-2.5 rounded-lg border border-gray-100 bg-gray-50">
-                                <div className="flex items-start justify-between gap-3">
-                                  <p className="text-sm text-gray-800 line-clamp-2">{q.content}</p>
-                                  <Badge variant="secondary">{q.count}</Badge>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-orange-100">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Feedback & Voice</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3 text-sm">
-                        <div className="flex items-center justify-between p-2 rounded bg-green-50 border border-green-100">
-                          <span>Feedback Wanaagsan</span>
-                          <span className="font-semibold">{tarbiyaInsights?.feedback?.up ?? 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded bg-rose-50 border border-rose-100">
-                          <span>Feedback Wanaajin</span>
-                          <span className="font-semibold">{tarbiyaInsights?.feedback?.down ?? 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded bg-amber-50 border border-amber-100">
-                          <span>STT Total</span>
-                          <span className="font-semibold">{tarbiyaInsights?.voice?.transcribeTotal ?? 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded bg-indigo-50 border border-indigo-100">
-                          <span>TTS Total</span>
-                          <span className="font-semibold">{tarbiyaInsights?.voice?.ttsTotal ?? 0}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 pt-2">
-                          Voice metrics since: {tarbiyaInsights?.voice?.since ? new Date(tarbiyaInsights.voice.since).toLocaleString() : "-"}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
             <TabsContent value="announcements">
               <AnnouncementsTab />
             </TabsContent>
@@ -10804,28 +10540,6 @@ ${baseUrl}/maaweelo`;
                           <p className="text-xs text-gray-500 mt-2">
                             Azure TTS: https://{"{region}"}.tts.speech.microsoft.com/cognitiveservices/v1
                           </p>
-
-                          <Label className="mb-2 mt-4 block">Adeegga Codka (TTS Provider)</Label>
-                          <div className="flex gap-2">
-                            <Button
-                              variant={selectedTtsProvider === "gemini" ? "default" : "outline"}
-                              onClick={() => setSelectedTtsProvider("gemini")}
-                              className={selectedTtsProvider === "gemini" ? "bg-emerald-600" : ""}
-                              data-testid="button-provider-gemini"
-                            >
-                              <Sparkles className="w-4 h-4 mr-2" />
-                              Gemini
-                            </Button>
-                            <Button
-                              variant={selectedTtsProvider === "azure" ? "default" : "outline"}
-                              onClick={() => setSelectedTtsProvider("azure")}
-                              className={selectedTtsProvider === "azure" ? "bg-blue-600" : ""}
-                              data-testid="button-provider-azure"
-                            >
-                              <Cloud className="w-4 h-4 mr-2" />
-                              Azure
-                            </Button>
-                          </div>
                         </div>
 
                         {/* Action Buttons */}
@@ -11065,29 +10779,7 @@ ${baseUrl}/maaweelo`;
                                   </Button>
                                 )}
                                 {msg.isPublished && (
-                                  <div className="flex items-center gap-1 border rounded-md px-1 py-0.5 bg-white">
-                                    <Button
-                                      size="sm"
-                                      variant={selectedTtsProvider === "gemini" ? "default" : "ghost"}
-                                      className={`h-7 px-2 text-xs ${selectedTtsProvider === "gemini" ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
-                                      onClick={() => setSelectedTtsProvider("gemini")}
-                                      data-testid={`button-provider-gemini-parent-message-${msg.id}`}
-                                    >
-                                      Gemini
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={selectedTtsProvider === "azure" ? "default" : "ghost"}
-                                      className={`h-7 px-2 text-xs ${selectedTtsProvider === "azure" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                                      onClick={() => setSelectedTtsProvider("azure")}
-                                      data-testid={`button-provider-azure-parent-message-${msg.id}`}
-                                    >
-                                      Azure
-                                    </Button>
-                                  </div>
-                                )}
-                                {msg.isPublished && (
-                                  <Button size="sm" variant="outline" onClick={() => generateParentMessageAudioMutation.mutate({ id: msg.id, provider: selectedTtsProvider })} disabled={generateParentMessageAudioMutation.isPending} data-testid={`button-audio-parent-message-${msg.id}`}>
+                                  <Button size="sm" variant="outline" onClick={() => generateParentMessageAudioMutation.mutate(msg.id)} disabled={generateParentMessageAudioMutation.isPending} data-testid={`button-audio-parent-message-${msg.id}`}>
                                     {generateParentMessageAudioMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Radio className="w-3 h-3 mr-1" />}
                                     {msg.audioUrl ? 'Audio Dib u samayn' : 'Audio Samayn'}
                                   </Button>
@@ -11237,29 +10929,7 @@ ${baseUrl}/maaweelo`;
                                   </Button>
                                 )}
                                 {story.isPublished && (
-                                  <div className="flex items-center gap-1 border rounded-md px-1 py-0.5 bg-white">
-                                    <Button
-                                      size="sm"
-                                      variant={selectedTtsProvider === "gemini" ? "default" : "ghost"}
-                                      className={`h-7 px-2 text-xs ${selectedTtsProvider === "gemini" ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
-                                      onClick={() => setSelectedTtsProvider("gemini")}
-                                      data-testid={`button-provider-gemini-bedtime-story-${story.id}`}
-                                    >
-                                      Gemini
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={selectedTtsProvider === "azure" ? "default" : "ghost"}
-                                      className={`h-7 px-2 text-xs ${selectedTtsProvider === "azure" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                                      onClick={() => setSelectedTtsProvider("azure")}
-                                      data-testid={`button-provider-azure-bedtime-story-${story.id}`}
-                                    >
-                                      Azure
-                                    </Button>
-                                  </div>
-                                )}
-                                {story.isPublished && (
-                                  <Button size="sm" variant="outline" onClick={() => generateBedtimeStoryAudioMutation.mutate({ id: story.id, provider: selectedTtsProvider })} disabled={generateBedtimeStoryAudioMutation.isPending} data-testid={`button-audio-bedtime-story-${story.id}`}>
+                                  <Button size="sm" variant="outline" onClick={() => generateBedtimeStoryAudioMutation.mutate(story.id)} disabled={generateBedtimeStoryAudioMutation.isPending} data-testid={`button-audio-bedtime-story-${story.id}`}>
                                     {generateBedtimeStoryAudioMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Radio className="w-3 h-3 mr-1" />}
                                     {story.audioUrl ? 'Audio Dib u samayn' : 'Audio Samayn'}
                                   </Button>
@@ -15468,9 +15138,6 @@ function PromoVideosTab() {
     updateMutation.mutate({ id: video.id, isVisible: !video.isVisible });
   };
 
-  const visibleVideos = videos.filter((video: any) => video.isVisible);
-  const archivedVideos = videos.filter((video: any) => !video.isVisible);
-
   return (
     <div className="space-y-4" data-testid="promo-videos-admin">
       <Card>
@@ -15521,84 +15188,36 @@ function PromoVideosTab() {
           ) : videos.length === 0 ? (
             <p className="text-center text-gray-400 py-8">Weli muuqaal lama gelin. Guji "Ku Dar Cusub".</p>
           ) : (
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-2">Muuqaalka Hadda ee Bogga Hore</h4>
-                {visibleVideos.length === 0 ? (
-                  <p className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">Weli muuqaal muuqda ma jiro.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {visibleVideos.map((video: any) => (
-                      <div key={video.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white border-gray-200" data-testid={`admin-promo-${video.id}`}>
-                        <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
-                          {video.thumbnailUrl ? (
-                            <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Play className="w-6 h-6 text-gray-300" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{video.title}</h4>
-                          {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
-                          <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
-                        </div>
-                        <div className="flex items-center gap-1 flex-none">
-                          <Button variant="outline" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
-                            <Archive className="w-4 h-4 mr-1" /> Maktabada u wareeji
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
-                            <Edit className="w-4 h-4 text-blue-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </div>
+            <div className="space-y-3">
+              {videos.map((video: any) => (
+                <div key={video.id} className={`flex items-center gap-3 p-3 rounded-xl border ${video.isVisible ? "bg-white border-gray-200" : "bg-gray-50 border-gray-200 opacity-60"}`} data-testid={`admin-promo-${video.id}`}>
+                  <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
+                    {video.thumbnailUrl ? (
+                      <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-6 h-6 text-gray-300" />
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-
-              <div>
-                <h4 className="text-xs uppercase tracking-wide text-gray-600 font-semibold mb-2">Muuqaaladii Hore ee Bogga Hore</h4>
-                {archivedVideos.length === 0 ? (
-                  <p className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">Maktabadda wali wax muuqaal ah kuma jiro.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {archivedVideos.map((video: any) => (
-                      <div key={video.id} className="flex items-center gap-3 p-3 rounded-xl border bg-gray-50 border-gray-200" data-testid={`admin-promo-${video.id}`}>
-                        <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
-                          {video.thumbnailUrl ? (
-                            <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Play className="w-6 h-6 text-gray-300" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{video.title}</h4>
-                          {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
-                          <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
-                        </div>
-                        <div className="flex items-center gap-1 flex-none">
-                          <Button variant="outline" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
-                            <Eye className="w-4 h-4 mr-1" /> Bogga Hore ku celi
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
-                            <Edit className="w-4 h-4 text-blue-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-sm truncate">{video.title}</h4>
+                    {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
+                    <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
                   </div>
-                )}
-              </div>
+                  <div className="flex items-center gap-1 flex-none">
+                    <Button variant="ghost" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
+                      {video.isVisible ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
+                      <Edit className="w-4 h-4 text-blue-600" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

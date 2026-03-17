@@ -23,9 +23,9 @@ const openai = new OpenAI({
   ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
 });
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const useGemini = !!GEMINI_API_KEY;
-console.log(`[Bedtime Stories] Gemini config: ${useGemini ? 'Available (required for text generation)' : 'Not configured'}`);
+console.log(`[Bedtime Stories] Gemini config: ${useGemini ? 'Available (primary)' : 'Not configured (using OpenAI only)'}`);
 
 function getGeminiAI(): GoogleGenAI | null {
   if (!GEMINI_API_KEY) return null;
@@ -471,7 +471,7 @@ export async function generateDailyBedtimeStory(): Promise<void> {
       characterName: character.nameSomali,
       characterType: character.type,
       moralLesson: storyText.moralLesson,
-      ageRange: "6 bilood - 13 sano",
+      ageRange: "3-8",
       images,
       storyDate: today,
       isPublished: true, // Auto-publish for daily cron job
@@ -732,15 +732,13 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       }
 
       const { id } = req.params;
-      const requestedProvider = req.body?.ttsProvider as string | undefined;
-      const ttsProvider = requestedProvider === "gemini" || requestedProvider === "azure" ? requestedProvider : "auto";
       const story = await storage.getBedtimeStory(id);
       if (!story) {
         return res.status(404).json({ error: "Story not found" });
       }
 
-      console.log(`[TTS] Generating audio for story: ${story.titleSomali} (provider: ${ttsProvider})`);
-      const audioUrl = await generateBedtimeStoryAudio(story.content, story.moralLesson, story.id, ttsProvider);
+      console.log(`[TTS] Generating audio for story: ${story.titleSomali}`);
+      const audioUrl = await generateBedtimeStoryAudio(story.content, story.moralLesson, story.id);
       
       const updated = await storage.updateBedtimeStory(id, { audioUrl });
       console.log(`[TTS] Audio generated and saved for story ${id}`);

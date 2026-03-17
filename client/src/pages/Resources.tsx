@@ -201,15 +201,6 @@ interface DriveFile {
   iconLink?: string;
 }
 
-interface ArchivedPromoVideo {
-  id: string;
-  title: string;
-  description: string | null;
-  videoUrl: string;
-  thumbnailUrl: string | null;
-  createdAt: string;
-}
-
 const categoryKeys = ["all", "guide", "checklist", "infographic", "audio"] as const;
 
 const fileTypeIcons: Record<string, React.ReactNode> = {
@@ -226,7 +217,7 @@ const fileTypeColors: Record<string, string> = {
   video: "from-blue-400 to-indigo-500",
 };
 
-type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages" | "meet-recordings" | "homepage-promo-archive";
+type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages" | "meet-recordings";
 
 export default function Resources() {
   const { t } = useTranslation();
@@ -247,7 +238,7 @@ export default function Resources() {
     if (typeof window === "undefined") return "main";
     try {
       const hash = window.location.hash.replace('#', '') as LibrarySection;
-      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages", "meet-recordings", "homepage-promo-archive"];
+      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages", "meet-recordings"];
       return validSections.includes(hash) ? hash : "main";
     } catch {
       return "main";
@@ -418,7 +409,6 @@ export default function Resources() {
         ? selectedReciter.audioBaseUrl 
         : selectedReciter.audioBaseUrl + "/";
       const audioUrl = `${baseUrl}${currentSurah.number.toString().padStart(3, "0")}.mp3`;
-      console.log(`[Quran] Auto-playing next surah ${currentSurah.number} from: ${audioUrl}`);
       setCurrentAudioUrl(audioUrl);
       setAudioLoading(true);
     }
@@ -504,7 +494,6 @@ export default function Resources() {
         ? selectedReciter.audioBaseUrl 
         : selectedReciter.audioBaseUrl + "/";
       const audioUrl = `${baseUrl}${surah.number.toString().padStart(3, "0")}.mp3`;
-      console.log(`[Quran] Playing surah ${surah.number} from: ${audioUrl}`);
       setCurrentAudioUrl(audioUrl);
     } else {
       setAudioError("Fadlan dooro shiikh");
@@ -521,7 +510,6 @@ export default function Resources() {
         audio.play().then(() => {
           setIsPlaying(true);
         }).catch((err) => {
-          console.log("Autoplay blocked, user must click play:", err);
           setIsPlaying(false);
         });
       };
@@ -677,16 +665,6 @@ export default function Resources() {
     queryFn: async () => {
       const res = await fetch("/api/drive/maktabada");
       if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
-    enabled: !!parent,
-  });
-
-  const { data: archivedPromoVideos = [], isLoading: archivedPromoVideosLoading } = useQuery<ArchivedPromoVideo[]>({
-    queryKey: ["promoVideosArchive"],
-    queryFn: async () => {
-      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch archived promo videos");
       return res.json();
     },
     enabled: !!parent,
@@ -1868,67 +1846,6 @@ export default function Resources() {
     );
   }
 
-  if (activeSection === "homepage-promo-archive") {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-24">
-        <header className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 to-indigo-700 safe-top shadow-lg">
-          <div className="px-4 py-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setActiveSection("main")}
-                className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"
-                data-testid="button-back-homepage-promo-archive"
-              >
-                <ArrowLeft className="w-5 h-5 text-white" />
-              </button>
-              <div>
-                <h1 className="font-bold text-white text-lg">Muuqaaladii Hore ee Bogga Hore</h1>
-                <p className="text-blue-100 text-sm">Linki ahaan dib uga daawo</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="px-4 py-4">
-          {archivedPromoVideosLoading ? (
-            <div className="text-center py-10 text-gray-500">Waa la soo gelinayaa...</div>
-          ) : archivedPromoVideos.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-blue-100 p-6 text-center text-gray-600">
-              Weli muuqaal hore lama keydin.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {archivedPromoVideos.map((video) => (
-                <a
-                  key={video.id}
-                  href={video.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-4"
-                  data-testid={`archived-homepage-video-${video.id}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2">{video.title}</h3>
-                      {video.description && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-2">
-                        {new Date(video.createdAt).toLocaleDateString("so-SO", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-blue-600 shrink-0 mt-1" />
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
       <header className="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 safe-top shadow-lg">
@@ -2063,22 +1980,6 @@ export default function Resources() {
               <div>
                 <h3 className="font-bold text-white text-lg">Kulamadii Hore</h3>
                 <p className="text-red-200 text-xs mt-1">Kulamadii Bahda Tarbiyadda Caruurta ee Hore</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveSection("homepage-promo-archive")}
-            className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl p-5 text-left shadow-lg active:scale-[0.98] transition-transform col-span-2"
-            data-testid="button-homepage-promo-archive-section"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                <span className="text-3xl">🎬</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-lg">Muuqaaladii Hore ee Bogga Hore</h3>
-                <p className="text-blue-200 text-xs mt-1">Linki ahaan dib uga daawo</p>
               </div>
             </div>
           </button>

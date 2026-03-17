@@ -318,25 +318,22 @@ async function generateAiParentingTip() {
 
   console.log("[CRON] Generating AI parenting tip...");
 
-  const geminiApiKey = process.env.GOOGLE_GEMINI_API_KEY;
   const openaiApiKey =
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
   const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
 
-  if (!geminiApiKey && !openaiApiKey) {
+  if (!openaiApiKey) {
     console.log(
-      "[CRON] No AI key configured (Gemini/OpenAI) - skipping AI tip generation",
+      "[CRON] OpenAI API key not configured - skipping AI tip generation",
     );
     return;
   }
 
   try {
-    const openai = openaiApiKey
-      ? new OpenAI({
-          apiKey: openaiApiKey,
-          baseURL: openaiBaseUrl,
-        })
-      : null;
+    const openai = new OpenAI({
+      apiKey: openaiApiKey,
+      baseURL: openaiBaseUrl,
+    });
 
     const ageRanges = [
       "0-6 bilood",
@@ -375,51 +372,15 @@ async function generateAiParentingTip() {
       .replace(/\{category\}/g, categoryNames[randomCategory])
       .replace(/\{ageRange\}/g, randomAgeRange);
 
-    let tipContent: string | undefined;
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_completion_tokens: 300,
+    });
 
-    if (geminiApiKey) {
-      try {
-        const response = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": geminiApiKey,
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.8,
-                maxOutputTokens: 500,
-              },
-            }),
-          },
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Gemini API error: ${errorText}`);
-        }
-
-        const data = await response.json();
-        tipContent = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      } catch (geminiError) {
-        console.warn("[CRON] Gemini tip generation failed, trying OpenAI fallback:", (geminiError as Error).message);
-      }
-    }
-
-    if (!tipContent && openai) {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        max_completion_tokens: 300,
-      });
-      tipContent = response.choices[0]?.message?.content?.trim();
-    }
-
+    const tipContent = response.choices[0]?.message?.content?.trim();
     if (!tipContent) {
-      console.log("[CRON] No content received from AI provider");
+      console.log("[CRON] No content received from OpenAI");
       return;
     }
 
@@ -1016,15 +977,15 @@ export function startCronJobs() {
   //   await generateAiFlashcards();
   // });
 
-  // Daily parent message auto-generation at 8:00 AM Mogadishu time
-  cron.schedule("0 8 * * *", async () => {
-    await generateAndSaveParentMessage();
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI daily parent message auto-generation (manual content now)
+  // cron.schedule("0 8 * * *", async () => {
+  //   await generateAndSaveParentMessage();
+  // }, { timezone: "Africa/Mogadishu" });
 
-  // Daily bedtime story auto-generation at 8:00 AM Mogadishu time
-  cron.schedule("0 8 * * *", async () => {
-    await generateDailyBedtimeStory();
-  }, { timezone: "Africa/Mogadishu" });
+  // DISABLED: OpenAI daily bedtime story auto-generation (manual content now)
+  // cron.schedule("0 8 * * *", async () => {
+  //   await generateDailyBedtimeStory();
+  // }, { timezone: "Africa/Mogadishu" });
 
   // DISABLED: OpenAI daily parent tips auto-generation (cost savings)
   // cron.schedule("30 7 * * *", async () => {
@@ -1054,7 +1015,7 @@ export function startCronJobs() {
   // }, { timezone: "Africa/Mogadishu" });
 
   console.log(
-    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, daily parent message 8AM, daily bedtime story 8AM, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h) | DISABLED: AI tips, flashcards, batch worker, batch status",
+    "[CRON] Cron jobs scheduled (subscriptions hourly, events 30min, appointments 15min, bedtime notification 6PM, daily reminders hourly, inactive re-engagement every 6h) | DISABLED: AI tips, flashcards, parent message, bedtime story, batch worker, batch status",
   );
 
   setTimeout(async () => {

@@ -5,7 +5,7 @@ import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown, Eye, Share2 } from "lucide-react";
+import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown } from "lucide-react";
 import { openSSOLink } from "@/lib/api";
 import { VoiceSpaces } from "@/components/VoiceSpaces";
 import { InstallBanner } from "@/components/InstallBanner";
@@ -79,8 +79,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ContentComments, ContentReactions } from "@/components/engagement";
 
 
 function translateDuration(duration: string | null, t: (key: string) => string): string | null {
@@ -341,36 +339,13 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
 }
 
 function PromoVideoSection() {
-  const { parent } = useParentAuth();
-  const queryClient = useQueryClient();
   const { data: videos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos"],
   });
-  const { data: archivedVideos = [] } = useQuery<any[]>({
-    queryKey: ["/api/promo-videos/archive"],
-    queryFn: async () => {
-      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
-      if (!res.ok) {
-        return [];
-      }
-      return res.json();
-    },
-    enabled: !!parent,
-  });
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [openCommentsForVideoId, setOpenCommentsForVideoId] = useState<string | null>(null);
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start", dragFree: true });
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
-
-  const trackViewMutation = useMutation({
-    mutationFn: async (videoId: string) => {
-      await apiRequest("POST", `/api/promo-videos/${videoId}/view`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
-    },
-  });
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -384,11 +359,6 @@ function PromoVideoSection() {
   }, [emblaApi]);
 
   if (videos.length === 0) return null;
-
-  const archivedOnly = archivedVideos.filter(
-    (video: any) => !videos.some((current: any) => current.id === video.id)
-  );
-  const archivedPreview = archivedOnly.slice(0, 5);
 
   const getGDriveFileId = (url: string) => {
     const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -417,82 +387,6 @@ function PromoVideoSection() {
     const ytMatch = video.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
     if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
     return null;
-  };
-
-  const handleShareVideo = async (video: any) => {
-    const shareUrl = `${window.location.origin}/?promo=${video.id}`;
-    const shareData = {
-      title: video.title,
-      text: video.description || video.title,
-      url: shareUrl,
-    };
-
-    if (navigator.share && navigator.canShare?.(shareData)) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") return;
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Linkiga muuqaalka waa la koobiyay");
-    } catch {
-      toast.error("Linkiga lama koobin");
-    }
-  };
-
-  const PromoCommentsPreview = ({ videoId }: { videoId: string }) => {
-    const { data: comments = [] } = useQuery<any[]>({
-      queryKey: [`/api/promo-videos/${videoId}/comments`],
-      queryFn: async () => {
-        const res = await fetch(`/api/promo-videos/${videoId}/comments`, { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to fetch comments");
-        return res.json();
-      },
-    });
-
-    const topLevel = comments.filter((comment) => !comment.replyToId);
-    const preview = topLevel.slice(0, 2);
-
-    return (
-      <div className="mt-3 border-t border-gray-100 pt-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-700">Faallooyin ({comments.length})</p>
-          <button
-            onClick={() => setOpenCommentsForVideoId(videoId)}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            data-testid={`promo-open-comments-${videoId}`}
-          >
-            Arag dhammaan
-          </button>
-        </div>
-
-        {preview.length === 0 ? (
-          <p className="text-sm text-gray-500 mt-2">Wali faallo ma jirto.</p>
-        ) : (
-          <div className="space-y-2 mt-2">
-            {preview.map((comment) => (
-              <div key={comment.id} className="bg-gray-50 rounded-lg px-3 py-2">
-                <p className="text-xs font-semibold text-gray-700">{comment.parent?.name || "Waalid"}</p>
-                <p className="text-sm text-gray-600 line-clamp-2">{comment.body}</p>
-              </div>
-            ))}
-            {topLevel.length > 2 && (
-              <button
-                onClick={() => setOpenCommentsForVideoId(videoId)}
-                className="text-xs text-gray-500 hover:text-gray-700"
-                data-testid={`promo-more-comments-${videoId}`}
-              >
-                +{topLevel.length - 2} faallo oo kale
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -534,12 +428,7 @@ function PromoVideoSection() {
                 </div>
               ) : (
                 <button
-                  onClick={() => {
-                    setActiveVideo(video.id);
-                    if (parent) {
-                      trackViewMutation.mutate(video.id);
-                    }
-                  }}
+                  onClick={() => setActiveVideo(video.id)}
                   className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
                   data-testid={`promo-play-${video.id}`}
                 >
@@ -562,73 +451,11 @@ function PromoVideoSection() {
                 {video.description && (
                   <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
                 )}
-                <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
-                  <span className="inline-flex items-center gap-1" data-testid={`promo-views-${video.id}`}>
-                    <Eye className="w-4 h-4" />
-                    {video.viewCount || 0}
-                  </span>
-                  <button
-                    onClick={() => handleShareVideo(video)}
-                    className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
-                    data-testid={`promo-share-${video.id}`}
-                  >
-                    <Share2 className="w-4 h-4" />
-                    La wadaag
-                  </button>
-                </div>
-
-                <div className="mt-3 bg-slate-900 rounded-xl p-3">
-                  <ContentReactions contentType="promo_video" contentId={video.id} />
-                </div>
-
-                <PromoCommentsPreview videoId={video.id} />
                 </div>
               </div>
             </div>
           ))}
       </div>
-
-      <Dialog open={!!openCommentsForVideoId} onOpenChange={(open) => !open && setOpenCommentsForVideoId(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-slate-900 border-slate-700">
-          <DialogHeader>
-            <DialogTitle className="text-white">Faallooyinka Muuqaalka</DialogTitle>
-          </DialogHeader>
-          {openCommentsForVideoId && (
-            <ContentComments contentType="promo_video" contentId={openCommentsForVideoId} />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {archivedPreview.length > 0 && (
-        <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4" data-testid="promo-archive-links">
-          <h4 className="text-sm font-bold text-slate-800">Muuqaaladii Hore ee Bogga Hore</h4>
-          <p className="text-xs text-slate-500 mt-1">Linki ahaan dib uga daawo.</p>
-          <div className="mt-3 space-y-2">
-            {archivedPreview.map((video: any) => (
-              <a
-                key={video.id}
-                href={video.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
-                data-testid={`promo-archive-link-${video.id}`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{video.title}</p>
-                  <p className="text-xs text-slate-500">
-                    {new Date(video.createdAt).toLocaleDateString("so-SO", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-                <ExternalLink className="w-4 h-4 text-slate-400 flex-none" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2710,22 +2537,38 @@ export default function Home() {
             {hasEnrollments ? (
               <>
                 <p className="text-gray-600 text-base mb-5">{t("home.knowledgeBasedParenting")}</p>
-                <Link href="/learning-hub">
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-continue-learning">
-                    <Play className="w-5 h-5" />
-                    {t("home.startLessons")}
-                  </button>
-                </Link>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Link href="/learning-hub">
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-continue-learning">
+                      <Play className="w-5 h-5" />
+                      {t("home.startLessons")}
+                    </button>
+                  </Link>
+                  <Link href="/child-login">
+                    <button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-children-quran">
+                      <BookOpen className="w-5 h-5" />
+                      Baro Quraanka
+                    </button>
+                  </Link>
+                </div>
               </>
             ) : (
               <>
                 <p className="text-gray-600 text-base mb-5">{t("home.chooseCourse")}</p>
-                <Link href="/learning-hub">
-                  <button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-browse-courses">
-                    <Sparkles className="w-5 h-5" />
-                    {t("home.browseCourses", "Arag Koorsooyinka")}
-                  </button>
-                </Link>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Link href="/learning-hub">
+                    <button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-browse-courses">
+                      <Sparkles className="w-5 h-5" />
+                      {t("home.browseCourses", "Arag Koorsooyinka")}
+                    </button>
+                  </Link>
+                  <Link href="/child-login">
+                    <button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-children-quran-no-enroll">
+                      <BookOpen className="w-5 h-5" />
+                      Baro Quraanka
+                    </button>
+                  </Link>
+                </div>
               </>
             )}
           </div>
@@ -2896,14 +2739,14 @@ export default function Home() {
       {isSectionVisible("services") && (
       <div className="mt-6 px-4 max-w-7xl mx-auto lg:px-8">
         <h2 className="text-lg font-bold text-gray-900 mb-3 lg:text-xl">{t("home.otherServices")}</h2>
-        <div className="grid grid-cols-4 gap-1.5 lg:grid-cols-4 lg:gap-5">
+        <div className="grid grid-cols-4 gap-1.5 lg:grid-cols-8 lg:gap-6">
           <a href="/sheeko" onClick={(e) => { e.preventDefault(); window.location.assign('/sheeko'); }}>
             <div className="flex flex-col items-center p-1.5 lg:p-4 bg-white rounded-xl shadow-sm border border-red-200 active:scale-95 transition-all cursor-pointer min-w-0 relative" data-testid="link-sheeko">
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-red-400 to-rose-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <Radio className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-bold text-red-600 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Sheeko</span>
+              <span className="text-[10px] lg:text-sm font-bold text-red-600 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Sheeko</span>
             </div>
           </a>
           <Link href="/resources#quran">
@@ -2911,7 +2754,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <BookOpen className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-emerald-700 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Quraanka</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-emerald-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Quraanka</span>
             </div>
           </Link>
           <Link href="/parent-tips">
@@ -2919,7 +2762,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <Lightbulb className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Horumarka Da'da</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Horumarka Da'da</span>
             </div>
           </Link>
           <Link href="/milestones">
@@ -2927,7 +2770,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <Target className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Horumarka ilmaha</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Horumarka ilmaha</span>
             </div>
           </Link>
           <Link href="/resources">
@@ -2935,7 +2778,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <BookOpen className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Maktabada</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-gray-800 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Maktabada</span>
             </div>
           </Link>
           <Link href="/waalid/feed">
@@ -2943,7 +2786,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <Users className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-blue-700 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Baraha</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-blue-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Baraha</span>
             </div>
           </Link>
           <Link href="/groups">
@@ -2951,7 +2794,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-indigo-400 to-blue-600 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <UserPlus className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-indigo-700 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Guruubada</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-indigo-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Guruubada</span>
             </div>
           </Link>
           <Link href="/learning-hub">
@@ -2959,7 +2802,7 @@ export default function Home() {
               <div className="w-9 h-9 lg:w-16 lg:h-16 bg-gradient-to-br from-sky-400 to-cyan-500 rounded-lg lg:rounded-2xl flex items-center justify-center mb-1 lg:mb-3">
                 <GraduationCap className="w-4 h-4 lg:w-8 lg:h-8 text-white" />
               </div>
-              <span className="text-[10px] lg:text-sm font-semibold text-sky-700 text-center leading-tight w-full whitespace-normal break-words min-h-[28px] lg:min-h-[44px] px-0.5">Baro</span>
+              <span className="text-[10px] lg:text-sm font-semibold text-sky-700 text-center leading-tight w-full truncate lg:overflow-visible lg:whitespace-normal px-0.5">Baro</span>
             </div>
           </Link>
         </div>

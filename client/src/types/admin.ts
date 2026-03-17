@@ -143,7 +143,5 @@ export interface LessonImage {
   lessonId: string;
   imageUrl: string;
   prompt: string | null;
-  caption: string | null;
-  order: number;
   createdAt: string;
 }

@@ -256,7 +256,7 @@ export default function Dhambaal() {
   });
 
   const { data: allMessages, isLoading: loadingAll } = useQuery<ParentMessage[]>({
-    queryKey: [`/api/parent-messages?lang=${apiLanguage}&limit=200`],
+    queryKey: [`/api/parent-messages?lang=${apiLanguage}`],
   });
 
   const { data: dhambaalProgress = [] } = useQuery<{ contentId: string }[]>({

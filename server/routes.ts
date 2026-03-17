@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, contentProgress, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -29,7 +29,6 @@ import { registerLessonGroupRoutes } from "./lessonGroups";
 import { registerDhambaalDiscussionRoutes } from "./dhambaalDiscussion";
 import { registerBatchApiRoutes } from "./batch-api/routes";
 import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
-import { synthesizeSpeech } from "./tts";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { getParentingHelp, checkRateLimit } from "./ai/parenting-help";
@@ -38,15 +37,142 @@ import { uploadToR2, isR2Configured, listR2Files } from "./r2Storage";
 import { moderateContent } from "./ai/content-moderation";
 import { AccessToken } from "livekit-server-sdk";
 import { videoProxyRouter } from "./videoProxy";
+// STRIPE DISABLED
+// import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const recordingUpload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }
 });
 
+const SOMALI_FLASHCARD_POOL = [
+  { somali: "Hooyo", english: "Mother", emoji: "👩", example: "Hooyo waa naxariis badan." },
+  { somali: "Aabe", english: "Father", emoji: "👨", example: "Aabe wuxuu na baraa adab." },
+  { somali: "Ilmo", english: "Child", emoji: "🧒", example: "Ilmo wanaagsan buu yahay." },
+  { somali: "Qoys", english: "Family", emoji: "👨‍👩‍👧", example: "Qoyska waa niyad degen." },
+  { somali: "Dugsi", english: "School", emoji: "🏫", example: "Dugsi ayaan subax kasta aadnaa." },
+  { somali: "Macalin", english: "Teacher", emoji: "👩‍🏫", example: "Macalin fiican baa jooga." },
+  { somali: "Quraan", english: "Quran", emoji: "📖", example: "Quraan ayaan maalin kasta akhriyaa." },
+  { somali: "Salaad", english: "Prayer", emoji: "🤲", example: "Salaaddu waa waajib." },
+  { somali: "Masjid", english: "Mosque", emoji: "🕌", example: "Masjidka ayaan galnay." },
+  { somali: "Biyo", english: "Water", emoji: "💧", example: "Biyo nadiif ah cab." },
+  { somali: "Cunto", english: "Food", emoji: "🍽️", example: "Cunto caafimaad leh cun." },
+  { somali: "Qorrax", english: "Sun", emoji: "☀️", example: "Qorraxdu way ifaysaa." },
+  { somali: "Dayax", english: "Moon", emoji: "🌙", example: "Dayax qurux badan baa jira." },
+  { somali: "Xiddig", english: "Star", emoji: "⭐", example: "Xiddigaha habeenkii way muuqdaan." },
+  { somali: "Geed", english: "Tree", emoji: "🌳", example: "Geed cagaaran ayuu beeray." },
+  { somali: "Ubax", english: "Flower", emoji: "🌸", example: "Ubaxu wuu carfayaa." },
+  { somali: "Buug", english: "Book", emoji: "📚", example: "Buug cusub ayaan hayaa." },
+  { somali: "Qalin", english: "Pen", emoji: "🖊️", example: "Qalin ku qor casharka." },
+  { somali: "Waqti", english: "Time", emoji: "⏰", example: "Waqtiga ilaali." },
+  { somali: "Saaxiib", english: "Friend", emoji: "🤝", example: "Saaxiib wanaagsan dooro." },
+  { somali: "Farxad", english: "Happiness", emoji: "😊", example: "Farxad ayaan dareemayaa." },
+  { somali: "Nabad", english: "Peace", emoji: "🕊️", example: "Nabad iyo jacayl ha jiro." },
+  { somali: "Iftiin", english: "Light", emoji: "💡", example: "Iftiin ayaa qolka galay." },
+  { somali: "Qalbiga", english: "Heart", emoji: "❤️", example: "Qalbigaaga nadiifi." },
+  { somali: "Akhlaaq", english: "Good manners", emoji: "🌟", example: "Akhlaaq wanaagsan yeelo." },
+  { somali: "Sabir", english: "Patience", emoji: "🧘", example: "Sabirku waa qurux." },
+  { somali: "Mahad", english: "Gratitude", emoji: "🙏", example: "Allah mahad u naq." },
+  { somali: "Raxmad", english: "Mercy", emoji: "🤍", example: "Raxmaddu waa deeq." },
+  { somali: "Daacad", english: "Honest", emoji: "✅", example: "Daacadnimo ku hadal." },
+  { somali: "Nadiif", english: "Clean", emoji: "🧼", example: "Gacmahaaga nadiifi." },
+  { somali: "Riyo", english: "Dream", emoji: "💭", example: "Riyo wanaagsan ku riyoo." },
+  { somali: "Xigmad", english: "Wisdom", emoji: "🧠", example: "Xigmaddu waxay timaadaa barasho." },
+  { somali: "Aman", english: "Trust", emoji: "🤲", example: "Amanada ilaali." },
+  { somali: "Hawl", english: "Task", emoji: "📝", example: "Hawl maalmeedka dhammee." },
+  { somali: "Guri", english: "House", emoji: "🏠", example: "Guriga nadiif ka dhig." },
+  { somali: "Jardiino", english: "Garden", emoji: "🌿", example: "Jardiinada ubax baa yaal." },
+  { somali: "Lacag", english: "Money", emoji: "💰", example: "Lacagta si fiican u isticmaal." },
+  { somali: "Bariis", english: "Rice", emoji: "🍚", example: "Bariis kulul baa diyaar ah." },
+  { somali: "Caano", english: "Milk", emoji: "🥛", example: "Caano subax kasta cab." },
+  { somali: "Canjeero", english: "Pancake", emoji: "🥞", example: "Canjeero macaan baan cunay." },
+  { somali: "Kalluun", english: "Fish", emoji: "🐟", example: "Kalluunka badda ka yimid buu yahay." },
+  { somali: "Shimbir", english: "Bird", emoji: "🐦", example: "Shimbirku cirka ayuu duulay." },
+  { somali: "Roob", english: "Rain", emoji: "🌧️", example: "Roob yar baa da'aya." },
+  { somali: "Dabayl", english: "Wind", emoji: "💨", example: "Dabayl qabow baa socota." },
+  { somali: "Buur", english: "Mountain", emoji: "⛰️", example: "Buurta dusheeda waa qurux." },
+  { somali: "Badda", english: "Sea", emoji: "🌊", example: "Badda waa ballaaran tahay." },
+  { somali: "Waddo", english: "Road", emoji: "🛣️", example: "Waddada si taxadar leh u gudub." },
+  { somali: "Gaari", english: "Car", emoji: "🚗", example: "Gaarigu si tartiib ah buu u socdaa." },
+  { somali: "Baaskiil", english: "Bicycle", emoji: "🚲", example: "Baaskiil baan ku ciyaaraa." },
+  { somali: "Kabo", english: "Shoes", emoji: "👟", example: "Kabahaaga meel fiican dhig." },
+  { somali: "Dhar", english: "Clothes", emoji: "👕", example: "Dhar nadiif ah xiro." },
+  { somali: "Koob", english: "Cup", emoji: "☕", example: "Koob biyo ah i sii." },
+  { somali: "Saxan", english: "Plate", emoji: "🍽️", example: "Saxanka miiska saar." },
+  { somali: "Qado", english: "Lunch", emoji: "🥗", example: "Qadada waqtigeeda cun." },
+  { somali: "Casho", english: "Dinner", emoji: "🍲", example: "Cashada qoyska la cun." },
+  { somali: "Subax", english: "Morning", emoji: "🌅", example: "Subax wanaagsan ku toos." },
+  { somali: "Habeen", english: "Night", emoji: "🌃", example: "Habeenkii hurdo fiican seexo." },
+  { somali: "Jimicsi", english: "Exercise", emoji: "🏃", example: "Jimicsi yar maalin walba samee." },
+  { somali: "Caafimaad", english: "Health", emoji: "💚", example: "Caafimaadkaaga ilaali." },
+  { somali: "Fikrad", english: "Idea", emoji: "💡", example: "Fikrad fiican ayaad keentay." },
+  { somali: "Su'aal", english: "Question", emoji: "❓", example: "Su'aal weydii marka aadan fahmin." },
+  { somali: "Jawaab", english: "Answer", emoji: "✅", example: "Jawaabta saxda ah hel." },
+  { somali: "Sheeko", english: "Story", emoji: "📚", example: "Sheeko wanaagsan noo akhri." },
+  { somali: "Hees", english: "Song", emoji: "🎵", example: "Hees Somali ah qaad." },
+  { somali: "Cod", english: "Voice", emoji: "🎙️", example: "Cod deggan ku hadal." },
+  { somali: "Dhoolla-caddeyn", english: "Smile", emoji: "😄", example: "Dhoolla-caddeyn mar walba muuji." },
+  { somali: "Jacayl", english: "Love", emoji: "💖", example: "Qoyskaaga jacayl la wadaag." },
+  { somali: "Ixtiraam", english: "Respect", emoji: "🙌", example: "Waalidkaaga ixtiraam." },
+  { somali: "Caawin", english: "Help", emoji: "🤝", example: "Saaxiibkaa caawi." },
+  { somali: "Hogaamiye", english: "Leader", emoji: "🧭", example: "Hogaamiye wanaagsan noqo." },
+  { somali: "Guul", english: "Success", emoji: "🏅", example: "Guul dadaal bay ka dhalataa." },
+  { somali: "Dulqaad", english: "Perseverance", emoji: "🛤️", example: "Dulqaadku guul buu keenaa." },
+  { somali: "Naxariis", english: "Kindness", emoji: "💞", example: "Naxariis qof walba u muuji." },
+  { somali: "Xushmad", english: "Honor", emoji: "🎖️", example: "Xushmaddu waa qiimo." },
+  { somali: "Iimaan", english: "Faith", emoji: "🕋", example: "Iimaankaaga adkee." },
+  { somali: "Cilmiga", english: "Knowledge", emoji: "🎓", example: "Cilmigu waa iftiin." },
+  { somali: "Akhris", english: "Reading", emoji: "📖", example: "Akhris badan samee." },
+  { somali: "Qoris", english: "Writing", emoji: "✍️", example: "Qoris nadiif ah ku tababar." },
+  { somali: "Dhageysi", english: "Listening", emoji: "👂", example: "Macalinka si fiican u dhageyso." },
+  { somali: "Faham", english: "Understanding", emoji: "🧩", example: "Fahamku wuxuu ka yimaadaa su'aalo." },
+  { somali: "Dadaal", english: "Effort", emoji: "💪", example: "Dadaalkaaga sii wad." },
+  { somali: "Barako", english: "Blessing", emoji: "✨", example: "Barako ha ku jirto maalintaada." },
+  { somali: "Ducada", english: "Supplication", emoji: "🤲", example: "Ducadaada joogtee." },
+  { somali: "Run", english: "Truth", emoji: "🕊️", example: "Runta mar walba sheeg." },
+  { somali: "Cadaalad", english: "Justice", emoji: "⚖️", example: "Cadaalad ku dhaqmo." },
+  { somali: "Samir", english: "Endurance", emoji: "⏳", example: "Samirku waa furaha guusha." },
+  { somali: "Niyad", english: "Spirit", emoji: "🌈", example: "Niyad wanaagsan yeelo." },
+  { somali: "Horumar", english: "Progress", emoji: "📈", example: "Maalin kasta horumar samee." },
+
+  // Qayb cusub: Alaabta Guriga
+  { somali: "Miis", english: "Table", emoji: "🪑", example: "Miiska casharka ku samee." },
+  { somali: "Kursi", english: "Chair", emoji: "🪑", example: "Kursiga si fiican u fariiso." },
+  { somali: "Sariir", english: "Bed", emoji: "🛏️", example: "Sariirtaada hagaaji subax kasta." },
+  { somali: "Barkin", english: "Pillow", emoji: "🛌", example: "Barkinka sariirta saar." },
+  { somali: "Buste", english: "Blanket", emoji: "🧣", example: "Buste diiran habeenkii qaado." },
+  { somali: "Albaab", english: "Door", emoji: "🚪", example: "Albaabka si tartiib ah u xidh." },
+  { somali: "Daaqad", english: "Window", emoji: "🪟", example: "Daaqadda fur si hawo u soo gasho." },
+  { somali: "Daah", english: "Curtain", emoji: "🪟", example: "Daahyada daaqadda ka laali." },
+  { somali: "Nal", english: "Lamp", emoji: "🛋️", example: "Nalalka qolka shid." },
+  { somali: "Fadhi", english: "Sofa", emoji: "🛋️", example: "Fadhiga qoyska waa raaxo." },
+  { somali: "Rug", english: "Carpet", emoji: "🧶", example: "Rugta qolka ku gogol." },
+  { somali: "Kabadh", english: "Cupboard", emoji: "🗄️", example: "Kabadhka saxamada hagaaji." },
+  { somali: "Armaajo", english: "Wardrobe", emoji: "🚪", example: "Dharka armaajada geli." },
+  { somali: "Qaboojiye", english: "Fridge", emoji: "🧊", example: "Qaboojiyaha cunto ku kaydi." },
+  { somali: "Foornno", english: "Oven", emoji: "🔥", example: "Foornada rooti ku dub." },
+  { somali: "Shoolad", english: "Stove", emoji: "🍳", example: "Shooladda dusheeda cunto ku kari." },
+  { somali: "Dheri", english: "Pot", emoji: "🍲", example: "Dheriga maraq ku samee." },
+  { somali: "Qaaddo", english: "Spoon", emoji: "🥄", example: "Qaaddo ku cun cuntada." },
+  { somali: "Fargeeto", english: "Fork", emoji: "🍴", example: "Fargeeto ku cun baastada." },
+  { somali: "Mindi", english: "Knife", emoji: "🔪", example: "Mindi si taxadar leh u isticmaal." },
+  { somali: "Dhalo", english: "Bottle", emoji: "🧴", example: "Dhalada biyaha buuxi." },
+  { somali: "Furaha", english: "Key", emoji: "🔑", example: "Furaha albaabka ha lumin." },
+  { somali: "Muraayad", english: "Mirror", emoji: "🪞", example: "Muraayadda hortooda istaag." },
+  { somali: "Saacad", english: "Clock", emoji: "🕰️", example: "Saacadda darbiga fiiri." },
+  { somali: "Telefishin", english: "Television", emoji: "📺", example: "Telefishinka waqti yar daawo." },
+  { somali: "Raadiye", english: "Radio", emoji: "📻", example: "Raadiyaha wararka ka dhagayso." },
+  { somali: "Maro", english: "Towel", emoji: "🧻", example: "Marada qubayska meel qalalan dhig." },
+  { somali: "Saabuun", english: "Soap", emoji: "🧼", example: "Saabuun ku dhaq gacmaha." },
+  { somali: "Baaldi", english: "Bucket", emoji: "🪣", example: "Baaldi biyo ka buuxi." },
+  { somali: "Xaaqin", english: "Broom", emoji: "🧹", example: "Xaaqinka qolka ku nadiifi." },
+  { somali: "Qashin-qub", english: "Trash bin", emoji: "🗑️", example: "Qashinka qashin-qubka ku rid." },
+  { somali: "Makiinad", english: "Washing machine", emoji: "🧺", example: "Makiinadda dharka ku dhaq." },
+];
+
 const postImageUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -55,6 +181,15 @@ const postImageUpload = multer({
     }
   }
 });
+
+function resolveQuranJsonPath(fileName: string): string {
+  const distPath = path.join(process.cwd(), "dist", "public", "quran", fileName);
+  if (fs.existsSync(distPath)) {
+    return distPath;
+  }
+
+  return path.join(process.cwd(), "client", "public", "quran", fileName);
+}
 
 function getOpenAIClient(): OpenAI {
   const replitKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
@@ -158,13 +293,6 @@ function normalizeVideoUrl(url: string | null | undefined): string | null {
 // Rate limiting for AI Homework Helper - 5 questions per parent per day
 const DAILY_QUESTION_LIMIT = 5;
 const aiHelperUsage: Map<string, { count: number; date: string }> = new Map();
-const tarbiyaVoiceStats = {
-  transcribeSuccess: 0,
-  transcribeFail: 0,
-  ttsSuccess: 0,
-  ttsFail: 0,
-  since: new Date().toISOString(),
-};
 
 function checkAiHelperLimit(parentId: string): { allowed: boolean; remaining: number } {
   const today = new Date().toISOString().split('T')[0];
@@ -198,8 +326,11 @@ declare module 'express-session' {
   interface SessionData {
     userId: string;
     parentId: string;
-    sessionToken: string; // For single-session enforcement
-    oauthReturnUrl?: string; // For WordPress redirect after OAuth
+    childId: string;
+    childSessionToken: string;
+    sessionToken: string;
+    oauthReturnUrl?: string;
+    isAdmin: boolean;
   }
 }
 
@@ -312,20 +443,6 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   
   return res.status(401).json({ error: "Unauthorized" });
-}
-
-async function isAdminSession(req: Request): Promise<boolean> {
-  if (req.session.userId) {
-    const user = await storage.getUser(req.session.userId);
-    if (user?.isAdmin) return true;
-  }
-
-  if (req.session.parentId) {
-    const parent = await storage.getParent(req.session.parentId);
-    if (parent?.isAdmin) return true;
-  }
-
-  return false;
 }
 
 // Middleware for Sheeko host permission (admins or parents with canHostSheeko)
@@ -462,7 +579,50 @@ async function checkCourseAccess(parentId: string, courseId: string): Promise<{ 
   return { hasAccess: true };
 }
 
+async function runMigrations() {
+  try {
+    const migrationsDir = path.join(process.cwd(), "migrations");
+    if (!fs.existsSync(migrationsDir)) {
+      console.log("[Migrations] No migrations directory found, skipping startup migrations");
+      return;
+    }
+
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    console.log("[Migrations] Starting database migrations...");
+    console.log("[Migrations] Found migrations:", files);
+
+    for (const file of files) {
+      const filePath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(filePath, "utf-8");
+      console.log(`[Migrations] Executing: ${file}`);
+      try {
+        await pool.query(sql);
+        console.log(`[Migrations] ✓ Completed: ${file}`);
+      } catch (err: any) {
+        if (err.message?.includes("already exists")) {
+          console.log(`[Migrations] ✓ Already applied: ${file}`);
+        } else {
+          console.error(`[Migrations] ✗ Failed: ${file}`, err.message);
+          throw err;
+        }
+      }
+    }
+
+    console.log("[Migrations] All migrations completed successfully");
+  } catch (err) {
+    console.error("[Migrations] Fatal error:", err);
+    throw err;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Run database migrations on startup
+  await runMigrations();
+
   // Trust proxy for Replit's infrastructure (always enabled for Replit)
   app.set("trust proxy", 1);
 
@@ -638,32 +798,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const TELEGRAM_GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID;
     const TELEGRAM_GROUP_CHAT_ID_2 = process.env.TELEGRAM_GROUP_CHAT_ID_2;
-    const TELEGRAM_GROUP_CHAT_IDS = process.env.TELEGRAM_GROUP_CHAT_IDS;
-    const TELEGRAM_BAHDA_GROUP_CHAT_ID = process.env.TELEGRAM_BAHDA_GROUP_CHAT_ID;
-    const TELEGRAM_ACADEMY_GROUP_CHAT_ID = process.env.TELEGRAM_ACADEMY_GROUP_CHAT_ID;
 
     if (!TELEGRAM_BOT_TOKEN) {
       return res.status(500).json({ error: "Telegram bot token not configured" });
     }
 
-    const rawGroupIds = [
-      TELEGRAM_GROUP_CHAT_ID,
-      TELEGRAM_GROUP_CHAT_ID_2,
-      TELEGRAM_BAHDA_GROUP_CHAT_ID,
-      TELEGRAM_ACADEMY_GROUP_CHAT_ID,
-      ...(TELEGRAM_GROUP_CHAT_IDS || "").split(","),
-    ];
-
-    const normalizedGroupIds = rawGroupIds
-      .map((id) => (id || "").trim())
-      .filter((id) => id.length > 0);
-
-    const groupIds = Array.from(new Set(normalizedGroupIds));
-
-    if (normalizedGroupIds.length !== groupIds.length) {
-      console.warn(`[Telegram] Duplicate group IDs found in env for manual notify; deduped ${normalizedGroupIds.length} -> ${groupIds.length}`);
-    }
-
+    const groupIds = [TELEGRAM_GROUP_CHAT_ID, TELEGRAM_GROUP_CHAT_ID_2].filter(Boolean) as string[];
     if (groupIds.length === 0) {
       return res.status(500).json({ error: "Telegram group chat IDs not configured" });
     }
@@ -1587,21 +1727,60 @@ Ka jawaab qaabkan JSON ah:
         return res.status(401).json({ error: "Admin login required" });
       }
 
-      const { text, voiceName, ttsProvider } = req.body;
+      const { text, voiceName } = req.body;
       
       if (!text) {
         return res.status(400).json({ error: "Text is required" });
       }
 
       const voice = voiceName === "ubax" ? "so-SO-UbaxNeural" : "so-SO-MuuseNeural";
-      const provider = ttsProvider === "gemini" || ttsProvider === "azure" ? ttsProvider : "auto";
+      
+      const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
+      const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION;
+      
+      if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
+        return res.status(500).json({ error: "Azure Speech credentials not configured" });
+      }
 
-      console.log(`[AUDIO] Generating audio with voice: ${voice} (provider: ${provider})`);
+      console.log(`[AUDIO] Generating audio with voice: ${voice}`);
 
-      const audioBuffer = await synthesizeSpeech(String(text), {
-        azureVoice: voice,
-        provider,
+      // Escape text for SSML
+      const escapedText = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+      const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='so-SO'>
+        <voice name='${voice}'>
+          <prosody rate='0.95'>
+            ${escapedText}
+          </prosody>
+        </voice>
+      </speak>`;
+
+      const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+
+      const audioResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+          "Content-Type": "application/ssml+xml",
+          "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+          "User-Agent": "BarbaarintasanAcademy",
+        },
+        body: ssml,
       });
+
+      if (!audioResponse.ok) {
+        const errorText = await audioResponse.text();
+        console.error("[AUDIO] Azure error:", audioResponse.status, errorText);
+        return res.status(500).json({ error: `Azure TTS error: ${audioResponse.status}` });
+      }
+
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
       
       // Return audio as base64
       const audioBase64 = audioBuffer.toString('base64');
@@ -1613,7 +1792,7 @@ Ka jawaab qaabkan JSON ah:
         audioBase64,
         audioSize: audioBuffer.length,
         voice: voiceName === "ubax" ? "Ubax (Naag)" : "Muuse (Lab)",
-        provider: provider === "auto" ? "auto" : provider
+        azureUrl: `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`
       });
     } catch (error: any) {
       console.error("[AUDIO] Error:", error);
@@ -1870,10 +2049,7 @@ Ka jawaab qaabkan JSON ah:
   // Logo base64 endpoint for certificates
   app.get("/api/logo-base64", async (req, res) => {
     try {
-      const publicRoot = process.env.NODE_ENV === "production"
-        ? path.join(process.cwd(), "dist", "public")
-        : path.join(process.cwd(), "client", "public");
-      const logoPath = path.join(publicRoot, "bsa-logo.png");
+      const logoPath = path.join(process.cwd(), "attached_assets", "NEW_LOGO-BSU_1_1768990258338.png");
       if (fs.existsSync(logoPath)) {
         const logoBuffer = fs.readFileSync(logoPath);
         const base64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
@@ -2141,8 +2317,9 @@ Ka jawaab qaabkan JSON ah:
       });
       console.log(`[SESSION] Parent ${parent.id} registered. New session: ${sessionToken.substring(0, 8)}... IP: ${loginIp}`);
 
-      // Clear admin session if exists
+      // Clear admin/child session if exists
       delete req.session.userId;
+      delete req.session.childId;
       
       req.session.parentId = parent.id;
       req.session.sessionToken = sessionToken; // Store token in session for validation
@@ -2219,8 +2396,9 @@ Ka jawaab qaabkan JSON ah:
       });
       console.log(`[SESSION] Parent ${parent.id} logged in. New session: ${sessionToken.substring(0, 8)}... IP: ${loginIp}`);
 
-      // Clear admin session if exists
+      // Clear admin/child session if exists
       delete req.session.userId;
+      delete req.session.childId;
       
       req.session.parentId = parent.id;
       req.session.sessionToken = sessionToken; // Store token in session for validation
@@ -2409,8 +2587,9 @@ Ka jawaab qaabkan JSON ah:
       await storage.updateParent(parent.id, updateData);
       console.log(`[SESSION] Parent ${parent.id} logged in via Google. New session: ${sessionToken.substring(0, 8)}... IP: ${loginIp}`);
       
-      // Clear admin session if exists and set parent session
+      // Clear admin/child session if exists and set parent session
       delete req.session.userId;
+      delete req.session.childId;
       req.session.parentId = parent.id;
       req.session.sessionToken = sessionToken; // Store token in session for validation
       
@@ -4014,34 +4193,9 @@ Ka jawaab qaabkan JSON ah:
         return res.status(400).json({ error: "Sawirka lama helin" });
       }
 
-      const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-      if (!allowedMimes.includes((file.mimetype || '').toLowerCase())) {
-        return res.status(400).json({ error: "Fadlan isticmaal JPG, PNG, WEBP ama GIF" });
-      }
-
       const timestamp = Date.now();
       const ext = file.originalname.split('.').pop() || 'jpg';
       const fileName = `social_post_${req.session.parentId}_${timestamp}.${ext}`;
-
-      if (isR2Configured()) {
-        try {
-          const { url, key } = await uploadToR2(
-            file.buffer,
-            fileName,
-            file.mimetype,
-            'social-post-images',
-            'sawirada'
-          );
-
-          return res.json({
-            imageUrl: url,
-            storageKey: key,
-            storage: 'r2',
-          });
-        } catch (r2Error) {
-          console.warn('[SOCIAL-POST] R2 upload failed, trying Google Drive fallback:', (r2Error as Error).message);
-        }
-      }
 
       const driveResult = await uploadToGoogleDrive(
         file.buffer,
@@ -4050,14 +4204,13 @@ Ka jawaab qaabkan JSON ah:
         await getOrCreateSheekoFolder()
       );
 
-      return res.json({
+      res.json({ 
         imageUrl: `https://drive.google.com/thumbnail?id=${driveResult.fileId}&sz=w1000`,
-        fileId: driveResult.fileId,
-        storage: 'gdrive',
+        fileId: driveResult.fileId
       });
     } catch (error) {
       console.error("Error uploading image:", error);
-      res.status(500).json({ error: "Sawirka lama soo gelin karin. Fadlan mar kale isku day." });
+      res.status(500).json({ error: "Sawirka lama soo gelin karin" });
     }
   });
 
@@ -5196,37 +5349,7 @@ Ka jawaab qaabkan JSON ah:
       if (!enrollment || enrollment.parentId !== req.session.parentId) {
         return res.status(404).json({ error: "Enrollment not found" });
       }
-
-      const { courseId } = req.body as { courseId?: string };
-      const allAccessCourse = await storage.getCourseByCourseId("all-access");
-      const isAllAccessEnrollment = !!(allAccessCourse && enrollment.courseId === allAccessCourse.id);
-
-      if (isAllAccessEnrollment && courseId) {
-        const course = await storage.getCourse(courseId);
-        if (!course) {
-          return res.status(404).json({ error: "Course not found" });
-        }
-
-        const existingCourseEnrollment = await storage.getActiveEnrollmentByParentAndCourse(req.session.parentId!, courseId);
-        if (existingCourseEnrollment && existingCourseEnrollment.courseId === courseId) {
-          await storage.startCourseEnrollment(existingCourseEnrollment.id);
-        } else {
-          const parent = await storage.getParent(req.session.parentId!);
-          const created = await storage.createEnrollment({
-            parentId: req.session.parentId!,
-            customerPhone: parent?.phone || enrollment.customerPhone || null,
-            courseId,
-            planType: enrollment.planType,
-            status: "active",
-            accessEnd: enrollment.accessEnd,
-            firstLessonAt: new Date(),
-          });
-          await storage.startCourseEnrollment(created.id);
-        }
-      } else {
-        await storage.startCourseEnrollment(id);
-      }
-
+      await storage.startCourseEnrollment(id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error starting enrollment:", error);
@@ -8329,50 +8452,6 @@ Return a JSON object with:
     }
   });
 
-  // Admin: Update drip settings (1-10 lessons per week)
-  app.patch("/api/admin/courses/:id/drip-settings", requireAuth, async (req, res) => {
-    try {
-      const isAdmin = await isAdminSession(req);
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Admin only" });
-      }
-
-      const { id } = req.params;
-      const { dripEnabled, dripLessonsPerWeek } = req.body as {
-        dripEnabled?: boolean;
-        dripLessonsPerWeek?: number;
-      };
-
-      const updateData: any = {};
-
-      if (typeof dripEnabled !== "undefined") {
-        updateData.dripEnabled = !!dripEnabled;
-      }
-
-      if (typeof dripLessonsPerWeek !== "undefined") {
-        const parsed = Number(dripLessonsPerWeek);
-        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) {
-          return res.status(400).json({ error: "dripLessonsPerWeek must be an integer between 1 and 10" });
-        }
-        updateData.dripLessonsPerWeek = parsed;
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ error: "No drip settings provided" });
-      }
-
-      const updatedCourse = await storage.updateCourse(id, updateData);
-      if (!updatedCourse) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      res.json(updatedCourse);
-    } catch (error) {
-      console.error("Error updating drip settings:", error);
-      res.status(500).json({ error: "Failed to update drip settings" });
-    }
-  });
-
   // Admin: Delete a course
   app.delete("/api/admin/courses/:id", requireAuth, async (req, res) => {
     try {
@@ -8550,7 +8629,7 @@ Return a JSON object with:
       res.json({
         success: true,
         uploaded: results.length,
-        errors: errors.length,
+        errorCount: errors.length,
         results,
         errors: errors
       });
@@ -9230,206 +9309,11 @@ Return a JSON object with:
 
   app.get("/api/promo-videos", async (_req, res) => {
     try {
-      let videos = await db
-        .select()
-        .from(promoVideos)
-        .where(eq(promoVideos.isVisible, true))
-        .orderBy(promoVideos.order);
-
-      // Restore engagement UI when all homepage promo videos were archived.
-      // If no visible videos exist, fall back to recent archived videos.
-      if (videos.length === 0) {
-        videos = await db
-          .select()
-          .from(promoVideos)
-          .where(eq(promoVideos.isVisible, false))
-          .orderBy(sql`${promoVideos.createdAt} DESC`)
-          .limit(8);
-      }
-
-      const viewRows = await db
-        .select({
-          contentId: contentProgress.contentId,
-          count: sql<number>`COUNT(*)::int`,
-        })
-        .from(contentProgress)
-        .where(eq(contentProgress.contentType, "promo_video"))
-        .groupBy(contentProgress.contentId);
-
-      const viewCountMap = new Map(viewRows.map((row) => [row.contentId, row.count]));
-      const videosWithViews = videos.map((video) => ({
-        ...video,
-        viewCount: viewCountMap.get(video.id) || 0,
-      }));
-
-      res.json(videosWithViews);
+      const videos = await db.select().from(promoVideos).where(eq(promoVideos.isVisible, true)).orderBy(promoVideos.order);
+      res.json(videos);
     } catch (error) {
       console.error("Error fetching promo videos:", error);
       res.status(500).json({ error: "Failed to fetch promo videos" });
-    }
-  });
-
-  app.get("/api/promo-videos/archive", async (req, res) => {
-    try {
-      if (!req.session.parentId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const archived = await db
-        .select({
-          id: promoVideos.id,
-          title: promoVideos.title,
-          description: promoVideos.description,
-          videoUrl: promoVideos.videoUrl,
-          thumbnailUrl: promoVideos.thumbnailUrl,
-          createdAt: promoVideos.createdAt,
-        })
-        .from(promoVideos)
-        .where(eq(promoVideos.isVisible, false))
-        .orderBy(sql`${promoVideos.createdAt} DESC`);
-
-      res.json(archived);
-    } catch (error) {
-      console.error("Error fetching archived promo videos:", error);
-      res.status(500).json({ error: "Failed to fetch archived promo videos" });
-    }
-  });
-
-  app.post("/api/promo-videos/:id/view", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const [video] = await db.select().from(promoVideos).where(eq(promoVideos.id, req.params.id)).limit(1);
-      if (!video) {
-        return res.status(404).json({ error: "Video not found" });
-      }
-
-      await storage.markContentComplete(parentId, "promo_video", req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error tracking promo video view:", error);
-      res.status(500).json({ error: "Failed to track view" });
-    }
-  });
-
-  app.get("/api/promo-videos/:id/views", async (req, res) => {
-    try {
-      const [video] = await db.select().from(promoVideos).where(eq(promoVideos.id, req.params.id)).limit(1);
-      if (!video) {
-        return res.status(404).json({ error: "Video not found" });
-      }
-
-      const [row] = await db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(contentProgress)
-        .where(and(eq(contentProgress.contentType, "promo_video"), eq(contentProgress.contentId, req.params.id)));
-
-      res.json({ count: row?.count || 0 });
-    } catch (error) {
-      console.error("Error fetching promo video views:", error);
-      res.status(500).json({ error: "Failed to fetch views" });
-    }
-  });
-
-  app.get("/api/promo-videos/:id/reactions", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      const data = await storage.getContentReactions("promo_video", req.params.id, parentId);
-      res.json(data);
-    } catch (error) {
-      console.error("Error fetching promo video reactions:", error);
-      res.status(500).json({ error: "Failed to fetch reactions" });
-    }
-  });
-
-  app.post("/api/promo-videos/:id/reactions", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const { reactionType } = req.body;
-      if (!["love", "like", "dislike", "sparkle"].includes(reactionType)) {
-        return res.status(400).json({ error: "Invalid reaction type" });
-      }
-
-      const reaction = await storage.upsertContentReaction(parentId, "promo_video", req.params.id, reactionType);
-      res.json(reaction);
-    } catch (error) {
-      console.error("Error adding promo video reaction:", error);
-      res.status(500).json({ error: "Failed to add reaction" });
-    }
-  });
-
-  app.delete("/api/promo-videos/:id/reactions", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      await storage.removeContentReaction(parentId, "promo_video", req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error removing promo video reaction:", error);
-      res.status(500).json({ error: "Failed to remove reaction" });
-    }
-  });
-
-  app.get("/api/promo-videos/:id/comments", async (req, res) => {
-    try {
-      const comments = await storage.getContentComments("promo_video", req.params.id);
-      res.json(comments);
-    } catch (error) {
-      console.error("Error fetching promo video comments:", error);
-      res.status(500).json({ error: "Failed to fetch comments" });
-    }
-  });
-
-  app.post("/api/promo-videos/:id/comments", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      const { body, replyToId } = req.body;
-      if (!body || body.trim().length === 0) {
-        return res.status(400).json({ error: "Comment body is required" });
-      }
-
-      const comment = await storage.createContentComment({
-        parentId,
-        contentType: "promo_video",
-        contentId: req.params.id,
-        body: body.trim(),
-        replyToId: replyToId || null,
-        isHidden: false,
-      });
-
-      res.json(comment);
-    } catch (error) {
-      console.error("Error adding promo video comment:", error);
-      res.status(500).json({ error: "Failed to add comment" });
-    }
-  });
-
-  app.delete("/api/promo-videos/:id/comments/:commentId", async (req, res) => {
-    try {
-      const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
-      await storage.deleteContentComment(req.params.commentId, parentId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting promo video comment:", error);
-      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 
@@ -9448,13 +9332,6 @@ Return a JSON object with:
       if (!title || !videoUrl) {
         return res.status(400).json({ error: "Title and video URL are required" });
       }
-
-      // Keep homepage focused on newest promo while preserving previous ones in archive.
-      await db
-        .update(promoVideos)
-        .set({ isVisible: false })
-        .where(eq(promoVideos.isVisible, true));
-
       const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${promoVideos.order}), 0)` }).from(promoVideos);
       const [video] = await db.insert(promoVideos).values({
         title,
@@ -9481,14 +9358,6 @@ Return a JSON object with:
       if (thumbnailUrl !== undefined) updates.thumbnailUrl = thumbnailUrl;
       if (isVisible !== undefined) updates.isVisible = isVisible;
       if (order !== undefined) updates.order = order;
-
-      if (isVisible === true) {
-        await db
-          .update(promoVideos)
-          .set({ isVisible: false })
-          .where(and(eq(promoVideos.isVisible, true), sql`${promoVideos.id} <> ${id}`));
-      }
-
       const [video] = await db.update(promoVideos).set(updates).where(eq(promoVideos.id, id)).returning();
       if (!video) return res.status(404).json({ error: "Video not found" });
       res.json(video);
@@ -10868,6 +10737,1195 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
   // Register OpenAI Batch API routes (Bulk Translation & Content Generation)
   registerBatchApiRoutes(app);
+
+  // ====== Children (Quraanka Caruurta) Routes ======
+
+  async function requireChildAuth(req: Request, res: Response, next: NextFunction) {
+    if (!req.session.childId || !req.session.childSessionToken) {
+      return res.status(401).json({ error: "Fadlan soo gal akoonkaaga" });
+    }
+    const [activeSession] = await db.select().from(childSessions).where(
+      and(
+        eq(childSessions.sessionToken, req.session.childSessionToken),
+        eq(childSessions.isActive, true)
+      )
+    );
+    if (!activeSession) {
+      delete req.session.childId;
+      delete req.session.childSessionToken;
+      return res.status(401).json({ error: "Session-ka waa dhacay" });
+    }
+    if (activeSession.expiresAt && new Date(activeSession.expiresAt) < new Date()) {
+      await db.update(childSessions).set({ isActive: false }).where(eq(childSessions.id, activeSession.id));
+      delete req.session.childId;
+      delete req.session.childSessionToken;
+      return res.status(401).json({ error: "Session-ka waa dhacay" });
+    }
+    if (activeSession.childId !== req.session.childId) {
+      delete req.session.childId;
+      delete req.session.childSessionToken;
+      return res.status(401).json({ error: "Session khalad ah" });
+    }
+    const child = await storage.getChild(req.session.childId);
+    if (!child) {
+      req.session.destroy(() => {});
+      return res.status(401).json({ error: "Akoonkaaga lama helin" });
+    }
+    return next();
+  }
+
+  // Parent: create child profile
+  app.post("/api/children", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const { name, age, username, password, avatarColor } = req.body;
+      if (!name || !age || !username || !password) {
+        return res.status(400).json({ error: "Buuxi dhammaan meelaha" });
+      }
+
+      const parsedAge = Number.parseInt(String(age), 10);
+      if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
+        return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+      }
+
+      if (username.length < 3) {
+        return res.status(400).json({ error: "Username waa inuu ka badan yahay 3 xaraf" });
+      }
+      const existing = await storage.getChildByUsername(username.toLowerCase().trim());
+      if (existing) {
+        return res.status(400).json({ error: "Username-kan waa la isticmaalayaa. Mid kale dooro." });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const child = await storage.createChild({
+        parentId: req.session.parentId,
+        name: name.trim(),
+        age: parsedAge,
+        username: username.toLowerCase().trim(),
+        password: hashedPassword,
+        avatarColor: avatarColor || "#FFD93D",
+      });
+      const { password: _, ...safeChild } = child;
+      res.json(safeChild);
+    } catch (error: any) {
+      console.error("[CHILDREN] Create error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Parent: list children
+  app.get("/api/children", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const childrenList = await storage.getChildrenByParentId(req.session.parentId);
+      const safeChildren = childrenList.map(({ password, ...rest }) => rest);
+      res.json(safeChildren);
+    } catch (error: any) {
+      console.error("[CHILDREN] List error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Parent: update child
+  app.put("/api/children/:id", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const child = await storage.getChild(req.params.id);
+      if (!child || child.parentId !== req.session.parentId) {
+        return res.status(404).json({ error: "Ilmaha lama helin" });
+      }
+      const updateData: any = {};
+      if (req.body.name) updateData.name = req.body.name.trim();
+      if (req.body.age !== undefined && req.body.age !== null && String(req.body.age).trim() !== "") {
+        const parsedAge = Number.parseInt(String(req.body.age), 10);
+        if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
+          return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+        }
+        updateData.age = parsedAge;
+      }
+      if (req.body.avatarColor) updateData.avatarColor = req.body.avatarColor;
+      if (req.body.password) {
+        updateData.password = await bcrypt.hash(req.body.password, 10);
+      }
+      if (req.body.username) {
+        const newUsername = req.body.username.toLowerCase().trim();
+        if (newUsername !== child.username) {
+          const existing = await storage.getChildByUsername(newUsername);
+          if (existing && existing.id !== child.id) {
+            return res.status(400).json({ error: "Username-kan waa la isticmaalayaa" });
+          }
+          updateData.username = newUsername;
+        }
+      }
+      const updated = await storage.updateChild(req.params.id, updateData);
+      if (updated) {
+        const { password, ...safeChild } = updated;
+        res.json(safeChild);
+      } else {
+        res.status(404).json({ error: "Ilmaha lama helin" });
+      }
+    } catch (error: any) {
+      console.error("[CHILDREN] Update error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Parent: delete child
+  app.delete("/api/children/:id", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const child = await storage.getChild(req.params.id);
+      if (!child || child.parentId !== req.session.parentId) {
+        return res.status(404).json({ error: "Ilmaha lama helin" });
+      }
+      await storage.deleteChild(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[CHILDREN] Delete error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Child login
+  app.post("/api/auth/child/login", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Buuxi username iyo password" });
+      }
+      const child = await storage.getChildByUsername(username.toLowerCase().trim());
+      if (!child) {
+        return res.status(401).json({ error: "Username ama password waa khalad" });
+      }
+      const validPassword = await bcrypt.compare(password, child.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Username ama password waa khalad" });
+      }
+      const parent = await storage.getParent(child.parentId);
+      if (!parent) {
+        return res.status(403).json({ error: "Akoonka waalidka lama helin" });
+      }
+      await db.update(childSessions).set({ isActive: false }).where(
+        and(eq(childSessions.childId, child.id), eq(childSessions.isActive, true))
+      );
+      const childSessionToken = crypto.randomUUID();
+      await db.insert(childSessions).values({
+        childId: child.id,
+        parentId: child.parentId,
+        sessionToken: childSessionToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      req.session.childId = child.id;
+      req.session.childSessionToken = childSessionToken;
+      const { password: _, ...safeChild } = child;
+      res.json({ child: safeChild });
+    } catch (error: any) {
+      console.error("[CHILD AUTH] Login error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Child: get current session
+  app.get("/api/auth/child/me", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.childId || !req.session.childSessionToken) {
+        return res.status(401).json({ error: "Ma jirto session" });
+      }
+      const [activeSession] = await db.select().from(childSessions).where(
+        and(
+          eq(childSessions.sessionToken, req.session.childSessionToken),
+          eq(childSessions.isActive, true)
+        )
+      );
+      if (!activeSession) {
+        delete req.session.childId;
+        delete req.session.childSessionToken;
+        return res.status(401).json({ error: "Session-ka waa dhacay" });
+      }
+      if (activeSession.expiresAt && new Date(activeSession.expiresAt) < new Date()) {
+        await db.update(childSessions).set({ isActive: false }).where(eq(childSessions.id, activeSession.id));
+        delete req.session.childId;
+        delete req.session.childSessionToken;
+        return res.status(401).json({ error: "Session-ka waa dhacay" });
+      }
+      const child = await storage.getChild(req.session.childId);
+      if (!child) {
+        return res.status(401).json({ error: "Akoonka lama helin" });
+      }
+      const { password: _, ...safeChild } = child;
+      res.json({ child: safeChild });
+    } catch (error: any) {
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // Child logout
+  app.post("/api/auth/child/logout", async (req: Request, res: Response) => {
+    if (req.session.childSessionToken) {
+      await db.update(childSessions).set({ isActive: false }).where(
+        eq(childSessions.sessionToken, req.session.childSessionToken)
+      );
+    }
+    delete req.session.childId;
+    delete req.session.childSessionToken;
+    res.json({ success: true });
+  });
+
+  app.get("/api/children/:id/progress", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const child = await storage.getChild(req.params.id);
+      if (!child || child.parentId !== req.session.parentId) {
+        return res.status(404).json({ error: "Ilmaha lama helin" });
+      }
+      const progressRecords = await db.select().from(childProgress).where(
+        eq(childProgress.childId, child.id)
+      );
+      const completedSurahs = progressRecords.filter(p => p.completed);
+      const totalTimeSeconds = progressRecords.reduce((sum, p) => sum + (p.timeSpentSeconds || 0), 0);
+      const totalStars = progressRecords.reduce((sum, p) => sum + (p.starsEarned || 0), 0);
+      const avgAccuracy = completedSurahs.length > 0
+        ? Math.round(completedSurahs.reduce((sum, p) => sum + (p.accuracy || 0), 0) / completedSurahs.length)
+        : 0;
+      const sessions = await db.select().from(childSessions).where(
+        eq(childSessions.childId, child.id)
+      );
+      let currentStreak = 0;
+      if (completedSurahs.length > 0) {
+        const completionDates = completedSurahs
+          .filter(p => p.completedAt)
+          .map(p => new Date(p.completedAt!).toDateString())
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        const today = new Date();
+        for (let i = 0; i < completionDates.length; i++) {
+          const expected = new Date(today);
+          expected.setDate(expected.getDate() - i);
+          if (completionDates[i] === expected.toDateString()) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+      res.json({
+        childId: child.id,
+        childName: child.name,
+        surahsCompleted: completedSurahs.length,
+        totalSurahs: 114,
+        averageAccuracy: avgAccuracy,
+        totalTimeMinutes: Math.round(totalTimeSeconds / 60),
+        currentStreak,
+        stars: totalStars,
+        lastActivity: completedSurahs.length > 0
+          ? completedSurahs.sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime())[0].completedAt
+          : null,
+        totalSessions: sessions.length,
+      });
+    } catch (error: any) {
+      console.error("[CHILDREN] Progress error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // ==========================================
+  // Quraanka Caruurta - Quran Lessons API
+  // ==========================================
+
+  const quranAudioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+  app.get("/api/quran/curriculum", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const progress = await db.select().from(quranLessonProgress).where(eq(quranLessonProgress.childId, childId));
+      const completedSurahNumbers = new Set<number>();
+      const surahAyahCounts: Record<number, { total: number; completed: number }> = {};
+      for (const p of progress) {
+        if (!surahAyahCounts[p.surahNumber]) {
+          surahAyahCounts[p.surahNumber] = { total: 0, completed: 0 };
+        }
+        surahAyahCounts[p.surahNumber].total++;
+        if (p.completed) surahAyahCounts[p.surahNumber].completed++;
+      }
+      const { JUZ_AMMA_CURRICULUM } = await import("./quranLessons");
+      for (const surah of JUZ_AMMA_CURRICULUM) {
+        const counts = surahAyahCounts[surah.number];
+        if (counts && counts.completed >= surah.ayahCount) {
+          completedSurahNumbers.add(surah.number);
+        }
+      }
+      const { getCurriculumWithProgress } = await import("./quranLessons");
+      const curriculum = getCurriculumWithProgress(completedSurahNumbers);
+      const enriched = curriculum.map(s => {
+        const counts = surahAyahCounts[s.number];
+        return {
+          ...s,
+          ayahsCompleted: counts?.completed || 0,
+          progressPercent: counts ? Math.round((counts.completed / s.ayahCount) * 100) : 0,
+        };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("[QURAN] Curriculum error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/surah/:surahNumber/progress", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const surahNumber = parseInt(req.params.surahNumber);
+      const progress = await db.select().from(quranLessonProgress).where(
+        and(eq(quranLessonProgress.childId, childId), eq(quranLessonProgress.surahNumber, surahNumber))
+      );
+      const byAyah: Record<number, typeof progress[0]> = {};
+      for (const p of progress) {
+        byAyah[p.ayahNumber] = p;
+      }
+      res.json({ surahNumber, progress: byAyah });
+    } catch (error: any) {
+      console.error("[QURAN] Progress error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  const QURAN_RECITERS: Record<string, { folder: string; name: string; nameAr: string }> = {
+    husary_muallim: { folder: "Husary_Muallim_128kbps", name: "Sheikh Al-Husary (Muallim)", nameAr: "الشيخ الحصري - المعلم" },
+    abdul_basit: { folder: "Abdul_Basit_Mujawwad_128kbps", name: "Sheikh Abdul Basit (Mujawwad)", nameAr: "الشيخ عبد الباسط - مجوّد" },
+  };
+
+  const FOLDER_TO_RECITER_KEY: Record<string, string> = {
+    "Husary_Muallim_128kbps": "husary_muallim",
+    "Abdul_Basit_Mujawwad_128kbps": "abdul_basit",
+  };
+
+  function resolveReciterKey(input: string | undefined): string {
+    if (!input) return "husary_muallim";
+    if (QURAN_RECITERS[input]) return input;
+    if (FOLDER_TO_RECITER_KEY[input]) return FOLDER_TO_RECITER_KEY[input];
+    return "husary_muallim";
+  }
+
+  app.get("/api/quran/reciters", requireChildAuth, (_req: Request, res: Response) => {
+    res.json({
+      reciters: Object.entries(QURAN_RECITERS).map(([key, val]) => ({
+        id: key,
+        name: val.name,
+        nameAr: val.nameAr,
+      })),
+      defaultReciter: "husary_muallim",
+    });
+  });
+
+  app.post("/api/quran/recite", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const { surahNumber, ayahNumber, reciter } = req.body;
+      if (!surahNumber || !ayahNumber) {
+        return res.status(400).json({ error: "Surah iyo ayah number waa loo baahan yahay" });
+      }
+      const sNum = parseInt(surahNumber);
+      const aNum = parseInt(ayahNumber);
+      const reciterKey = resolveReciterKey(reciter);
+      const reciterFolder = QURAN_RECITERS[reciterKey].folder;
+      const paddedSurah = sNum.toString().padStart(3, "0");
+      const paddedAyah = aNum.toString().padStart(3, "0");
+      const audioUrl = `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
+
+      res.json({ audioUrl, reciter: reciterKey, reciterName: QURAN_RECITERS[reciterKey].name, surah: sNum, ayah: aNum });
+    } catch (error: any) {
+      console.error("[QURAN] Recite error:", error);
+      res.status(500).json({ error: "Codsi audio ma suurtagelin" });
+    }
+  });
+
+  app.post("/api/quran/flashcards/tts", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const textRaw = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+      if (!textRaw) {
+        return res.status(400).json({ error: "Qoraalka waa loo baahan yahay" });
+      }
+
+      const text = textRaw.slice(0, 260);
+      const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
+      const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION;
+
+      if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
+        return res.status(503).json({ error: "Somali TTS wali lama diyaarin" });
+      }
+
+      const escapeForSsml = (value: string) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+      const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='so-SO'>
+        <voice name='so-SO-UbaxNeural'>
+          <prosody rate='0.93' pitch='+2Hz'>${escapeForSsml(text)}</prosody>
+        </voice>
+      </speak>`;
+
+      const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+      const audioResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+          "Content-Type": "application/ssml+xml",
+          "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+          "User-Agent": "BarbaarintasanAcademy",
+        },
+        body: ssml,
+      });
+
+      if (!audioResponse.ok) {
+        const errorText = await audioResponse.text();
+        console.error("[FLASHCARDS-TTS] Azure error:", audioResponse.status, errorText);
+        return res.status(502).json({ error: "Codka Soomaaliga lama helin" });
+      }
+
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      return res.json({
+        audioBase64: audioBuffer.toString("base64"),
+        voice: "so-SO-UbaxNeural",
+      });
+    } catch (error: any) {
+      console.error("[FLASHCARDS-TTS] Error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/check", requireChildAuth, quranAudioUpload.single("audio"), async (req: Request, res: Response) => {
+    try {
+      const { surahNumber, ayahNumber } = req.body;
+      if (!req.file || !surahNumber || !ayahNumber) {
+        return res.status(400).json({ error: "Audio, surah, iyo ayah number waa loo baahan yahay" });
+      }
+      const childId = req.session.childId!;
+      const { getRandomEncouragement } = await import("./quranLessons");
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStr = todayStart.toISOString().slice(0, 10);
+      const sNum = parseInt(surahNumber);
+      const aNum = parseInt(ayahNumber);
+      const paddedNum = sNum.toString().padStart(3, "0");
+      const fs = await import("fs");
+      const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
+      let correctText: string;
+      try {
+        const fileContent = fs.default.readFileSync(quranFilePath, "utf-8");
+        const surahData = JSON.parse(fileContent);
+        const ayah = surahData.ayahs?.find((a: any) => a.number === aNum);
+        if (!ayah) {
+          return res.status(400).json({ error: "Aayada lama helin" });
+        }
+        correctText = ayah.text;
+      } catch {
+        return res.status(400).json({ error: "Suurada lama helin" });
+      }
+      const openai = getOpenAIClient();
+      const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
+      let result: { outcome: string };
+      try {
+        const transcription = await openai.audio.transcriptions.create({
+          model: "whisper-1",
+          file: audioFile,
+          language: "ar",
+        });
+        const transcribedText = transcription.text.trim();
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `Waxaad tahay macalin Quraan ah oo carruurta wax bara. Ilmo ayaa akhrinaya aayad Quraan ah.
+Is barbar dhig qoraalka saxda ah iyo kan ilmuhu akhriyay.
+Waa inaad ku jawaabto JSON-kan oo kaliya (qoraal kale ha ku darin):
+{
+  "outcome": "correct" ama "needs_retry"
+}
+Haddii ilmuhu si fiican u akhriyay oo aayada sax u dhammeeyay, "correct" sii.
+Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" sii - ilmuhu wuxuu ku baranayaa isku dayga!`
+            },
+            {
+              role: "user",
+              content: `Qoraalka saxda ah (Aayada): ${correctText}\n\nKan ilmuhu akhriyay: ${transcribedText}`
+            }
+          ],
+          temperature: 0.3,
+        });
+        try {
+          const responseText = completion.choices[0].message.content || "{}";
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          result = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+        } catch {
+          result = { outcome: "needs_retry" };
+        }
+      } catch (aiError: any) {
+        console.warn("[QURAN] AI check fallback - whisper/gpt unavailable:", aiError.code || aiError.message);
+        result = { outcome: "correct" };
+      }
+      const isCorrect = result.outcome === "correct";
+      const completed = isCorrect;
+      const score = isCorrect ? 100 : 40;
+      const existing = await db.select().from(quranLessonProgress).where(
+        and(
+          eq(quranLessonProgress.childId, childId),
+          eq(quranLessonProgress.surahNumber, parseInt(surahNumber)),
+          eq(quranLessonProgress.ayahNumber, parseInt(ayahNumber))
+        )
+      );
+      if (existing.length > 0) {
+        const prev = existing[0];
+        const prevDailyDate = prev.dailyAttemptDate || "";
+        const newDailyAttempts = prevDailyDate === todayStr ? (prev.dailyAttempts || 0) + 1 : 1;
+        await db.update(quranLessonProgress).set({
+          attempts: (prev.attempts || 0) + 1,
+          lastScore: score,
+          bestScore: Math.max(prev.bestScore || 0, score),
+          completed: completed || prev.completed,
+          completedAt: completed && !prev.completed ? new Date() : prev.completedAt,
+          lastAttemptAt: new Date(),
+          dailyAttempts: newDailyAttempts,
+          dailyAttemptDate: todayStr,
+        }).where(eq(quranLessonProgress.id, prev.id));
+      } else {
+        await db.insert(quranLessonProgress).values({
+          childId,
+          surahNumber: parseInt(surahNumber),
+          ayahNumber: parseInt(ayahNumber),
+          attempts: 1,
+          bestScore: score,
+          lastScore: score,
+          completed,
+          completedAt: completed ? new Date() : null,
+          lastAttemptAt: new Date(),
+          dailyAttempts: 1,
+          dailyAttemptDate: todayStr,
+        });
+      }
+      if (completed) {
+        const { JUZ_AMMA_CURRICULUM } = await import("./quranLessons");
+        const surah = JUZ_AMMA_CURRICULUM.find(s => s.number === parseInt(surahNumber));
+        if (surah) {
+          const allAyahProgress = await db.select().from(quranLessonProgress).where(
+            and(eq(quranLessonProgress.childId, childId), eq(quranLessonProgress.surahNumber, parseInt(surahNumber)))
+          );
+          const completedAyahs = allAyahProgress.filter(p => p.completed).length;
+          if (completedAyahs >= surah.ayahCount) {
+            const existingSurah = await db.select().from(childProgress).where(
+              and(eq(childProgress.childId, childId), eq(childProgress.surahNumber, parseInt(surahNumber)))
+            );
+            if (existingSurah.length === 0) {
+              const avgScore = Math.round(allAyahProgress.reduce((s, p) => s + (p.bestScore || 0), 0) / allAyahProgress.length);
+              const totalTime = allAyahProgress.reduce((s, p) => s + ((p.attempts || 1) * 15), 0);
+              const stars = avgScore >= 90 ? 3 : avgScore >= 75 ? 2 : 1;
+              await db.insert(childProgress).values({
+                childId,
+                surahNumber: parseInt(surahNumber),
+                surahName: surah.name,
+                completed: true,
+                accuracy: avgScore,
+                timeSpentSeconds: totalTime,
+                starsEarned: stars,
+                completedAt: new Date(),
+              });
+
+              const allCompleted = await db.select().from(childProgress).where(
+                and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
+              );
+              const surahBadgeDefs = [
+                { key: "first_surah", name: "Bilowga Qur'aan", icon: "🌟", color: "#FFD93D", requirement: 1 },
+                { key: "surah_3", name: "3 Surah Xaafidh", icon: "📖", color: "#4ECDC4", requirement: 3 },
+                { key: "surah_5", name: "5 Surah Master", icon: "⭐", color: "#FF6B6B", requirement: 5 },
+                { key: "surah_10", name: "10 Surah Champion", icon: "🏆", color: "#A855F7", requirement: 10 },
+                { key: "surah_20", name: "20 Surah Legend", icon: "👑", color: "#F59E0B", requirement: 20 },
+              ];
+              for (const bd of surahBadgeDefs) {
+                if (allCompleted.length >= bd.requirement) {
+                  try {
+                    await db.insert(childBadges).values({
+                      childId, badgeKey: bd.key, badgeName: bd.name, badgeIcon: bd.icon, badgeColor: bd.color
+                    });
+                  } catch {}
+                }
+              }
+              const allAvgAccuracy = allCompleted.length > 0
+                ? Math.round(allCompleted.reduce((s, p) => s + (p.accuracy || 0), 0) / allCompleted.length) : 0;
+              if (allAvgAccuracy >= 90 && allCompleted.length >= 3) {
+                try {
+                  await db.insert(childBadges).values({
+                    childId, badgeKey: "high_accuracy", badgeName: "Cod Qurux Badan", badgeIcon: "🎯", badgeColor: "#10B981"
+                  });
+                } catch {}
+              }
+
+              for (const gt of ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"]) {
+                try {
+                  await db.insert(childGameUnlocks).values({
+                    childId, surahNumber: parseInt(surahNumber), gameType: gt, unlockSource: "surah_completion"
+                  });
+                } catch {}
+              }
+
+              const tokenGrant = avgScore >= 85 ? 2 : 1;
+              const [existingBalance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+              if (existingBalance) {
+                await db.update(childRewardBalances).set({
+                  totalTokens: existingBalance.totalTokens + tokenGrant,
+                  totalStars: existingBalance.totalStars + stars,
+                  updatedAt: new Date(),
+                }).where(eq(childRewardBalances.childId, childId));
+              } else {
+                await db.insert(childRewardBalances).values({
+                  childId,
+                  totalTokens: tokenGrant,
+                  totalStars: stars,
+                  totalCoins: 0,
+                  tokensUsed: 0,
+                });
+              }
+
+              await db.insert(childRewardLedger).values({
+                childId, type: "token", amount: tokenGrant, source: "surah_completion", sourceId: surahNumber
+              });
+              await db.insert(childRewardLedger).values({
+                childId, type: "star", amount: stars, source: "surah_completion", sourceId: surahNumber
+              });
+            }
+          }
+        }
+      }
+      const encouragement = !completed ? getRandomEncouragement() : "";
+      res.json({
+        outcome: completed ? "correct" : "needs_retry",
+        completed,
+        message: completed ? "Sax! Aad baad u mahadsantahay! ⭐" : encouragement,
+      });
+    } catch (error: any) {
+      console.error("[QURAN] Check error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay markii la hubinayay" });
+    }
+  });
+
+  // ==========================================
+  // Quraanka Caruurta - Games & Rewards API
+  // ==========================================
+
+  const QURAN_BADGE_DEFINITIONS = [
+    { key: "first_surah", name: "Bilowga Qur'aan", icon: "🌟", color: "#FFD93D", requirement: 1 },
+    { key: "surah_3", name: "3 Surah Xaafidh", icon: "📖", color: "#4ECDC4", requirement: 3 },
+    { key: "surah_5", name: "5 Surah Master", icon: "⭐", color: "#FF6B6B", requirement: 5 },
+    { key: "surah_10", name: "10 Surah Champion", icon: "🏆", color: "#A855F7", requirement: 10 },
+    { key: "surah_20", name: "20 Surah Legend", icon: "👑", color: "#F59E0B", requirement: 20 },
+    { key: "high_accuracy", name: "Cod Qurux Badan", icon: "🎯", color: "#10B981", requirement: 0 },
+    { key: "first_game", name: "Ciyaaryahan Cusub", icon: "🎮", color: "#6366F1", requirement: 0 },
+    { key: "game_master", name: "Ciyaar Master", icon: "🎯", color: "#EC4899", requirement: 0 },
+    { key: "perfect_score", name: "Dhibcaha Tamaamka", icon: "💯", color: "#EF4444", requirement: 0 },
+  ];
+
+  const MAX_GAME_TOKENS = 5;
+  const MAX_GAMES_PER_SESSION = 3;
+  const MAX_GAME_DURATION_MINUTES = 45;
+  const MAX_LESSON_DURATION_MINUTES = 60;
+
+  function calculateStreakMultiplier(consecutiveDays: number): number {
+    if (consecutiveDays >= 7) return 2.0;
+    if (consecutiveDays >= 3) return 1.2;
+    return 1.0;
+  }
+
+  async function getChildGameStreak(childId: string): Promise<{ currentStreak: number; bestStreak: number; lastPlayDate: string | null }> {
+    const scores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
+    if (scores.length === 0) return { currentStreak: 0, bestStreak: 0, lastPlayDate: null };
+
+    const playDates = [...new Set(scores.map(s => new Date(s.completedAt).toISOString().split("T")[0]))].sort().reverse();
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    let currentStreak = 0;
+    let checkDate = playDates[0] === today || playDates[0] === yesterday ? playDates[0] : null;
+
+    if (checkDate) {
+      for (const date of playDates) {
+        if (date === checkDate) {
+          currentStreak++;
+          const prev = new Date(checkDate);
+          prev.setDate(prev.getDate() - 1);
+          checkDate = prev.toISOString().split("T")[0];
+        } else if (date < checkDate!) {
+          break;
+        }
+      }
+    }
+
+    let bestStreak = currentStreak;
+    let tempStreak = 1;
+    for (let i = 1; i < playDates.length; i++) {
+      const diff = (new Date(playDates[i - 1]).getTime() - new Date(playDates[i]).getTime()) / 86400000;
+      if (diff === 1) {
+        tempStreak++;
+        bestStreak = Math.max(bestStreak, tempStreak);
+      } else {
+        tempStreak = 1;
+      }
+    }
+
+    return { currentStreak, bestStreak, lastPlayDate: playDates[0] || null };
+  }
+
+  async function getTodayGameCount(childId: string): Promise<number> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const scores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
+    return scores.filter(s => new Date(s.completedAt) >= today).length;
+  }
+
+  async function ensureChildGameState(childId: string) {
+      // Legacy helper retained for compatibility. Game access is now derived from progress,
+      // so this no longer writes unlock rows that may not exist in older databases.
+      const completedSurahs = await db
+        .select()
+        .from(childProgress)
+        .where(and(eq(childProgress.childId, childId), eq(childProgress.completed, true)));
+
+      const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+      if (!balance) {
+        const totalStars = completedSurahs.reduce((sum, s) => sum + (s.starsEarned || 0), 0);
+        await db.insert(childRewardBalances).values({
+          childId,
+          totalTokens: 0,
+          totalStars,
+          totalCoins: 0,
+          tokensUsed: 0,
+        });
+      }
+  }
+
+  app.get("/api/quran/rewards", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
+      const gameScores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
+      const badges = await db.select().from(childBadges).where(eq(childBadges.childId, childId));
+      const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+
+      const totalStars = balance?.totalStars ?? progress.reduce((s, p) => s + (p.starsEarned || 0), 0);
+      const totalTrophies = progress.filter(p => p.completed).length;
+      const totalCoins = balance?.totalCoins ?? gameScores.reduce((s, g) => s + (g.coinsEarned || 0), 0);
+      const streak = await getChildGameStreak(childId);
+
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const weeklyGames = gameScores.filter(s => new Date(s.completedAt) >= weekStart).length;
+      const weeklyCoins = gameScores.filter(s => new Date(s.completedAt) >= weekStart).reduce((s, g) => s + (g.coinsEarned || 0), 0);
+
+      res.json({
+        aayahStars: totalStars,
+        surahTrophies: totalTrophies,
+        gameCoins: totalCoins,
+        gameTokens: totalTrophies,
+        gamesRemainingToday: 999,
+        maxGamesPerDay: 999,
+        badges: badges.map(b => ({ key: b.badgeKey, name: b.badgeName, icon: b.badgeIcon, color: b.badgeColor, earnedAt: b.earnedAt })),
+        completedSurahs: totalTrophies,
+        gamesPlayed: gameScores.length,
+        streak: {
+          current: streak.currentStreak,
+          best: streak.bestStreak,
+          multiplier: calculateStreakMultiplier(streak.currentStreak),
+          lastPlayDate: streak.lastPlayDate,
+        },
+        weeklyProgress: {
+          gamesPlayed: weeklyGames,
+          coinsEarned: weeklyCoins,
+        },
+        sessionLimits: {
+          maxGameMinutes: null,
+          maxLessonMinutes: MAX_LESSON_DURATION_MINUTES,
+          maxGamesPerDay: null,
+        },
+      });
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Rewards error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/games/available", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
+      const playableSurahs = progress.filter((p) => p.completed);
+      const unlockedGames = playableSurahs.map((surah) => ({
+        surahNumber: surah.surahNumber,
+        surahName: surah.surahName || `Surah ${surah.surahNumber}`,
+        starsEarned: surah.starsEarned || 0,
+        games: ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"],
+      }));
+
+      res.json({
+        tokensAvailable: unlockedGames.length,
+        gamesRemainingToday: 999,
+        maxGamesPerDay: 999,
+        unlockedGames,
+        totalCompleted: playableSurahs.length,
+      });
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Available games error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/games/data/:gameType/:surahNumber", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const { gameType, surahNumber } = req.params;
+      const sNum = parseInt(surahNumber);
+      const childId = req.session.childId!;
+
+      const paddedNum = sNum.toString().padStart(3, "0");
+      const fsModule = await import("fs");
+      const pathModule = await import("path");
+      const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
+
+      let surahData: any;
+      try {
+        const fileContent = fsModule.default.readFileSync(quranFilePath, "utf-8");
+        surahData = JSON.parse(fileContent);
+      } catch {
+        return res.status(400).json({ error: "Suurada lama helin" });
+      }
+
+      const ayahs = surahData.ayahs || [];
+
+      if (gameType === "word_puzzle") {
+        const selectedAyahs = ayahs.slice(0, Math.min(5, ayahs.length)).map((a: any) => ({
+          number: a.number,
+          text: a.text,
+          words: a.text.split(/\s+/),
+        }));
+        res.json({ surahName: surahData.name, englishName: surahData.englishName, ayahs: selectedAyahs });
+      } else if (gameType === "memory_match") {
+        const difficulty = req.query.difficulty ? parseInt(req.query.difficulty as string) : 1;
+        const pairCount = difficulty === 3 ? 6 : difficulty === 2 ? 4 : 2;
+        const pairs = ayahs.slice(0, Math.min(pairCount, ayahs.length)).map((a: any) => {
+          const words = a.text.split(/\s+/);
+          const mid = Math.ceil(words.length / 2);
+          return {
+            number: a.number,
+            firstHalf: words.slice(0, mid).join(" "),
+            secondHalf: words.slice(mid).join(" "),
+            fullText: a.text,
+          };
+        });
+        res.json({ surahName: surahData.name, englishName: surahData.englishName, pairs, difficulty });
+      } else if (gameType === "surah_quiz") {
+        const questions: any[] = [];
+        const { JUZ_AMMA_CURRICULUM } = await import("./quranLessons");
+        const currentSurah = JUZ_AMMA_CURRICULUM.find(s => s.number === sNum);
+
+        if (ayahs.length > 0) {
+          const randomAyah = ayahs[Math.floor(Math.random() * ayahs.length)];
+          questions.push({
+            type: "identify_ayah",
+            question: `Aayadan waa Suurad kee?`,
+            ayahText: randomAyah.text,
+            correctAnswer: surahData.englishName || surahData.name,
+            options: [
+              surahData.englishName || surahData.name,
+              ...JUZ_AMMA_CURRICULUM.filter(s => s.number !== sNum).sort(() => Math.random() - 0.5).slice(0, 3).map(s => s.englishName)
+            ].sort(() => Math.random() - 0.5),
+          });
+        }
+
+        if (ayahs.length >= 3) {
+          const shuffled = [...ayahs].sort(() => Math.random() - 0.5);
+          const correctAyah = shuffled[0];
+          const wrongAyahs = shuffled.slice(1, 4);
+          questions.push({
+            type: "complete_ayah",
+            question: `Aayadan dhameystir - kee baa ku xiga?`,
+            ayahText: correctAyah.text.split(/\s+/).slice(0, Math.ceil(correctAyah.text.split(/\s+/).length / 2)).join(" ") + " ...",
+            correctAnswer: correctAyah.text,
+            options: [
+              correctAyah.text,
+              ...wrongAyahs.map((a: any) => a.text),
+            ].sort(() => Math.random() - 0.5),
+          });
+        }
+
+        if (ayahs.length >= 2) {
+          const firstAyah = ayahs[0];
+          questions.push({
+            type: "first_ayah",
+            question: `Suuratu ${surahData.englishName} aayadeeda kowaad waa kee?`,
+            correctAnswer: firstAyah.text,
+            options: [
+              firstAyah.text,
+              ...ayahs.filter((a: any) => a.number !== 1).sort(() => Math.random() - 0.5).slice(0, 3).map((a: any) => a.text)
+            ].sort(() => Math.random() - 0.5),
+          });
+        }
+
+        if (ayahs.length > 1) {
+          const randomIdx = Math.floor(Math.random() * ayahs.length);
+          questions.push({
+            type: "ayah_number",
+            question: `Aayadan waa aayaddee?`,
+            ayahText: ayahs[randomIdx].text,
+            correctAnswer: (randomIdx + 1).toString(),
+            options: [
+              (randomIdx + 1).toString(),
+              (Math.max(1, randomIdx)).toString(),
+              (randomIdx + 3).toString(),
+              (Math.max(1, randomIdx - 1)).toString(),
+            ].filter((v, i, a) => a.indexOf(v) === i).sort(() => Math.random() - 0.5),
+          });
+        }
+
+        const completedSurahs = await db.select().from(childProgress).where(
+          and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
+        );
+        if (completedSurahs.length > 1) {
+          const otherSurah = completedSurahs.find(s => s.surahNumber !== sNum);
+          if (otherSurah) {
+            const otherPadded = otherSurah.surahNumber.toString().padStart(3, "0");
+            const otherPath = resolveQuranJsonPath(`${otherPadded}.json`);
+            try {
+              const otherContent = fsModule.default.readFileSync(otherPath, "utf-8");
+              const otherData = JSON.parse(otherContent);
+              if (otherData.ayahs?.length > 0) {
+                const mixedAyah = otherData.ayahs[Math.floor(Math.random() * otherData.ayahs.length)];
+                questions.push({
+                  type: "which_surah",
+                  question: `Aayadan Suurad kee ka mid ah?\n"${mixedAyah.text}"`,
+                  correctAnswer: otherData.englishName || otherData.name,
+                  options: [
+                    otherData.englishName || otherData.name,
+                    surahData.englishName || surahData.name,
+                    ...JUZ_AMMA_CURRICULUM.filter(s => s.number !== sNum && s.number !== otherSurah.surahNumber).sort(() => Math.random() - 0.5).slice(0, 2).map(s => s.englishName)
+                  ].sort(() => Math.random() - 0.5),
+                });
+              }
+            } catch {}
+          }
+        }
+
+        res.json({ surahName: surahData.name, englishName: surahData.englishName, questions });
+      } else if (gameType === "somali_flashcards") {
+        const cardCount = Math.min(28, SOMALI_FLASHCARD_POOL.length);
+        const start = (sNum * 3) % SOMALI_FLASHCARD_POOL.length;
+        const cards = Array.from({ length: cardCount }).map((_, i) => {
+          const card = SOMALI_FLASHCARD_POOL[(start + i) % SOMALI_FLASHCARD_POOL.length];
+          return {
+            id: `${sNum}-${i}`,
+            ...card,
+          };
+        });
+        res.json({ surahName: surahData.name, englishName: surahData.englishName, cards });
+      } else {
+        res.status(400).json({ error: "Game type aan la aqoon" });
+      }
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Game data error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/games/score", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const { gameType, surahNumber, score, maxScore, timeSpentSeconds } = req.body;
+
+      if (!gameType || !surahNumber || score === undefined || maxScore === undefined) {
+        return res.status(400).json({ error: "Xogta game-ka buuxi" });
+      }
+
+      if (!["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"].includes(gameType)) {
+        return res.status(400).json({ error: "Game type aan la aqoon" });
+      }
+
+      const sNum = parseInt(surahNumber);
+      const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+
+      const streak = await getChildGameStreak(childId);
+      const streakMultiplier = calculateStreakMultiplier(streak.currentStreak);
+
+      const scorePercent = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+      const baseCoins = scorePercent >= 90 ? 3 : scorePercent >= 70 ? 2 : scorePercent >= 50 ? 1 : 0;
+      const coinsEarned = Math.round(baseCoins * streakMultiplier);
+
+      await db.insert(childGameScores).values({
+        childId,
+        gameType,
+        surahNumber: sNum,
+        score: parseInt(score),
+        maxScore: parseInt(maxScore),
+        coinsEarned,
+        timeSpentSeconds: timeSpentSeconds ? parseInt(timeSpentSeconds) : 0,
+      });
+
+      if (balance) {
+        await db.update(childRewardBalances).set({
+          totalCoins: balance.totalCoins + coinsEarned,
+          updatedAt: new Date(),
+        }).where(eq(childRewardBalances.childId, childId));
+      } else {
+        await db.insert(childRewardBalances).values({
+          childId,
+          totalTokens: 0,
+          totalStars: 0,
+          totalCoins: coinsEarned,
+          tokensUsed: 0,
+        });
+      }
+
+      if (coinsEarned > 0) {
+        await db.insert(childRewardLedger).values({
+          childId, type: "coin", amount: coinsEarned, source: "game_score", sourceId: `${gameType}_${sNum}`
+        });
+      }
+
+      const newBadges: any[] = [];
+      const allGameScores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
+
+      if (allGameScores.length === 1) {
+        try {
+          await db.insert(childBadges).values({
+            childId, badgeKey: "first_game", badgeName: "Ciyaaryahan Cusub", badgeIcon: "🎮", badgeColor: "#6366F1"
+          });
+          newBadges.push({ key: "first_game", name: "Ciyaaryahan Cusub", icon: "🎮" });
+        } catch {}
+      }
+
+      if (allGameScores.length >= 10) {
+        try {
+          await db.insert(childBadges).values({
+            childId, badgeKey: "game_master", badgeName: "Ciyaar Master", badgeIcon: "🎯", badgeColor: "#EC4899"
+          });
+          newBadges.push({ key: "game_master", name: "Ciyaar Master", icon: "🎯" });
+        } catch {}
+      }
+
+      if (scorePercent === 100) {
+        try {
+          await db.insert(childBadges).values({
+            childId, badgeKey: "perfect_score", badgeName: "Dhibcaha Tamaamka", badgeIcon: "💯", badgeColor: "#EF4444"
+          });
+          newBadges.push({ key: "perfect_score", name: "Dhibcaha Tamaamka", icon: "💯" });
+        } catch {}
+      }
+
+      const completedSurahs = await db.select().from(childProgress).where(
+        and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
+      );
+      for (const badgeDef of QURAN_BADGE_DEFINITIONS) {
+        if (badgeDef.requirement > 0 && completedSurahs.length >= badgeDef.requirement) {
+          try {
+            await db.insert(childBadges).values({
+              childId, badgeKey: badgeDef.key, badgeName: badgeDef.name, badgeIcon: badgeDef.icon, badgeColor: badgeDef.color
+            });
+            newBadges.push({ key: badgeDef.key, name: badgeDef.name, icon: badgeDef.icon });
+          } catch {}
+        }
+      }
+
+      const avgAccuracy = completedSurahs.length > 0
+        ? Math.round(completedSurahs.reduce((s, p) => s + (p.accuracy || 0), 0) / completedSurahs.length)
+        : 0;
+      if (avgAccuracy >= 90 && completedSurahs.length >= 3) {
+        try {
+          await db.insert(childBadges).values({
+            childId, badgeKey: "high_accuracy", badgeName: "Cod Qurux Badan", badgeIcon: "🎯", badgeColor: "#10B981"
+          });
+          newBadges.push({ key: "high_accuracy", name: "Cod Qurux Badan", icon: "🎯" });
+        } catch {}
+      }
+
+      const updatedStreak = await getChildGameStreak(childId);
+      res.json({
+        coinsEarned,
+        scorePercent,
+        newBadges,
+        streakMultiplier,
+        streak: {
+          current: updatedStreak.currentStreak,
+          best: updatedStreak.bestStreak,
+        },
+      });
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Score save error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/badges", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const earned = await db.select().from(childBadges).where(eq(childBadges.childId, childId));
+      const earnedKeys = new Set(earned.map(b => b.badgeKey));
+
+      const allBadges = QURAN_BADGE_DEFINITIONS.map(def => ({
+        ...def,
+        earned: earnedKeys.has(def.key),
+        earnedAt: earned.find(b => b.badgeKey === def.key)?.earnedAt || null,
+      }));
+
+      res.json(allBadges);
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Badges error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/leaderboard", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const child = await storage.getChild(childId);
+      if (!child) return res.status(404).json({ error: "Ilmaha lama helin" });
+
+      const siblings = await storage.getChildrenByParentId(child.parentId);
+      const leaderboard = [];
+
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+
+      for (const sibling of siblings) {
+        const progress = await db.select().from(childProgress).where(
+          and(eq(childProgress.childId, sibling.id), eq(childProgress.completed, true))
+        );
+        const gameScores = await db.select().from(childGameScores).where(eq(childGameScores.childId, sibling.id));
+
+        const totalStars = progress.reduce((s, p) => s + (p.starsEarned || 0), 0);
+        const totalTrophies = progress.length;
+        const totalCoins = gameScores.reduce((s, g) => s + (g.coinsEarned || 0), 0);
+
+        const streak = await getChildGameStreak(sibling.id);
+        const weeklyGames = gameScores.filter(s => new Date(s.completedAt) >= weekStart).length;
+
+        leaderboard.push({
+          id: sibling.id,
+          name: sibling.name,
+          avatarColor: sibling.avatarColor,
+          aayahStars: totalStars,
+          surahTrophies: totalTrophies,
+          gameCoins: totalCoins,
+          totalScore: totalStars + totalTrophies * 10 + totalCoins,
+          isCurrentChild: sibling.id === childId,
+          bestStreak: streak.bestStreak,
+          currentStreak: streak.currentStreak,
+          weeklyGames,
+        });
+      }
+
+      leaderboard.sort((a, b) => b.totalScore - a.totalScore);
+      res.json(leaderboard);
+    } catch (error: any) {
+      console.error("[QURAN GAMES] Leaderboard error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
 
   // Register video proxy routes (Google Drive video streaming)
   app.use(videoProxyRouter);
@@ -14782,18 +15840,7 @@ Ha isticmaalin jawaabo dheer - ka dhig mid fudud oo carruurta u fudud.`;
       }
 
       const messages = await storage.getParentingMessages(conversationId);
-      const feedbackByMessage: Record<string, "up" | "down"> = {};
-      for (const msg of messages) {
-        if ((msg.role === "feedback_up" || msg.role === "feedback_down") && msg.content.startsWith("target:")) {
-          const targetId = msg.content.replace("target:", "").trim();
-          if (targetId) {
-            feedbackByMessage[targetId] = msg.role === "feedback_up" ? "up" : "down";
-          }
-        }
-      }
-
-      const visibleMessages = messages.filter((m) => m.role === "user" || m.role === "assistant");
-      res.json({ conversation, messages: visibleMessages, feedbackByMessage });
+      res.json({ conversation, messages });
     } catch (error) {
       console.error("[TARBIYA] Get messages error:", error);
       res.status(500).json({ error: "Failed to get messages" });
@@ -14851,46 +15898,49 @@ Ha isticmaalin jawaabo dheer - ka dhig mid fudud oo carruurta u fudud.`;
 
       const topicContext = conversation.topic !== "Guud" ? `Mawduuca waalidku wuxuu weyddiinayaa: ${conversation.topic}.` : "";
 
-      const systemPrompt = `Waxaad tahay Kaaliyaha Barbaarinta ee app-ka "BarbaarintaSan". Doorkaagu waa inaad waalidka ka caawiso su'aalaha ku saabsan korinta carruurta, asluubta, waxbarashada, horumarka dareenka, iyo xiriirka qoyska.
+      const systemPrompt = `Waxaad tahay la-taliye tarbiyad iyo waalidnimo oo ku salaysan dhaqanka Soomaaliyeed iyo bulshada.
 
 ${topicContext}
 
-XEERARKA GUUD:
-- U jawaab si aad u kooban (ugu badnaan 2 ilaa 3 weedhood).
-- Jawaabtaadu waa inay noqotaa mid lagu akhrin karo wax ka yar 20 ilbiriqsi.
-- Isticmaal Af-Soomaali dabiici ah oo ku habboon dhegeysiga.
-- Noqo qof xushmad leh oo garab taagan waalidka.
-- Sii talooyin wax ku ool ah oo waalidku isla markaaba fulin karo.
-- Diiradda saar barbaarinta wanaagsan (positive parenting) iyo cilmi-nafsiga ilmaha.
-- Iska ilaali inaad bixiso baaritaan caafimaad ama mid sharci.
+XEERKA UGU MUHIIMSAN:
+- WALIGAA talo toos ah ha bixin markii ugu horeeysa ee waalidku keeno dhibaato culus ee dabeecadda ilmaha.
+- Marka hore, waraysi gaaban oo xushmad leh ku samee.
+- Su'aalahan hal mar weydii, dhammaan ha wada tuurin:
+  1) "Fadlan ii sheeg, immisa sano ayuu ilmuhu jiraa?"
+  2) "Ma leeyahay walaalo kale? Haddii ay jiraan, sidee ayuu ula dhaqmaa?"
+  3) "Marka uu khalad sameeyo, sidee ayaad u edbisaa? Ma tishaa? Ma ku qaylisaa? Ma garaacdaa?"
+  4) "Goorma ayaad bilowday inaad aragto dabeecaddan?"
+  5) "Ma ku jirtaa guruubkeena Telegram ee Bahda Tarbiyadda Carruurta?"
 
-QODOBBADA GAARKA AH:
-- Haddii waalidku sheego calaamado muujinaya dhibaato maskaxeed ama mid jireed, weydii su'aalo xasaasi ah sida: "Ilmaha ma ku qaylisaa?" iyo "Sidee u ciqaabtaa?".
-- Haddii waalidku qirto inuu isticmaalo qaylo ama garaacid, si cilmiyeysan ugu sharax dhibaatada trauma-da ay ku keenayso ilmaha.
+GURUUBKA TELEGRAM:
+- Mar walba weydii waalidka inuu ku jiro guruubka Telegram.
+- Hadduu yiraahdo "Haa": weydii goorma uu ku soo biirtay. Aqbal jawaabtiisa.
+- Hadduu yiraahdo "Maya": si deggan oo xushmad leh u xus faa'iidada guruubka (ha qasbin): "Waalid qaaliga ah, guruubkeena Bahda Tarbiyadda Carruurta waxaa ku jira waalidiin badan oo Soomaaliyeed oo is caawiya, sidoo kale waxaa jira talooyin iyo waayo-aragnimo faa'iido leh." Ka dib sii wad waraysiga.
 
-DUGSI QURAANKA:
-- Da'da ugu habboon ee ilmaha lagu bilaabo waa 5 ilaa 6 sano.
-- Ku adkee waalidka inaysan waligood ilmahooda geeyn Dugsi Quraan carruurta lagu garaaco, lagu qayliyo, ama si nafsiyan ah loo bahdilo.
-- Sharax in garaaca iyo bahdilku ay ilmaha ku keenaan cabsi iyo nacayb uu u qaado barashada diinta.
+CAJLADAHA DUUBAN EE USTAAD MUUSE:
+- Marka waraysigu dhammaado, ka hor inta aanad talo bixin, dheh:
+  "Waxaa jira cajlado duuban oo dhagaysi ah oo aad u fara badan oo Ustaad Muuse duubay oo Telegram-ka ku jira, arrimahan si qoto dheer ayuu uga hadlay. Aad bay faa'iido u leeyihiin inaad dhagaysato."
+- Ka dib dheh: "Haddana, talooyin wax ku ool ah ayaan hadda ku siinayaa."
 
-XANAANADA (PRESCHOOL):
-- Da'da ugu habboon ee ilmaha xanaanada lagu geeyo waa 4 ilaa 5 sano.
-- Hubi in goobtu tahay mid ammaan ah oo ilmaha si naxariis leh loogu soo dhaweeyo.
+TALADA:
+- Ku saley dhaqanka Soomaaliyeed, naxariista Islaamka, iyo cilmiga nafsiga carruurta.
+- Hab-dhaqameedyada waxyeelada ah (qaylo badan, garaacid) si naxariis leh uga hadal.
+- Waligaa ha eedayn, ha ceeben, ha xukumin.
+- Talooyinka ha ka dhig kuwo wax ku ool ah, tallaabo-tallaabo, oo dhab ah.
+- Xooji naxariista, samirka, iyo xidhiidhka waalidka iyo ilmaha.
 
-XANNIBAADO:
-- HA ISTICMAALIN weedhan: "Sug jawaabtaada iyo faahfaahinta da'da ilmahaaga!".
-- Haddii su'aashu aysan la xiriirin barbaarinta, si asluub leh ugu soo celi wadahadalka mawduuca barbaarinta.
-
-GABAGABO:
-- Dhamaadka jawaab kasta, si dabiici ah ugu dhiiri-geli waalidka inay isticmaalaan app-ka "Barbaarintasan Academy" si ay u helaan casharo, muuqaalo talo ah, iyo sheekooyinka hurdada.`;
+LUUQADDA:
+- Af-Soomaali cad oo faham ah oo xushmad leh keliya ku jawaab.
+- Ha ku siin jawaab dheer — ka dhig mid gaaban oo faa'iido leh.
+- Isticmaal 🤲 emoji-ga talooyinka diiniga ah.
+- Haddii aanad hubin jawaabta, u sheeg inay la tashadaan culimo ama takhasusle.
+- Haddii lagu weydiiyo wax aan tarbiyada iyo carruurta ku saabsanayn, si naxariis leh u diid oo u sheeg inaad tahay caawiye tarbiyad oo keliya.`;
 
       const aiMessages: any[] = [
         { role: "system", content: systemPrompt }
       ];
 
-      const recentMessages = existingMessages
-        .filter((msg) => msg.role === "user" || msg.role === "assistant")
-        .slice(-8);
+      const recentMessages = existingMessages.slice(-8);
       for (const msg of recentMessages) {
         aiMessages.push({ role: msg.role, content: msg.content });
       }
@@ -14908,13 +15958,13 @@ GABAGABO:
       const answer = response.choices[0]?.message?.content ||
         "Waan ka xumahay, ma awoodi jawaabta. Fadlan isku day mar kale.";
 
-      const userSavedMessage = await storage.addParentingMessage({
+      await storage.addParentingMessage({
         conversationId: conversation.id,
         role: "user",
         content: question.trim()
       });
 
-      const assistantSavedMessage = await storage.addParentingMessage({
+      await storage.addParentingMessage({
         conversationId: conversation.id,
         role: "assistant",
         content: answer
@@ -14929,8 +15979,6 @@ GABAGABO:
       res.json({
         answer,
         conversationId: conversation.id,
-        userMessageId: userSavedMessage.id,
-        assistantMessageId: assistantSavedMessage.id,
         remaining
       });
     } catch (error: any) {
@@ -14952,139 +16000,6 @@ GABAGABO:
         error: "Khalad ayaa dhacay",
         answer: userMessage
       });
-    }
-  });
-
-  app.post("/api/tarbiya/feedback", requireParentAuth, async (req: Request, res: Response) => {
-    try {
-      const parentId = (req.session as any).parentId;
-      const { conversationId, messageId, rating } = req.body;
-
-      if (!conversationId || !messageId || (rating !== "up" && rating !== "down")) {
-        return res.status(400).json({ error: "Invalid feedback payload" });
-      }
-
-      const conversation = await storage.getParentingConversation(conversationId);
-      if (!conversation || conversation.parentId !== parentId) {
-        return res.status(404).json({ error: "Conversation not found" });
-      }
-
-      const messages = await storage.getParentingMessages(conversationId);
-      const targetMessage = messages.find((m) => m.id === messageId && m.role === "assistant");
-      if (!targetMessage) {
-        return res.status(404).json({ error: "Target message not found" });
-      }
-
-      const existing = messages.find(
-        (m) => (m.role === "feedback_up" || m.role === "feedback_down") && m.content === `target:${messageId}`
-      );
-      if (existing) {
-        return res.json({
-          success: true,
-          rating: existing.role === "feedback_up" ? "up" : "down",
-          alreadyRated: true,
-        });
-      }
-
-      await storage.addParentingMessage({
-        conversationId,
-        role: rating === "up" ? "feedback_up" : "feedback_down",
-        content: `target:${messageId}`,
-      });
-
-      res.json({ success: true, rating, alreadyRated: false });
-    } catch (error) {
-      console.error("[TARBIYA] Feedback error:", error);
-      res.status(500).json({ error: "Failed to save feedback" });
-    }
-  });
-
-  app.get("/api/admin/tarbiya-insights", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const today = new Date();
-      const toDate = today.toISOString().slice(0, 10);
-      const from = new Date(today);
-      from.setDate(from.getDate() - 6);
-      const fromDate = from.toISOString().slice(0, 10);
-
-      const topQuestionsResult = await db.execute(sql`
-        SELECT content, COUNT(*)::int AS count
-        FROM parenting_messages
-        WHERE role = 'user'
-        GROUP BY content
-        ORDER BY count DESC, MAX(created_at) DESC
-        LIMIT 20
-      `);
-
-      const activeTodayResult = await db.execute(sql`
-        SELECT COUNT(DISTINCT parent_id)::int AS count
-        FROM parenting_usage
-        WHERE date = ${toDate}
-      `);
-
-      const activeLast7Result = await db.execute(sql`
-        SELECT COUNT(DISTINCT parent_id)::int AS count
-        FROM parenting_usage
-        WHERE date BETWEEN ${fromDate} AND ${toDate}
-      `);
-
-      const returningLast7Result = await db.execute(sql`
-        SELECT COUNT(*)::int AS count
-        FROM (
-          SELECT parent_id
-          FROM parenting_usage
-          WHERE date BETWEEN ${fromDate} AND ${toDate}
-          GROUP BY parent_id
-          HAVING COUNT(DISTINCT date) >= 2
-        ) AS returning
-      `);
-
-      const feedbackResult = await db.execute(sql`
-        SELECT
-          SUM(CASE WHEN role = 'feedback_up' THEN 1 ELSE 0 END)::int AS up,
-          SUM(CASE WHEN role = 'feedback_down' THEN 1 ELSE 0 END)::int AS down
-        FROM parenting_messages
-        WHERE role IN ('feedback_up', 'feedback_down')
-      `);
-
-      const activeToday = Number((activeTodayResult.rows as any[])[0]?.count || 0);
-      const activeLast7 = Number((activeLast7Result.rows as any[])[0]?.count || 0);
-      const returningLast7 = Number((returningLast7Result.rows as any[])[0]?.count || 0);
-      const feedbackUp = Number((feedbackResult.rows as any[])[0]?.up || 0);
-      const feedbackDown = Number((feedbackResult.rows as any[])[0]?.down || 0);
-
-      res.json({
-        topQuestions: (topQuestionsResult.rows as any[]).map((row) => ({
-          content: row.content,
-          count: Number(row.count || 0),
-        })),
-        retention: {
-          range: { from: fromDate, to: toDate },
-          activeToday,
-          activeLast7,
-          returningLast7,
-          returningRate: activeLast7 > 0 ? Math.round((returningLast7 / activeLast7) * 100) : 0,
-        },
-        feedback: {
-          up: feedbackUp,
-          down: feedbackDown,
-          total: feedbackUp + feedbackDown,
-        },
-        voice: {
-          ...tarbiyaVoiceStats,
-          transcribeTotal: tarbiyaVoiceStats.transcribeSuccess + tarbiyaVoiceStats.transcribeFail,
-          ttsTotal: tarbiyaVoiceStats.ttsSuccess + tarbiyaVoiceStats.ttsFail,
-          transcribeSuccessRate: tarbiyaVoiceStats.transcribeSuccess + tarbiyaVoiceStats.transcribeFail > 0
-            ? Math.round((tarbiyaVoiceStats.transcribeSuccess / (tarbiyaVoiceStats.transcribeSuccess + tarbiyaVoiceStats.transcribeFail)) * 100)
-            : 0,
-          ttsSuccessRate: tarbiyaVoiceStats.ttsSuccess + tarbiyaVoiceStats.ttsFail > 0
-            ? Math.round((tarbiyaVoiceStats.ttsSuccess / (tarbiyaVoiceStats.ttsSuccess + tarbiyaVoiceStats.ttsFail)) * 100)
-            : 0,
-        },
-      });
-    } catch (error) {
-      console.error("[ADMIN] Tarbiya insights error:", error);
-      res.status(500).json({ error: "Failed to fetch tarbiya insights" });
     }
   });
 
@@ -15146,7 +16061,6 @@ GABAGABO:
       }
 
       if (!req.file) {
-        tarbiyaVoiceStats.transcribeFail++;
         return res.status(400).json({ error: "Audio file is required" });
       }
 
@@ -15180,7 +16094,6 @@ GABAGABO:
 
       const userText = transcription.text;
       if (!userText || userText.trim().length < 2) {
-        tarbiyaVoiceStats.transcribeFail++;
         return res.status(400).json({
           error: "Codka lagama fahmin qoraal",
           text: "Waan ka xumahay, codkaaga lagama fahmin. Fadlan ku hadal si dhow mic-ka oo isku day mar kale.",
@@ -15188,7 +16101,6 @@ GABAGABO:
       }
 
       console.log(`[TRANSCRIBE] Success: "${userText.substring(0, 50)}..."`);
-      tarbiyaVoiceStats.transcribeSuccess++;
 
       res.json({
         text: userText.trim(),
@@ -15199,7 +16111,6 @@ GABAGABO:
     } catch (error: any) {
       const errMsg = error?.message || error?.toString() || "Unknown error";
       console.error("[TRANSCRIBE] Error:", errMsg);
-      tarbiyaVoiceStats.transcribeFail++;
 
       let userMessage = "Codka lama fahmi karin. Fadlan isku day mar kale.";
       if (errMsg.includes("Could not process") || errMsg.includes("Invalid file") || errMsg.includes("audio")) {
@@ -15246,32 +16157,34 @@ GABAGABO:
 
   app.post("/api/voice/speak", requireParentAuth, async (req: Request, res: Response) => {
     try {
-      const { text, voice } = req.body;
+      const { text } = req.body;
       if (!text || typeof text !== "string" || text.trim().length < 2) {
         return res.status(400).json({ error: "Text is required" });
       }
 
+      const openai = getOpenAIClient();
+
       const maxRetries = 2;
       let lastError: any = null;
 
-      // Voice profiles for Somali reading quality. "zephyr" is mapped to Ubax.
-      const requestedVoice = typeof voice === "string" ? voice.toLowerCase().trim() : "zephyr";
-      const azureVoice = requestedVoice === "muuse"
-        ? "so-SO-MuuseNeural"
-        : "so-SO-UbaxNeural";
-
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`[TTS] Attempt ${attempt + 1}: generating Somali audio for ${text.length} chars (profile: ${requestedVoice})`);
+          console.log(`[TTS] Attempt ${attempt + 1}: generating audio for ${text.length} chars`);
 
-          const audioBuffer = await synthesizeSpeech(text.trim(), { azureVoice });
+          const ttsResponse = await openai.audio.speech.create({
+            model: "tts-1",
+            voice: "onyx",
+            input: text.substring(0, 1000),
+            speed: 0.9,
+          });
+
+          const audioBuffer = Buffer.from(await ttsResponse.arrayBuffer());
 
           const fileId = `tts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`;
           const filePath = path.join(ttsAudioDir, fileId);
           fs.writeFileSync(filePath, audioBuffer);
 
           console.log(`[TTS] Success: saved ${audioBuffer.length} bytes as ${fileId}`);
-          tarbiyaVoiceStats.ttsSuccess++;
 
           return res.json({
             audioUrl: `/tts-audio/${fileId}`,
@@ -15286,14 +16199,12 @@ GABAGABO:
       }
 
       console.error("[TTS] All retries failed:", lastError?.message);
-      tarbiyaVoiceStats.ttsFail++;
       res.status(500).json({
         error: "TTS failed",
         audioUrl: null,
       });
     } catch (error: any) {
       console.error("[TTS] Error:", error.message);
-      tarbiyaVoiceStats.ttsFail++;
       res.status(500).json({
         error: "TTS failed",
         audioUrl: null,
@@ -15368,15 +16279,9 @@ GABAGABO:
     }
   });
 
-  // ==========================================
-  // ONLINE CHECKOUT (DISABLED)
-  // ==========================================
+  // STRIPE GOLD MEMBERSHIP CHECKOUT - DISABLED
   app.post("/api/ai/gold-checkout", requireParentAuth, async (req: Request, res: Response) => {
-    return res.status(410).json({
-      error: "Online checkout is disabled",
-      code: "ONLINE_CHECKOUT_DISABLED",
-      message: "Lacag-bixinta online-ka ah waa la damiyay app-kan.",
-    });
+    res.status(503).json({ error: "Stripe payments are disabled" });
   });
 
   // ==========================================
@@ -17044,6 +17949,31 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     });
   });
 
+
+  // ===========================================
+  // STRIPE PAYMENT ROUTES - ALL DISABLED
+  // ===========================================
+
+  app.get("/api/stripe/test-checkout", (req, res) => {
+    res.status(503).json({ error: "Stripe disabled" });
+  });
+
+  app.get("/api/stripe/config", (req, res) => {
+    res.json({ publishableKey: null, disabled: true });
+  });
+
+  app.post("/api/stripe/create-checkout-session", (req, res) => {
+    res.status(503).json({ error: "Stripe disabled" });
+  });
+
+  app.post("/api/stripe/verify-session", (req, res) => {
+    res.status(503).json({ error: "Stripe disabled" });
+  });
+
+  app.post("/api/stripe/customer-portal", (req, res) => {
+    res.status(503).json({ error: "Stripe disabled" });
+  });
+
   // ==================== GOOGLE MEET EVENTS ====================
 
   app.get("/api/meet-events", async (req, res) => {
@@ -17305,6 +18235,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
         paymentSource: s.paymentSource || 'manual',
         paymentMethodId: s.paymentMethodId,
         paymentMethodName: s.paymentMethodId ? (methodMap[s.paymentMethodId] || null) : null,
+        stripeSessionId: s.stripeSessionId,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
         reviewedAt: s.reviewedAt,

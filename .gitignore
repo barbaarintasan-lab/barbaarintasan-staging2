@@ -1,6 +1,3 @@
-android-twa/
-checkpoints_hussein/
-
 # Dependencies
 node_modules/
 
@@ -61,3 +58,13 @@ client/public/google-play-header.png
 # WordPress plugin archives
 wordpress-plugin/*.zip
 wordpress-plugin/course-images.zip
+
+# Replit system files
+.replit
+replit.nix
+.config/
+.agents/
+/tmp/
+
+# Download folder
+download/

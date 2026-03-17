@@ -6,7 +6,7 @@ import { toast } from "sonner";
 type ReactionType = "love" | "like" | "dislike" | "sparkle";
 
 interface ContentReactionsProps {
-  contentType: "bedtime_story" | "parent_message" | "promo_video";
+  contentType: "bedtime_story" | "parent_message";
   contentId: string;
 }
 
@@ -26,12 +26,9 @@ export function ContentReactions({ contentType, contentId }: ContentReactionsPro
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
 
-  const apiPath =
-    contentType === "bedtime_story"
-      ? `/api/bedtime-stories/${contentId}/reactions`
-      : contentType === "parent_message"
-        ? `/api/parent-messages/${contentId}/reactions`
-        : `/api/promo-videos/${contentId}/reactions`;
+  const apiPath = contentType === "bedtime_story" 
+    ? `/api/bedtime-stories/${contentId}/reactions`
+    : `/api/parent-messages/${contentId}/reactions`;
 
   const queryKey = [apiPath];
 

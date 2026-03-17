@@ -489,7 +489,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: coursesRequests.length,
         description: `Translate ${coursesRequests.length} courses (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'course'
+        metadata: { entityType: 'course' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created course translation batch job: ${jobId}`);
@@ -505,7 +505,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: modulesRequests.length,
         description: `Translate ${modulesRequests.length} modules (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'module'
+        metadata: { entityType: 'module' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created module translation batch job: ${jobId}`);
@@ -521,7 +521,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: lessonsRequests.length,
         description: `Translate ${lessonsRequests.length} lessons (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'lesson'
+        metadata: { entityType: 'lesson' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created lesson translation batch job: ${jobId}`);
@@ -537,7 +537,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: quizRequests.length,
         description: `Translate ${quizRequests.length} quiz questions (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'quiz_question'
+        metadata: { entityType: 'quiz_question' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created quiz translation batch job: ${jobId}`);
@@ -553,7 +553,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: messagesRequests.length,
         description: `Translate ${messagesRequests.length} parent messages (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'parent_message'
+        metadata: { entityType: 'parent_message' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created parent message translation batch job: ${jobId}`);
@@ -569,7 +569,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: storiesRequests.length,
         description: `Translate ${storiesRequests.length} bedtime stories (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'bedtime_story'
+        metadata: { entityType: 'bedtime_story' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created bedtime story translation batch job: ${jobId}`);
@@ -585,7 +585,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: testimonialsRequests.length,
         description: `Translate ${testimonialsRequests.length} testimonials (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'testimonial'
+        metadata: { entityType: 'testimonial' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created testimonial translation batch job: ${jobId}`);
@@ -601,7 +601,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: announcementsRequests.length,
         description: `Translate ${announcementsRequests.length} announcements (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'announcement'
+        metadata: { entityType: 'announcement' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created announcement translation batch job: ${jobId}`);
@@ -617,7 +617,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: sectionsRequests.length,
         description: `Translate ${sectionsRequests.length} homepage sections (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'homepage_section'
+        metadata: { entityType: 'homepage_section' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created homepage section translation batch job: ${jobId}`);
@@ -633,7 +633,7 @@ export async function createComprehensiveTranslationBatchJob(limit: number = 50)
         totalItems: tipsRequests.length,
         description: `Translate ${tipsRequests.length} AI tips (Somali → English)`,
         createdBy: 'automated-worker',
-        entityType: 'ai_tip'
+        metadata: { entityType: 'ai_tip' }
       });
       jobIds.push(jobId);
       console.log(`[Batch Worker] Created AI tip translation batch job: ${jobId}`);

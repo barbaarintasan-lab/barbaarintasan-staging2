@@ -37,6 +37,11 @@ export async function setupVite(app: Express, server: Server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
+    // Skip static asset requests - let express.static handle them
+    if (url.startsWith('/attached_assets/')) {
+      return next();
+    }
+
     try {
       // Use sheeko.html for /sheeko routes (separate PWA with its own manifest)
       const isSheeko = url.startsWith('/sheeko');

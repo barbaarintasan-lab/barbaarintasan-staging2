@@ -25,14 +25,14 @@ export default function Sheeko() {
 
   if (isStandalone) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900">
+      <div className="min-h-screen bg-white">
         <VoiceSpaces initialRoomId={initialRoomId} fromAdmin={fromAdmin} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-20">
+    <div className="min-h-screen bg-white pb-20">
       <VoiceSpaces initialRoomId={initialRoomId} fromAdmin={fromAdmin} />
     </div>
   );

@@ -4,7 +4,6 @@ import type { InsertParentTip } from "@shared/schema";
 import { DEVELOPMENTAL_STAGES } from "@shared/schema";
 import { generateParentMessageAudio } from "./tts";
 import OpenAI from "openai";
-import { uploadToR2, isR2Configured } from "./r2Storage";
 
 const useReplitIntegration = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
 
@@ -12,15 +11,6 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
   ...(useReplitIntegration ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
 });
-
-const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.0-flash";
-
-type GeneratedParentTip = {
-  title: string;
-  content: string;
-  keyPoints: string;
-};
 
 const STAGE_TOPICS: Record<string, { topics: string[]; ageRange: string }> = {
   "newborn-0-3m": {
@@ -136,70 +126,7 @@ const STAGE_SCIENCE: Record<string, string> = {
   "school-age-5-7y": `Marxaladda SALAAD-BARAD (5-7 sano): Ilmuhu wuxuu bilaabayaa dugsiga, wuxuuna baranayaa akhriska iyo xisaabta. Saaxiibtinimadiisu way xoogaystaa. Wuxuu bilaabayaa inuu fahmo waxyaabaha saxda iyo qaladka ah. Waxaa muhiim ah tababarka cibaadooyinka (salaadda), mas'uuliyadda, iyo dhiirigalinta akhrisga iyo cilmiga.`,
 };
 
-function parseGeneratedTipJson(rawText: string): GeneratedParentTip {
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Could not parse tip JSON");
-
-  const strategies = [
-    () => { const cleaned = escapeNewlinesInStrings(jsonMatch[0]); return JSON.parse(cleaned); },
-    () => { const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\n/g, '\\n'); return JSON.parse(cleaned); },
-    () => { const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F\n\r\t]/g, ' '); return JSON.parse(cleaned); },
-  ];
-
-  for (let i = 0; i < strategies.length; i++) {
-    try {
-      const result = strategies[i]();
-      if (result.title && result.content) {
-        if (!result.keyPoints) result.keyPoints = "Talo muhiim ah";
-        return result;
-      }
-    } catch (e) {
-      console.log(`[Parent Tips] JSON strategy ${i + 1} failed:`, (e as Error).message);
-    }
-  }
-
-  throw new Error("Could not parse tip JSON after all strategies");
-}
-
-async function generateTipTextWithGemini(prompt: string): Promise<GeneratedParentTip> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("Google Gemini API key not configured");
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 900,
-          responseMimeType: "application/json",
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textContent) {
-    throw new Error("No content generated from Gemini");
-  }
-
-  return parseGeneratedTipJson(textContent);
-}
-
-async function generateTipText(stage: typeof DEVELOPMENTAL_STAGES[number], topic: string): Promise<GeneratedParentTip> {
+async function generateTipText(stage: typeof DEVELOPMENTAL_STAGES[number], topic: string): Promise<{ title: string; content: string; keyPoints: string }> {
   const stageScience = STAGE_SCIENCE[stage.id] || "";
   const prompt = `Waxaad tahay khabiir horumarinta caruurta oo Soomaali ah. Qor talo GAABAN oo ku saabsan: "${topic}" oo loogu talagalay waalidka carruurtoodu tahay marxaladda "${stage.label}" (${stage.labelEn}).
 
@@ -225,12 +152,6 @@ Ka jawaab JSON sax ah:
   "keyPoints": "Qodob 1\\nQodob 2\\nQodob 3"
 }`;
 
-  try {
-    return await generateTipTextWithGemini(prompt);
-  } catch (geminiError) {
-    console.warn("[Parent Tips] Gemini generation failed, falling back to OpenAI:", (geminiError as Error).message);
-  }
-
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -245,7 +166,28 @@ Ka jawaab JSON sax ah:
   const textContent = response.choices?.[0]?.message?.content;
   if (!textContent) throw new Error("No content generated");
 
-  return parseGeneratedTipJson(textContent);
+  const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Could not parse tip JSON");
+
+  const strategies = [
+    () => { const cleaned = escapeNewlinesInStrings(jsonMatch[0]); return JSON.parse(cleaned); },
+    () => { const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\n/g, '\\n'); return JSON.parse(cleaned); },
+    () => { const cleaned = jsonMatch[0].replace(/[\x00-\x1F\x7F\n\r\t]/g, ' '); return JSON.parse(cleaned); },
+  ];
+
+  for (let i = 0; i < strategies.length; i++) {
+    try {
+      const result = strategies[i]();
+      if (result.title && result.content) {
+        if (!result.keyPoints) result.keyPoints = "Talo muhiim ah";
+        return result;
+      }
+    } catch (e) {
+      console.log(`[Parent Tips] Strategy ${i + 1} failed:`, (e as Error).message);
+    }
+  }
+
+  throw new Error("Could not parse tip JSON after all strategies");
 }
 
 async function generateTipImage(stage: string, topic: string): Promise<string> {
@@ -260,43 +202,7 @@ async function generateTipImage(stage: string, topic: string): Promise<string> {
   });
 
   if (!response.data?.[0]?.b64_json) throw new Error("No image generated");
-
-  const imageBase64 = response.data[0].b64_json;
-
-  if (isR2Configured()) {
-    try {
-      const imageBuffer = Buffer.from(imageBase64, "base64");
-      const safeTopic = topic
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .trim()
-        .replace(/\s+/g, "-")
-        .slice(0, 80);
-      const fileName = `parent-tips/${safeTopic || "tip"}-${Date.now()}.png`;
-      const { url } = await uploadToR2(imageBuffer, fileName, "image/png", "parent-tips", "sawirada");
-      return url;
-    } catch (uploadError) {
-      console.warn("[Parent Tips] R2 upload failed, falling back to data URL:", (uploadError as Error).message);
-    }
-  }
-
-  return `data:image/png;base64,${imageBase64}`;
-}
-
-function parseDataUrlImage(image: string): { buffer: Buffer; mimeType: string; extension: string } | null {
-  const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) return null;
-
-  const mimeType = match[1].toLowerCase();
-  const base64Data = match[2];
-  const extension = mimeType.includes("jpeg") ? "jpg" : mimeType.split("/")[1] || "png";
-
-  try {
-    const buffer = Buffer.from(base64Data, "base64");
-    return { buffer, mimeType, extension };
-  } catch {
-    return null;
-  }
+  return `data:image/png;base64,${response.data[0].b64_json}`;
 }
 
 export async function generateAndSaveParentTip(stageId?: string): Promise<void> {
@@ -350,9 +256,16 @@ export async function generateAndSaveParentTip(stageId?: string): Promise<void> 
       console.log(`[Parent Tips] Saved tip for ${stage.id}: ${tipText.title}`);
 
       try {
-        const audioUrl = await generateParentMessageAudio(saved.content, `tip-${saved.id}`);
+        const { generateAndUploadAudio } = await import("./tts");
+        const audioUrl = await generateAndUploadAudio(
+          saved.content,
+          `tip-${saved.id}`,
+          "tts-audio/talooyinka",
+          { azureVoice: "so-SO-MuuseNeural" },
+          'talo'
+        );
         await storage.updateParentTip(saved.id, { audioUrl });
-        console.log(`[Parent Tips] Audio generated for ${stage.id}`);
+        console.log(`[Parent Tips] Audio generated for ${stage.id} to R2: ${audioUrl}`);
       } catch (err) {
         console.log(`[Parent Tips] Audio generation failed for ${stage.id}, continuing without audio`);
       }
@@ -365,7 +278,7 @@ export async function generateAndSaveParentTip(stageId?: string): Promise<void> 
 export function registerParentTipsRoutes(app: Express): void {
   app.get("/api/parent-tips/homepage", async (_req: Request, res: Response) => {
     try {
-      const tips = await storage.getHomepageActiveParentTips(3, 3);
+      const tips = await storage.getRecentParentTips(3);
       res.json(tips);
     } catch (error) {
       console.error("Error fetching homepage tips:", error);
@@ -376,41 +289,12 @@ export function registerParentTipsRoutes(app: Express): void {
   app.get("/api/parent-tips", async (req: Request, res: Response) => {
     try {
       const stage = req.query.stage as string;
-      const scope = (req.query.scope as string | undefined) || "archive";
-      const view = (req.query.view as string | undefined) || "full";
       let tips;
-
-      if (scope === "active") {
-        const activeTips = await storage.getHomepageActiveParentTips(50, 3);
-        tips = stage && stage !== "all"
-          ? activeTips.filter((tip) => tip.stage === stage)
-          : activeTips;
-      } else if (scope === "all") {
-        if (stage && stage !== 'all') {
-          tips = await storage.getParentTipsByStage(stage, 50);
-        } else {
-          tips = await storage.getAllParentTips(200);
-        }
+      if (stage && stage !== 'all') {
+        tips = await storage.getParentTipsByStage(stage, 50);
       } else {
-        tips = await storage.getArchivedParentTips(stage, 200, 3);
+        tips = await storage.getAllParentTips(200);
       }
-
-      // `view=list` trims heavy fields (especially base64 images) for fast list rendering.
-      if (view === "list") {
-        const compactTips = tips.map((tip) => ({
-          id: tip.id,
-          title: tip.title,
-          content: "",
-          topic: tip.topic,
-          keyPoints: null,
-          images: [],
-          audioUrl: tip.audioUrl,
-          tipDate: tip.tipDate,
-          stage: tip.stage,
-        }));
-        return res.json(compactTips);
-      }
-
       res.json(tips);
     } catch (error) {
       console.error("Error fetching parent tips:", error);
@@ -494,7 +378,7 @@ export function registerParentTipsRoutes(app: Express): void {
         `tip-${tip.id}-${timestamp}`,
         "tts-audio/talooyinka",
         { azureVoice: voiceName },
-        'dhambaal'
+        'talo'
       );
 
       await storage.updateParentTip(tip.id, { audioUrl });
@@ -519,80 +403,6 @@ export function registerParentTipsRoutes(app: Express): void {
     } catch (error) {
       console.error("Error generating tips:", error);
       res.status(500).json({ error: "Failed to generate tips" });
-    }
-  });
-
-  app.post("/api/admin/parent-tips/migrate-images-to-r2", async (req: Request, res: Response) => {
-    try {
-      const parentId = (req.session as any)?.parentId;
-      if (!parentId) return res.status(401).json({ error: "Authentication required" });
-      const parent = await storage.getParent(parentId);
-      if (!parent?.isAdmin) return res.status(403).json({ error: "Admin access required" });
-
-      if (!isR2Configured()) {
-        return res.status(400).json({ error: "R2 is not configured" });
-      }
-
-      const limit = Number(req.body?.limit) || 500;
-      const tips = await storage.getAllParentTips(limit);
-
-      let migratedTips = 0;
-      let migratedImages = 0;
-      let skipped = 0;
-      let failed = 0;
-
-      for (const tip of tips) {
-        if (!tip.images || tip.images.length === 0) {
-          skipped++;
-          continue;
-        }
-
-        let changed = false;
-        const nextImages: string[] = [];
-
-        for (let idx = 0; idx < tip.images.length; idx++) {
-          const image = tip.images[idx];
-
-          if (!image.startsWith("data:image")) {
-            nextImages.push(image);
-            continue;
-          }
-
-          const parsed = parseDataUrlImage(image);
-          if (!parsed) {
-            failed++;
-            nextImages.push(image);
-            continue;
-          }
-
-          try {
-            const fileName = `parent-tips/migrated-${tip.id}-${idx}-${Date.now()}.${parsed.extension}`;
-            const { url } = await uploadToR2(parsed.buffer, fileName, parsed.mimeType, "parent-tips", "sawirada");
-            nextImages.push(url);
-            changed = true;
-            migratedImages++;
-          } catch (error) {
-            failed++;
-            nextImages.push(image);
-          }
-        }
-
-        if (changed) {
-          await storage.updateParentTip(tip.id, { images: nextImages });
-          migratedTips++;
-        }
-      }
-
-      return res.json({
-        success: true,
-        migratedTips,
-        migratedImages,
-        skipped,
-        failed,
-      });
-    } catch (error) {
-      console.error("Error migrating parent tip images to R2:", error);
-      res.status(500).json({ error: "Failed to migrate parent tip images" });
     }
   });
 
