@@ -123,10 +123,6 @@ export default function ChildLogin() {
     }
   };
 
-  const goBack = () => {
-    window.location.href = "/";
-  };
-
   return (
     <div className="min-h-screen bg-[#1a1a2e] relative overflow-hidden flex flex-col" data-testid="child-login-page">
       <div className="absolute inset-0 pointer-events-none">
@@ -147,14 +143,14 @@ export default function ChildLogin() {
         ))}
       </div>
 
-      <button
-        onClick={goBack}
+      <a
+        href="/"
         className="absolute top-4 left-4 z-10 text-white/60 hover:text-white flex items-center gap-1 text-sm"
         data-testid="link-back-home"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Guriga</span>
-      </button>
+      </a>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
         <div className="mb-5">
