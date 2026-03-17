@@ -11055,6 +11055,66 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
+  app.post("/api/quran/flashcards/tts", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const textRaw = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+      if (!textRaw) {
+        return res.status(400).json({ error: "Qoraalka waa loo baahan yahay" });
+      }
+
+      const text = textRaw.slice(0, 260);
+      const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
+      const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION;
+
+      if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
+        return res.status(503).json({ error: "Somali TTS wali lama diyaarin" });
+      }
+
+      const escapeForSsml = (value: string) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+      const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='so-SO'>
+        <voice name='so-SO-UbaxNeural'>
+          <prosody rate='0.93' pitch='+2Hz'>${escapeForSsml(text)}</prosody>
+        </voice>
+      </speak>`;
+
+      const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+      const audioResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+          "Content-Type": "application/ssml+xml",
+          "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+          "User-Agent": "BarbaarintasanAcademy",
+        },
+        body: ssml,
+      });
+
+      if (!audioResponse.ok) {
+        const errorText = await audioResponse.text();
+        console.error("[FLASHCARDS-TTS] Azure error:", audioResponse.status, errorText);
+        return res.status(502).json({ error: "Codka Soomaaliga lama helin" });
+      }
+
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      return res.json({
+        audioBase64: audioBuffer.toString("base64"),
+        voice: "so-SO-UbaxNeural",
+      });
+    } catch (error: any) {
+      console.error("[FLASHCARDS-TTS] Error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
   app.post("/api/quran/check", requireChildAuth, quranAudioUpload.single("audio"), async (req: Request, res: Response) => {
     try {
       const { surahNumber, ayahNumber } = req.body;

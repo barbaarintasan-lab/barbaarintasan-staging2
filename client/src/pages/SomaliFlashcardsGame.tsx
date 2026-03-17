@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { useChildAuth } from "@/contexts/ChildAuthContext";
 import { ArrowLeft, BookOpen, Loader2, RotateCcw, Star, Volume2, XCircle } from "lucide-react";
@@ -37,6 +37,7 @@ export default function SomaliFlashcardsGame() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [somaliVoice, setSomaliVoice] = useState<SpeechSynthesisVoice | null>(null);
   const { celebrationState, celebrate, closeCelebration } = useCelebration();
+  const flashcardAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const selectSomaliVoice = useCallback(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -83,11 +84,59 @@ export default function SomaliFlashcardsGame() {
     return () => {
       window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
       window.speechSynthesis.cancel();
+      if (flashcardAudioRef.current) {
+        flashcardAudioRef.current.pause();
+        flashcardAudioRef.current = null;
+      }
     };
   }, [selectSomaliVoice]);
 
-  const speakSomali = useCallback((text: string) => {
-    if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return;
+  const playServerSomaliAudio = useCallback(async (text: string): Promise<boolean> => {
+    if (!text.trim()) return false;
+    try {
+      const response = await fetch("/api/quran/flashcards/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) return false;
+
+      const payload = await response.json();
+      if (!payload?.audioBase64) return false;
+
+      const audio = new Audio(`data:audio/mpeg;base64,${payload.audioBase64}`);
+      flashcardAudioRef.current = audio;
+      audio.onplay = () => setIsSpeaking(true);
+      audio.onended = () => setIsSpeaking(false);
+      audio.onerror = () => setIsSpeaking(false);
+      await audio.play();
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const speakSomali = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (flashcardAudioRef.current) {
+      flashcardAudioRef.current.pause();
+      flashcardAudioRef.current = null;
+    }
+
+    const usedServerVoice = await playServerSomaliAudio(text);
+    if (usedServerVoice) return;
+
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    const hasSomaliLocalVoice = !!somaliVoice && (
+      /^so(-|_)/i.test(somaliVoice.lang) || /somali/i.test(somaliVoice.name)
+    );
+    if (!hasSomaliLocalVoice) return;
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = somaliVoice?.lang || "so-SO";
@@ -98,9 +147,8 @@ export default function SomaliFlashcardsGame() {
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
-  }, [somaliVoice]);
+  }, [somaliVoice, playServerSomaliAudio]);
 
   useEffect(() => {
     if (!child) return;
@@ -151,12 +199,16 @@ export default function SomaliFlashcardsGame() {
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    if (flashcardAudioRef.current) {
+      flashcardAudioRef.current.pause();
+      flashcardAudioRef.current = null;
+    }
   };
 
-  const handleCardTap = () => {
+  const handleCardTap = async () => {
     if (!currentCard) return;
     setIsFlipped((v) => !v);
-    speakSomali(`${currentCard.somali}. ${currentCard.example}`);
+    await speakSomali(`${currentCard.somali}. ${currentCard.example}`);
   };
 
   const saveScore = async () => {
