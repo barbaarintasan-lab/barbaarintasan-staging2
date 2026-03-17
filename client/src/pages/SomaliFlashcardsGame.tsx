@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { useChildAuth } from "@/contexts/ChildAuthContext";
-import { ArrowLeft, BookOpen, Loader2, RotateCcw, Star, XCircle } from "lucide-react";
+import { ArrowLeft, BookOpen, Loader2, RotateCcw, Star, Volume2, XCircle } from "lucide-react";
 import CelebrationModal, { useCelebration } from "@/components/CelebrationModal";
 
 interface FlashcardItem {
@@ -34,7 +34,49 @@ export default function SomaliFlashcardsGame() {
   const [reviewCount, setReviewCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [somaliVoice, setSomaliVoice] = useState<SpeechSynthesisVoice | null>(null);
   const { celebrationState, celebrate, closeCelebration } = useCelebration();
+
+  const selectSomaliVoice = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return;
+
+    const preferred =
+      voices.find((v) => /^so(-|_)/i.test(v.lang)) ||
+      voices.find((v) => /somali/i.test(v.name) || /somali/i.test(v.lang)) ||
+      null;
+
+    setSomaliVoice(preferred);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    selectSomaliVoice();
+    const onVoicesChanged = () => selectSomaliVoice();
+    window.speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+      window.speechSynthesis.cancel();
+    };
+  }, [selectSomaliVoice]);
+
+  const speakSomali = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = somaliVoice?.lang || "so-SO";
+    if (somaliVoice) utterance.voice = somaliVoice;
+    utterance.rate = 0.88;
+    utterance.pitch = 1;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [somaliVoice]);
 
   useEffect(() => {
     if (!child) return;
@@ -81,6 +123,16 @@ export default function SomaliFlashcardsGame() {
     setKnownCount(0);
     setReviewCount(0);
     setFinished(false);
+    setIsSpeaking(false);
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const handleCardTap = () => {
+    if (!currentCard) return;
+    setIsFlipped((v) => !v);
+    speakSomali(`${currentCard.somali}. ${currentCard.example}`);
   };
 
   const saveScore = async () => {
@@ -137,7 +189,7 @@ export default function SomaliFlashcardsGame() {
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
         <p className="text-white/70 text-center mb-4">{error || "Xogta lama helin"}</p>
         <button
-          onClick={() => setLocation("/child-dashboard")}
+          onClick={() => setLocation("/child-login")}
           className="bg-[#FFD93D] text-[#1a1a2e] px-6 py-2 rounded-xl font-bold"
           data-testid="button-back-dashboard"
         >
@@ -154,7 +206,7 @@ export default function SomaliFlashcardsGame() {
         <h1 className="text-white text-2xl font-bold mb-2">Af-Soomaali Flashcards</h1>
         <p className="text-white/50 text-sm mb-2">{data.englishName} - {data.surahName}</p>
         <p className="text-white/40 text-xs text-center mb-6 max-w-xs">
-          Riix kaarka si aad u rogto, kadib dooro haddii erayga aad baratay ama aad rabto dib u eegis.
+          Riix kaarka si aad u rogto, codka Soomaaligana si toos ah ayuu kuu akhrinayaa erayga iyo tusaalaha.
         </p>
         <button
           onClick={() => setStarted(true)}
@@ -164,7 +216,7 @@ export default function SomaliFlashcardsGame() {
           Bilow Ciyaarta 🚀
         </button>
         <button
-          onClick={() => setLocation("/child-dashboard")}
+          onClick={() => setLocation("/child-login")}
           className="text-white/30 mt-4 text-sm"
           data-testid="button-back"
         >
@@ -216,7 +268,7 @@ export default function SomaliFlashcardsGame() {
           <RotateCcw className="w-4 h-4" /> Markale celi
         </button>
         <button
-          onClick={() => setLocation("/child-dashboard")}
+          onClick={() => setLocation("/child-login")}
           className="text-white/35 text-sm"
           data-testid="button-finish"
         >
@@ -231,16 +283,23 @@ export default function SomaliFlashcardsGame() {
     <div className="min-h-screen bg-[#1a1a2e] relative" data-testid="game-somali-flashcards">
       <div className="sticky top-0 z-20 bg-[#1a1a2e]/95 backdrop-blur-sm border-b border-white/5 px-4 py-3">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setLocation("/child-dashboard")} className="text-white/40 p-1" data-testid="button-back-game">
+          <button onClick={() => setLocation("/child-login")} className="text-white/40 p-1" data-testid="button-back-game">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 text-white/60 text-sm">
             <BookOpen className="w-4 h-4" />
             {currentIndex + 1}/{totalCards}
           </div>
-          <div className="flex items-center gap-1">
-            <Star className="w-4 h-4 text-[#FFD93D]" />
-            <span className="text-[#FFD93D] font-bold text-sm">{knownCount * 10}</span>
+          <div className="flex items-center gap-2">
+            {isSpeaking && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#4ECDC4]/15 px-2 py-1 text-[10px] font-bold text-[#4ECDC4]">
+                <Volume2 className="h-3 w-3" /> Cod
+              </span>
+            )}
+            <div className="flex items-center gap-1">
+              <Star className="w-4 h-4 text-[#FFD93D]" />
+              <span className="text-[#FFD93D] font-bold text-sm">{knownCount * 10}</span>
+            </div>
           </div>
         </div>
         <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -251,29 +310,29 @@ export default function SomaliFlashcardsGame() {
       <div className="px-4 pt-6 pb-24">
         {currentCard && (
           <button
-            onClick={() => setIsFlipped((v) => !v)}
-            className="w-full rounded-3xl border border-white/10 bg-white/5 p-6 min-h-[300px] text-left"
+            onClick={handleCardTap}
+            className="w-full rounded-3xl border border-white/10 bg-white/5 p-8 min-h-[420px] text-left"
             data-testid="flashcard"
           >
             {!isFlipped ? (
               <div className="h-full flex flex-col items-center justify-center text-center gap-4">
-                <div className="text-6xl">{currentCard.emoji}</div>
-                <p className="text-white text-3xl font-bold">{currentCard.somali}</p>
-                <p className="text-white/35 text-xs">Riix si aad u rogto</p>
+                <div className="text-7xl">{currentCard.emoji}</div>
+                <p className="text-white text-5xl font-extrabold leading-tight">{currentCard.somali}</p>
+                <p className="text-white/35 text-sm">Riix si aad u rogto oo codka u dhageyso</p>
               </div>
             ) : (
-              <div className="h-full flex flex-col justify-center gap-4">
+              <div className="h-full flex flex-col justify-center gap-5">
                 <div className="text-center">
                   <p className="text-[#4ECDC4] text-sm">Somali</p>
-                  <p className="text-white text-2xl font-bold">{currentCard.somali}</p>
+                  <p className="text-white text-4xl font-extrabold">{currentCard.somali}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[#FFD93D] text-sm">English</p>
-                  <p className="text-white/80 text-xl font-semibold">{currentCard.english}</p>
+                  <p className="text-white/80 text-2xl font-semibold">{currentCard.english}</p>
                 </div>
-                <div className="bg-white/5 rounded-xl p-3 text-center">
+                <div className="bg-white/5 rounded-xl p-4 text-center">
                   <p className="text-white/40 text-xs">Tusaale</p>
-                  <p className="text-white/80 text-sm">{currentCard.example}</p>
+                  <p className="text-white/80 text-lg">{currentCard.example}</p>
                 </div>
               </div>
             )}

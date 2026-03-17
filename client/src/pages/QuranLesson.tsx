@@ -411,7 +411,7 @@ export default function QuranLesson() {
           <p className="text-[#FFD93D] text-lg font-bold">{completedCount}/{totalAyahs} aayah</p>
           <p className="text-white/40 text-xs mt-1">Aayado aad dhameysay</p>
         </div>
-        <button onClick={() => setLocation("/child-dashboard")} className="bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-8 py-3 rounded-2xl font-bold w-full max-w-xs active:scale-95 transition-transform" data-testid="button-session-expired-back">
+        <button onClick={() => setLocation("/child-login")} className="bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-8 py-3 rounded-2xl font-bold w-full max-w-xs active:scale-95 transition-transform" data-testid="button-session-expired-back">
           Ku noqo Dashboard
         </button>
       </div>
@@ -467,7 +467,7 @@ export default function QuranLesson() {
 
       <div className="relative z-10">
         <div className="flex items-center gap-3 px-4 pt-6 pb-4">
-          <button onClick={() => setLocation("/child-dashboard")} className="text-white/60 hover:text-white p-2 -ml-2 rounded-xl active:bg-white/10" data-testid="button-back">
+          <button onClick={() => setLocation("/child-login")} className="text-white/60 hover:text-white p-2 -ml-2 rounded-xl active:bg-white/10" data-testid="button-back">
             <ArrowLeft className="w-7 h-7" />
           </button>
           <div className="flex-1 min-w-0">
@@ -561,7 +561,7 @@ export default function QuranLesson() {
               <div className="text-5xl mb-4">&#x1F319;</div>
               <h3 className="text-white font-bold text-xl mb-2">Maanta waad dhamaysay!</h3>
               <p className="text-white/70 text-base mb-4">Maanta waxaad aad u dadaashay! Berri soo noqo oo sii wad casharkaaga.</p>
-              <button onClick={() => setLocation("/child-dashboard")}
+              <button onClick={() => setLocation("/child-login")}
                 className="px-8 py-3 bg-[#4ECDC4] text-[#1a1a2e] font-bold rounded-2xl text-lg hover:bg-[#45B7AA] transition-colors active:scale-95"
                 data-testid="button-daily-limit-back"
               >
@@ -782,7 +782,7 @@ export default function QuranLesson() {
                     Sii wad Suurada xigta <ChevronRight className="w-5 h-5" />
                   </button>
                 )}
-                <button onClick={() => setLocation("/child-dashboard")}
+                <button onClick={() => setLocation("/child-login")}
                   className={`w-full py-4 font-bold text-lg rounded-2xl hover:opacity-90 transition-all active:scale-95 ${
                     nextSurahNumber
                       ? "bg-white/10 text-white/70 border border-white/10"
