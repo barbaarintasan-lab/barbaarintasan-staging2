@@ -217,25 +217,85 @@ export default function QuranLesson() {
     }
   }, []);
 
+  const isLikelyIPhoneSafari = useCallback(() => {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iP(hone|od|ad)/i.test(ua);
+    const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua);
+    return isIOS && isSafari;
+  }, []);
+
+  const pickRecorderMimeType = useCallback(() => {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/aac",
+    ];
+    for (const mime of candidates) {
+      if ((window as any).MediaRecorder?.isTypeSupported?.(mime)) {
+        return mime;
+      }
+    }
+    return undefined;
+  }, []);
+
   const startRecording = useCallback(async () => {
-    try {
+    const createRecorder = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+      // iPhone Safari may need a short settle window after permission is granted.
+      if (isLikelyIPhoneSafari()) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      const mimeType = pickRecorderMimeType();
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
       chunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       mediaRecorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach((t) => t.stop());
       };
       mediaRecorder.start();
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
       setCheckResult(null);
+    };
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert("Browser-kan ma taageerayo microphone recording");
+        return;
+      }
+
+      try {
+        const permissionsApi = (navigator as any).permissions;
+        if (permissionsApi?.query) {
+          const status = await permissionsApi.query({ name: "microphone" as PermissionName });
+          if (status?.state === "denied") {
+            alert("Microphone-ka waa xiran yahay. Fadlan ka fur Settings kadibna isku day mar kale.");
+            return;
+          }
+        }
+      } catch {
+        // Some Safari versions do not support microphone permission query.
+      }
+
+      await createRecorder();
     } catch {
-      alert("Fadlan oggolow microphone-ka");
+      try {
+        // Retry once for iPhone/Safari timing race after allow popup.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await createRecorder();
+      } catch {
+        alert("Fadlan oggolow microphone-ka kadibna mar kale riix Isku day!");
+      }
     }
-  }, []);
+  }, [isLikelyIPhoneSafari, pickRecorderMimeType]);
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || !currentAyah) return;
