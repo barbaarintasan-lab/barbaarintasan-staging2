@@ -11322,9 +11322,54 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
     return scores.filter(s => new Date(s.completedAt) >= today).length;
   }
 
+  async function ensureChildGameState(childId: string) {
+    const completedSurahs = await db
+      .select()
+      .from(childProgress)
+      .where(and(eq(childProgress.childId, childId), eq(childProgress.completed, true)));
+
+    if (completedSurahs.length === 0) return;
+
+    const unlocks = await db.select().from(childGameUnlocks).where(eq(childGameUnlocks.childId, childId));
+    const existingUnlockSet = new Set(unlocks.map((u) => `${u.surahNumber}:${u.gameType}`));
+    const gameTypes = ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"];
+
+    for (const surah of completedSurahs) {
+      for (const gameType of gameTypes) {
+        const key = `${surah.surahNumber}:${gameType}`;
+        if (existingUnlockSet.has(key)) continue;
+
+        try {
+          await db.insert(childGameUnlocks).values({
+            childId,
+            surahNumber: surah.surahNumber,
+            gameType,
+            unlockSource: "surah_completion",
+          });
+          existingUnlockSet.add(key);
+        } catch {
+          // Ignore duplicate race inserts.
+        }
+      }
+    }
+
+    const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+    if (!balance) {
+      const totalStars = completedSurahs.reduce((sum, s) => sum + (s.starsEarned || 0), 0);
+      await db.insert(childRewardBalances).values({
+        childId,
+        totalTokens: completedSurahs.length,
+        totalStars,
+        totalCoins: 0,
+        tokensUsed: 0,
+      });
+    }
+  }
+
   app.get("/api/quran/rewards", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
+      await ensureChildGameState(childId);
       const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
       const gameScores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
       const badges = await db.select().from(childBadges).where(eq(childBadges.childId, childId));
@@ -11381,6 +11426,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
   app.get("/api/quran/games/available", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
+      await ensureChildGameState(childId);
       const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
       const unlocks = await db.select().from(childGameUnlocks).where(eq(childGameUnlocks.childId, childId));
       const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
@@ -11422,6 +11468,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
   app.get("/api/quran/games/data/:gameType/:surahNumber", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
+      await ensureChildGameState(childId);
       const { gameType, surahNumber } = req.params;
       const sNum = parseInt(surahNumber);
 
@@ -11595,6 +11642,7 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
   app.post("/api/quran/games/score", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
+      await ensureChildGameState(childId);
       const { gameType, surahNumber, score, maxScore, timeSpentSeconds } = req.body;
 
       if (!gameType || !surahNumber || score === undefined || maxScore === undefined) {
