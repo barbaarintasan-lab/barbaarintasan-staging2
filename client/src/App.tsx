@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { useBrowserLocation } from "@/hooks/useBrowserLocation";
 import { queryClient } from "./lib/queryClient";
@@ -6,12 +6,12 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ParentAuthProvider } from "@/contexts/ParentAuthContext";
+import { ParentAuthProvider, useParentAuth } from "@/contexts/ParentAuthContext";
 import { NotificationModalProvider } from "@/contexts/NotificationModalContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { ChildAuthProvider } from "@/contexts/ChildAuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, Plus, Users } from "lucide-react";
 import { Analytics } from "@/components/Analytics";
 import { useLocation, useParams } from "wouter";
 
@@ -82,6 +82,8 @@ const BottomNav = lazy(() => import("@/components/BottomNav"));
 const ChatSupport = lazy(() => import("@/components/ChatSupport"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const VoiceSpaces = lazy(() => import("@/components/VoiceSpaces").then(m => ({ default: m.VoiceSpaces })));
+
+const ONBOARDING_AVATAR_COLORS = ["#FFD93D", "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8"];
 
 function PageLoader() {
   return (
@@ -312,6 +314,155 @@ function Router() {
   );
 }
 
+function ParentOnboardingGate({ children }: { children: ReactNode }) {
+  const { parent, isLoading } = useParentAuth();
+  const [isCheckingChildren, setIsCheckingChildren] = useState(false);
+  const [childrenCount, setChildrenCount] = useState<number | null>(null);
+  const [childName, setChildName] = useState("");
+  const [childPassword, setChildPassword] = useState("");
+  const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
+  const [isCreatingChild, setIsCreatingChild] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  const loadChildren = useCallback(async () => {
+    if (!parent || parent.isAdmin) {
+      setChildrenCount(1);
+      return;
+    }
+
+    setIsCheckingChildren(true);
+    try {
+      const response = await fetch("/api/children", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load children");
+      const data = await response.json();
+      setChildrenCount(Array.isArray(data) ? data.length : 0);
+    } catch {
+      setChildrenCount(1);
+    } finally {
+      setIsCheckingChildren(false);
+    }
+  }, [parent]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!parent) {
+      setChildrenCount(null);
+      return;
+    }
+    loadChildren();
+  }, [parent, isLoading, loadChildren]);
+
+  const handleCreateChild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!childName.trim() || !childPassword.trim() || !childPasswordConfirm.trim()) {
+      setCreateError("Buuxi dhammaan xogta ilmaha.");
+      return;
+    }
+    if (childPassword !== childPasswordConfirm) {
+      setCreateError("Labada password isma laha.");
+      return;
+    }
+
+    setCreateError("");
+    setIsCreatingChild(true);
+
+    try {
+      const response = await fetch("/api/children", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: childName.trim(),
+          password: childPassword,
+          passwordConfirm: childPasswordConfirm,
+          avatarColor: ONBOARDING_AVATAR_COLORS[Math.floor(Math.random() * ONBOARDING_AVATAR_COLORS.length)],
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || "Ilmaha lama samayn karin.");
+      }
+
+      setChildName("");
+      setChildPassword("");
+      setChildPasswordConfirm("");
+      setChildrenCount(1);
+    } catch (error: any) {
+      setCreateError(error?.message || "Ilmaha lama samayn karin.");
+    } finally {
+      setIsCreatingChild(false);
+    }
+  };
+
+  if (!parent || parent.isAdmin) {
+    return <>{children}</>;
+  }
+
+  if (isLoading || isCheckingChildren || childrenCount === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#1a1a2e]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#FFD93D]" />
+      </div>
+    );
+  }
+
+  if (childrenCount > 0) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#1a1a2e] px-4 py-10">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-sm">
+        <div className="mb-5 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#FFD93D] to-[#FFA502] text-[#1a1a2e]">
+            <Users className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-black text-white">Ku dar ilmahaaga</h2>
+          <p className="mt-2 text-sm text-white/65">
+            Kahor inta aadan app-ka sii galin, fadlan u samee ilmaha akoon si waxbarashadu u bilaabato.
+          </p>
+        </div>
+
+        <form onSubmit={handleCreateChild} className="space-y-3">
+          <input
+            type="text"
+            value={childName}
+            onChange={(e) => setChildName(e.target.value)}
+            placeholder="Magaca ilmaha"
+            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
+          />
+          <input
+            type="password"
+            value={childPassword}
+            onChange={(e) => setChildPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
+          />
+          <input
+            type="password"
+            value={childPasswordConfirm}
+            onChange={(e) => setChildPasswordConfirm(e.target.value)}
+            placeholder="Password mar kale"
+            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
+          />
+
+          {createError && <p className="text-sm font-medium text-red-300">{createError}</p>}
+
+          <button
+            type="submit"
+            disabled={isCreatingChild}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] px-4 py-3 font-bold text-[#1a1a2e] disabled:opacity-60"
+          >
+            {isCreatingChild ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Ilmo ku dar oo sii wad
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -326,7 +477,9 @@ function App() {
                     <Analytics />
                     <Toaster />
                     <SonnerToaster position="top-center" richColors />
-                    <Router />
+                    <ParentOnboardingGate>
+                      <Router />
+                    </ParentOnboardingGate>
                   </WouterRouter>
                 </TooltipProvider>
               </NotificationModalProvider>

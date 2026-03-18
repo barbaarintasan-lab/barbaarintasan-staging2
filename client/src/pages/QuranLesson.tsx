@@ -115,10 +115,16 @@ export default function QuranLesson() {
   const [revealText, setRevealText] = useState(false);
   const [autoAdvancing, setAutoAdvancing] = useState(false);
   const [ayahMistakes, setAyahMistakes] = useState<Record<number, number>>({});
+  const [currentAyahFailures, setCurrentAyahFailures] = useState(0);
+  const [slowMode, setSlowMode] = useState(false);
+  const [hintAvailable, setHintAvailable] = useState(false);
+  const [hintPlaying, setHintPlaying] = useState(false);
   const [fullSurahReview, setFullSurahReview] = useState(false);
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [reviewAyahIndex, setReviewAyahIndex] = useState(0);
   const [reviewState, setReviewState] = useState<"listening" | "ready" | "recording" | "checking" | "failed">("listening");
+  const [showSessionCelebration, setShowSessionCelebration] = useState(false);
+  const [progressLoaded, setProgressLoaded] = useState(false);
 
   // Tabs
   const [activeTab, setActiveTab] = useState<DashboardTab>("quran");
@@ -143,6 +149,7 @@ export default function QuranLesson() {
   const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submitInFlightRef = useRef(false);
+  const resumeAppliedRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !child) setLocation("/child-login");
@@ -150,13 +157,19 @@ export default function QuranLesson() {
 
   useEffect(() => {
     if (!surahNumber || !child) return;
+    setProgressLoaded(false);
     fetch(`/api/quran/surah/${surahNumber}/progress`, { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         if (data.progress) setAyahProgress(data.progress);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setProgressLoaded(true));
   }, [surahNumber, child]);
+
+  useEffect(() => {
+    resumeAppliedRef.current = null;
+  }, [surahNumber]);
 
 
   useEffect(() => {
@@ -200,6 +213,10 @@ export default function QuranLesson() {
     setAudioFailed(false);
     setRevealText(false);
     setAutoAdvancing(false);
+    setCurrentAyahFailures(0);
+    setSlowMode(false);
+    setHintAvailable(false);
+    setHintPlaying(false);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
     if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
@@ -212,6 +229,13 @@ export default function QuranLesson() {
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!surah || !progressLoaded || resumeAppliedRef.current === surahNumber) return;
+    const firstIncompleteIndex = surah.ayahs.findIndex((ayah) => !ayahProgress[ayah.number]?.completed);
+    setCurrentAyahIndex(firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0);
+    resumeAppliedRef.current = surahNumber;
+  }, [surah, progressLoaded, surahNumber, ayahProgress]);
 
   const currentAyah = surah?.ayahs?.[currentAyahIndex];
   const totalAyahs = surah?.numberOfAyahs || 0;
@@ -272,6 +296,7 @@ export default function QuranLesson() {
       }
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
+      audio.playbackRate = slowMode ? 0.75 : 1;
 
       const loadTimeout = setTimeout(() => {
         if (!audio.readyState || audio.readyState < 2) {
@@ -305,12 +330,13 @@ export default function QuranLesson() {
       setAudioFailed(true);
       if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
     }
-  }, [currentAyah, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah]);
+  }, [currentAyah, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah, slowMode]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
+      setHintPlaying(false);
     }
   }, []);
 
@@ -368,6 +394,7 @@ export default function QuranLesson() {
       mediaRecorder.start();
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
+      setHintPlaying(false);
       setCheckResult(null);
     };
 
@@ -401,6 +428,51 @@ export default function QuranLesson() {
       }
     }
   }, [autoAdvancing, isChecking, isLikelyIPhoneSafari, isRecording, pickRecorderMimeType]);
+
+  const playHintAndRecord = useCallback(async () => {
+    if (!currentAyah || isChecking || isRecording || autoAdvancing || hintPlaying) return;
+
+    setHintPlaying(true);
+    setAudioFailed(false);
+
+    try {
+      const audioUrl = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.playbackRate = slowMode ? 0.75 : 1;
+
+      audio.onplay = () => {
+        setIsPlaying(true);
+      };
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setHasListened(true);
+        setListenCount((prev) => prev + 1);
+        setHintPlaying(false);
+        setTimeout(() => {
+          startRecording().catch(() => {});
+        }, 150);
+      };
+
+      audio.onerror = () => {
+        setIsPlaying(false);
+        setHintPlaying(false);
+        setAudioFailed(true);
+      };
+
+      await audio.play();
+    } catch {
+      setHintPlaying(false);
+      setAudioFailed(true);
+    }
+  }, [autoAdvancing, currentAyah, getAudioUrl, hintPlaying, isChecking, isRecording, selectedReciter, slowMode, startRecording, surahNumber]);
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || !currentAyah || submitInFlightRef.current) return;
@@ -497,8 +569,15 @@ export default function QuranLesson() {
       }
 
       if (wasPassed && !wasAlreadyCompleted) {
+        setCurrentAyahFailures(0);
+        setSlowMode(false);
+        setHintAvailable(false);
+
         // Track this ayah index in the session
-        setSessionLearned(prev => prev.includes(currentAyahIndex) ? prev : [...prev, currentAyahIndex]);
+        const nextSessionLearned = sessionLearned.includes(currentAyahIndex)
+          ? sessionLearned
+          : [...sessionLearned, currentAyahIndex];
+        setSessionLearned(nextSessionLearned);
 
         const newCompletedCount = Object.values(updatedProgress).filter(p => p.completed).length;
         const isLast = newCompletedCount >= totalAyahs;
@@ -506,10 +585,15 @@ export default function QuranLesson() {
           setSurahComplete(true);
           setFullSurahReview(true); // show full text + sequential audio before games
         } else {
+          const showMilestone = nextSessionLearned.length > 0 && nextSessionLearned.length % 3 === 0;
+          if (showMilestone) {
+            setShowSessionCelebration(true);
+          }
           // auto-advance to next ayah after 2 seconds, then auto-play sheikh audio
           setAutoAdvancing(true);
           const nextIdx = Math.min(currentAyahIndex + 1, totalAyahs - 1);
           autoAdvanceTimeoutRef.current = setTimeout(() => {
+            setShowSessionCelebration(false);
             setAutoAdvancing(false);
             setCurrentAyahIndex(nextIdx);
             setCheckResult(null);
@@ -537,12 +621,20 @@ export default function QuranLesson() {
               audio.onerror = () => { setIsPlaying(false); setIsLoadingAudio(false); };
               setTimeout(() => audio.play().catch(() => {}), 400);
             }
-          }, isSoftPass ? 1500 : 2200);
+          }, showMilestone ? 2000 : (isSoftPass ? 1500 : 2200));
         }
       } else if (!wasPassed) {
         // Smart Retry: replay audio after each mistake (text is always visible)
         const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
         setAyahMistakes(prev => ({ ...prev, [currentAyah.number]: mistakeNum }));
+        const nextFailureCount = currentAyahFailures + 1;
+        setCurrentAyahFailures(nextFailureCount);
+        if (nextFailureCount >= 3) {
+          setSlowMode(true);
+        }
+        if (nextFailureCount >= 5) {
+          setHintAvailable(true);
+        }
 
         // Always replay audio so child can listen and compare
         const delay = mistakeNum >= 3 ? 400 : 800;
@@ -560,7 +652,7 @@ export default function QuranLesson() {
     }
     setIsChecking(false);
     submitInFlightRef.current = false;
-  }, [currentAyah, currentAyahIndex, surahNumber, totalAyahs, ayahProgress, ayahMistakes, getAudioUrl, selectedReciter, surah]);
+  }, [currentAyah, currentAyahIndex, surahNumber, totalAyahs, ayahProgress, ayahMistakes, currentAyahFailures, getAudioUrl, selectedReciter, sessionLearned, surah]);
 
   const goToAyah = (index: number) => {
     if (index >= 0 && index < totalAyahs && isAyahAccessible(index)) {
@@ -988,6 +1080,20 @@ export default function QuranLesson() {
         </div>
       )}
 
+      {showSessionCelebration && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 backdrop-blur-sm px-6">
+          <div className="rounded-3xl border border-[#FFD93D]/30 bg-gradient-to-br from-[#1f2948] to-[#18233d] px-8 py-7 text-center shadow-2xl">
+            <div className="mb-3 flex justify-center gap-2">
+              {[1, 2, 3].map((item) => (
+                <Star key={item} className="h-8 w-8 animate-pulse fill-[#FFD93D] text-[#FFD93D]" style={{ animationDelay: `${item * 0.15}s` }} />
+              ))}
+            </div>
+            <p className="text-xl font-black text-[#FFD93D]">Aad baad u fiican tahay!</p>
+            <p className="mt-1 text-sm font-semibold text-white/80">3 aayadood waad dhamaysay, sii wad!</p>
+          </div>
+        </div>
+      )}
+
 
       <div className="relative z-10">
         <div className="flex items-center gap-3 px-4 pt-6 pb-4">
@@ -1154,6 +1260,14 @@ export default function QuranLesson() {
                 </div>
               )}
 
+              {slowMode && !isCurrentCompleted && (
+                <div className="mb-4 flex justify-center">
+                  <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-300">
+                    Cod gaaban wuu shaqaynayaa
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-center gap-5">
                 <button onClick={isPlaying ? stopAudio : playAyah}
                   disabled={isLoadingAudio}
@@ -1218,6 +1332,18 @@ export default function QuranLesson() {
                 >
                   <RotateCcw className="w-4 h-4" />
                   Dhageyso mar kale ({listenCount}x)
+                </button>
+              )}
+
+              {hintAvailable && !isCurrentCompleted && !isRecording && !isChecking && !autoAdvancing && (
+                <button
+                  onClick={playHintAndRecord}
+                  disabled={hintPlaying}
+                  className="flex items-center justify-center gap-2 mx-auto mt-3 px-5 py-2 rounded-full bg-purple-500/15 text-purple-200 text-sm font-medium border border-purple-400/30 hover:bg-purple-500/25 active:scale-95 transition-all disabled:opacity-60"
+                  data-testid="button-play-hint"
+                >
+                  {hintPlaying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                  🎧 Maqal tilmaan
                 </button>
               )}
 
