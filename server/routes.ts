@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -11179,6 +11179,244 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     } catch (error: any) {
       console.error("[QURAN] Curriculum error:", error);
       res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // ==========================================
+  // Quraanka Caruurta - Arabic Alphabet API
+  // ==========================================
+
+  const alphabetCompleteSchema = z.object({
+    letterId: z.coerce.number().int().positive(),
+    phase: z.coerce.number().int().min(1).max(4),
+    completed: z.boolean().optional().default(true),
+    tracingScore: z.coerce.number().int().min(0).max(100).optional().default(0),
+    recitationScore: z.coerce.number().int().min(0).max(100).optional().default(0),
+  });
+
+  const alphabetTracingScoreSchema = z.object({
+    letterId: z.coerce.number().int().positive(),
+    phase: z.coerce.number().int().min(1).max(4),
+    tracingScore: z.coerce.number().int().min(0).max(100),
+  });
+
+  const alphabetGameScoreSchema = z.object({
+    gameType: z.enum(["matching", "tracing", "recitation", "quiz"]),
+    phase: z.coerce.number().int().min(1).max(4),
+    score: z.coerce.number().int().min(0),
+    tokensEarned: z.coerce.number().int().min(0).optional().default(0),
+  });
+
+  app.get("/api/quran/alphabet/curriculum", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const phaseRaw = req.query.phase;
+      const phase = phaseRaw === undefined ? undefined : Number.parseInt(String(phaseRaw), 10);
+
+      if (phase !== undefined && (!Number.isInteger(phase) || phase < 1 || phase > 4)) {
+        return res.status(400).json({ error: "phase waa inuu noqdaa 1 ilaa 4" });
+      }
+
+      const letters = phase === undefined
+        ? await db.select().from(alphabetLetters).orderBy(alphabetLetters.phase, alphabetLetters.order)
+        : await db.select().from(alphabetLetters).where(eq(alphabetLetters.phase, phase)).orderBy(alphabetLetters.phase, alphabetLetters.order);
+
+      const progressRows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
+      const byLetterId = new Map(progressRows.map((p) => [p.letterId, p]));
+
+      const items = letters.map((l) => {
+        const progress = byLetterId.get(l.id);
+        return {
+          ...l,
+          completed: progress?.completed ?? false,
+          tracingScore: progress?.tracingScore ?? 0,
+          recitationScore: progress?.recitationScore ?? 0,
+          attempts: progress?.attempts ?? 0,
+          completedAt: progress?.completedAt ?? null,
+        };
+      });
+
+      return res.json({ items });
+    } catch (error: any) {
+      console.error("[ALPHABET] Curriculum error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/alphabet/progress", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const rows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
+
+      const total = rows.length;
+      const completed = rows.filter((r) => r.completed).length;
+      const avgTracing = total > 0 ? Math.round(rows.reduce((s, r) => s + (r.tracingScore || 0), 0) / total) : 0;
+      const avgRecitation = total > 0 ? Math.round(rows.reduce((s, r) => s + (r.recitationScore || 0), 0) / total) : 0;
+
+      return res.json({
+        summary: {
+          totalLetters: total,
+          completedLetters: completed,
+          avgTracingScore: avgTracing,
+          avgRecitationScore: avgRecitation,
+        },
+        items: rows,
+      });
+    } catch (error: any) {
+      console.error("[ALPHABET] Progress error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/alphabet/complete", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const parsed = alphabetCompleteSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Xogta la soo diray sax ma aha", details: parsed.error.flatten() });
+      }
+
+      const { letterId, phase, completed, tracingScore, recitationScore } = parsed.data;
+      const [letter] = await db.select().from(alphabetLetters).where(eq(alphabetLetters.id, letterId));
+      if (!letter) {
+        return res.status(404).json({ error: "Xarafka lama helin" });
+      }
+
+      const [existing] = await db.select().from(alphabetProgress).where(
+        and(eq(alphabetProgress.childId, childId), eq(alphabetProgress.letterId, letterId))
+      );
+
+      let saved;
+      if (existing) {
+        const nextCompleted = existing.completed || completed;
+        const [updated] = await db.update(alphabetProgress).set({
+          phase,
+          completed: nextCompleted,
+          tracingScore: Math.max(existing.tracingScore || 0, tracingScore),
+          recitationScore: Math.max(existing.recitationScore || 0, recitationScore),
+          attempts: (existing.attempts || 0) + 1,
+          completedAt: nextCompleted ? (existing.completedAt || new Date()) : null,
+          updatedAt: new Date(),
+        }).where(eq(alphabetProgress.id, existing.id)).returning();
+        saved = updated;
+      } else {
+        const [created] = await db.insert(alphabetProgress).values({
+          childId,
+          letterId,
+          phase,
+          completed,
+          tracingScore,
+          recitationScore,
+          attempts: 1,
+          completedAt: completed ? new Date() : null,
+        }).returning();
+        saved = created;
+      }
+
+      return res.json({ item: saved });
+    } catch (error: any) {
+      console.error("[ALPHABET] Complete error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/alphabet/tracing/score", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const parsed = alphabetTracingScoreSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Xogta la soo diray sax ma aha", details: parsed.error.flatten() });
+      }
+
+      const { letterId, phase, tracingScore } = parsed.data;
+      const completed = tracingScore >= 60;
+
+      const [existing] = await db.select().from(alphabetProgress).where(
+        and(eq(alphabetProgress.childId, childId), eq(alphabetProgress.letterId, letterId))
+      );
+
+      let saved;
+      if (existing) {
+        const nextCompleted = existing.completed || completed;
+        const [updated] = await db.update(alphabetProgress).set({
+          phase,
+          completed: nextCompleted,
+          tracingScore: Math.max(existing.tracingScore || 0, tracingScore),
+          attempts: (existing.attempts || 0) + 1,
+          completedAt: nextCompleted ? (existing.completedAt || new Date()) : null,
+          updatedAt: new Date(),
+        }).where(eq(alphabetProgress.id, existing.id)).returning();
+        saved = updated;
+      } else {
+        const [created] = await db.insert(alphabetProgress).values({
+          childId,
+          letterId,
+          phase,
+          completed,
+          tracingScore,
+          recitationScore: 0,
+          attempts: 1,
+          completedAt: completed ? new Date() : null,
+        }).returning();
+        saved = created;
+      }
+
+      return res.json({ item: saved, pass: completed, message: completed ? "Aad u fiican!" : "Mar kale isku day!" });
+    } catch (error: any) {
+      console.error("[ALPHABET] Tracing score error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/quran/alphabet/games/data/:type", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const gameType = String(req.params.type || "").toLowerCase();
+      if (!["matching", "tracing", "recitation", "quiz"].includes(gameType)) {
+        return res.status(400).json({ error: "Nooca game-ka lama aqoon" });
+      }
+
+      const phaseRaw = req.query.phase;
+      const phase = phaseRaw === undefined ? 1 : Number.parseInt(String(phaseRaw), 10);
+      if (!Number.isInteger(phase) || phase < 1 || phase > 4) {
+        return res.status(400).json({ error: "phase waa inuu noqdaa 1 ilaa 4" });
+      }
+
+      const letters = await db.select().from(alphabetLetters).where(eq(alphabetLetters.phase, phase)).orderBy(alphabetLetters.order);
+      const shuffled = [...letters].sort(() => Math.random() - 0.5);
+      const items = shuffled.slice(0, 12);
+
+      return res.json({
+        gameType,
+        phase,
+        items,
+      });
+    } catch (error: any) {
+      console.error("[ALPHABET] Game data error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/alphabet/games/score", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const parsed = alphabetGameScoreSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Xogta la soo diray sax ma aha", details: parsed.error.flatten() });
+      }
+
+      const { gameType, phase, score, tokensEarned } = parsed.data;
+      const [saved] = await db.insert(alphabetGameScores).values({
+        childId,
+        gameType,
+        phase,
+        score,
+        tokensEarned,
+      }).returning();
+
+      return res.status(201).json({ item: saved });
+    } catch (error: any) {
+      console.error("[ALPHABET] Game score error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
     }
   });
 

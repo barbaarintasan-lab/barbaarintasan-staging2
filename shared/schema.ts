@@ -2326,6 +2326,72 @@ export const childRewardLedger = pgTable("child_reward_ledger", {
 
 export type ChildRewardLedgerEntry = typeof childRewardLedger.$inferSelect;
 
+// Arabic Alphabet learning tables
+export const alphabetLetters = pgTable("alphabet_letters", {
+  id: serial("id").primaryKey(),
+  arabic: text("arabic").notNull(),
+  nameArabic: text("name_arabic").notNull(),
+  nameSomali: text("name_somali").notNull(),
+  phase: integer("phase").notNull(),
+  order: integer("order").notNull(),
+  audioUrl: text("audio_url"),
+  tracingPath: text("tracing_path"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_alphabet_letters_phase_order").on(table.phase, table.order),
+]);
+
+export const alphabetProgress = pgTable("alphabet_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
+  letterId: integer("letter_id").notNull().references(() => alphabetLetters.id, { onDelete: "cascade" }),
+  phase: integer("phase").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  tracingScore: integer("tracing_score").notNull().default(0),
+  recitationScore: integer("recitation_score").notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_alphabet_progress_child_letter").on(table.childId, table.letterId),
+]);
+
+export const alphabetGameScores = pgTable("alphabet_game_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  childId: varchar("child_id").notNull().references(() => children.id, { onDelete: "cascade" }),
+  gameType: text("game_type").notNull(),
+  phase: integer("phase").notNull(),
+  score: integer("score").notNull().default(0),
+  tokensEarned: integer("tokens_earned").notNull().default(0),
+  playedAt: timestamp("played_at").notNull().defaultNow(),
+});
+
+export const insertAlphabetLetterSchema = createInsertSchema(alphabetLetters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAlphabetProgressSchema = createInsertSchema(alphabetProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAlphabetGameScoreSchema = createInsertSchema(alphabetGameScores).omit({
+  id: true,
+  playedAt: true,
+});
+
+export type InsertAlphabetLetter = z.infer<typeof insertAlphabetLetterSchema>;
+export type AlphabetLetter = typeof alphabetLetters.$inferSelect;
+export type InsertAlphabetProgress = z.infer<typeof insertAlphabetProgressSchema>;
+export type AlphabetProgress = typeof alphabetProgress.$inferSelect;
+export type InsertAlphabetGameScore = z.infer<typeof insertAlphabetGameScoreSchema>;
+export type AlphabetGameScore = typeof alphabetGameScores.$inferSelect;
+
 export const ssoTokens = pgTable("sso_tokens", {
   id: serial("id").primaryKey(),
   token: text("token").notNull().unique(),
