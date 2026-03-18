@@ -46,11 +46,11 @@ export default function ChildDashboard() {
     () => [
       {
         key: "alphabet",
-        arabicTitle: "الحروف",
-        englishLabel: "Arabic Alphabet",
-        subtitle: "Xuruufta Carabiga",
-        meta: "Da'da 3-6",
-        icon: "🔤",
+        arabicTitle: "أَلِف بَاء",
+        englishLabel: "Alifka Quraanka",
+        subtitle: "Baro Alifka",
+        meta: "Da'da 3-4 jir",
+        icon: "✏️",
         status: "open",
         gradient: "from-[#6C63FF] via-[#5B54E8] to-[#4A3FD4]",
         accentColor: "#A78BFA",

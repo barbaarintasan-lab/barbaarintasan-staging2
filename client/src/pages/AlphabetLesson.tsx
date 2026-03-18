@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useLocation } from "wouter";
 import { useChildAuth } from "@/contexts/ChildAuthContext";
 
@@ -17,45 +17,67 @@ type AlphabetItem = {
 };
 
 type Point = { x: number; y: number };
+type Step = "listen" | "trace" | "done";
 
-const TRACE_PASS_SCORE = 60;
-const DISTANCE_THRESHOLD = 18;
+const TRACE_PASS_SCORE = 55;
+const DISTANCE_THRESHOLD = 22;
+
 const AUDIO_SLUG_BY_ARABIC: Record<string, string> = {
-  "ا": "alif",
-  "ب": "ba",
-  "ت": "ta",
-  "ث": "tha",
-  "ج": "jeem",
-  "ح": "ha",
-  "خ": "kha",
-  "د": "dal",
-  "ذ": "dhal",
-  "ر": "ra",
-  "ز": "zay",
-  "س": "seen",
-  "ش": "sheen",
-  "ص": "sad",
-  "ض": "dad",
-  "ط": "taa",
-  "ظ": "zaa",
-  "ع": "ain",
-  "غ": "ghain",
-  "ف": "fa",
-  "ق": "qaf",
-  "ك": "kaf",
-  "ل": "lam",
-  "م": "meem",
-  "ن": "noon",
-  "ه": "ha2",
-  "و": "waw",
-  "ي": "ya",
+  "ا": "alif", "ب": "ba", "ت": "ta", "ث": "tha", "ج": "jeem",
+  "ح": "ha", "خ": "kha", "د": "dal", "ذ": "dhal", "ر": "ra",
+  "ز": "zay", "س": "seen", "ش": "sheen", "ص": "sad", "ض": "dad",
+  "ط": "taa", "ظ": "zaa", "ع": "ain", "غ": "ghain", "ف": "fa",
+  "ق": "qaf", "ك": "kaf", "ل": "lam", "م": "meem", "ن": "noon",
+  "ه": "ha2", "و": "waw", "ي": "ya",
+};
+
+const LETTER_COLORS: string[] = [
+  "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FECA57",
+  "#FF9FF3", "#54A0FF", "#5F27CD", "#00D2D3", "#FF9F43",
+  "#EE5A24", "#009432", "#0652DD", "#9980FA", "#C4E538",
+  "#FDA7DF", "#D980FA", "#FFC312", "#12CBC4", "#B53471",
+  "#833471", "#1289A7", "#C4E538", "#F79F1F", "#A3CB38",
+  "#1B1464", "#6F1E51", "#ED4C67",
+];
+
+const QURAN_WORDS: Record<string, { word: string; meaning: string; emoji: string; sound?: string }> = {
+  "ا": { word: "اللَّه", meaning: "Allah", emoji: "✨", sound: "Allah" },
+  "ب": { word: "بِسْمِ", meaning: "Magaciisa", emoji: "📖", sound: "Bismi" },
+  "ت": { word: "تَوْبَة", meaning: "Toobad", emoji: "🤲", sound: "Tawbah" },
+  "ث": { word: "ثَوَاب", meaning: "Ajar", emoji: "⭐", sound: "Thawaab" },
+  "ج": { word: "جَنَّة", meaning: "Jannada", emoji: "🌿", sound: "Jannah" },
+  "ح": { word: "حَمْد", meaning: "Mahad", emoji: "🙏", sound: "Hamd" },
+  "خ": { word: "خَيْر", meaning: "Wanaag", emoji: "💫", sound: "Khayr" },
+  "د": { word: "دُعَاء", meaning: "Ducada", emoji: "🤲", sound: "Du'aa" },
+  "ذ": { word: "ذِكْر", meaning: "Xusuus", emoji: "💝", sound: "Dhikr" },
+  "ر": { word: "رَحْمَة", meaning: "Naxariis", emoji: "❤️", sound: "Rahmah" },
+  "ز": { word: "زَكَاة", meaning: "Sadar", emoji: "💛", sound: "Zakaah" },
+  "س": { word: "سَلَام", meaning: "Nabad", emoji: "☮️", sound: "Salaam" },
+  "ش": { word: "شُكْر", meaning: "Mahadnaq", emoji: "😊", sound: "Shukr" },
+  "ص": { word: "صَلَاة", meaning: "Salaadda", emoji: "🕌", sound: "Salaah" },
+  "ض": { word: "ضِيَاء", meaning: "Nuur", emoji: "💡", sound: "Diyaa" },
+  "ط": { word: "طَهَارَة", meaning: "Nadiifnimo", emoji: "✨", sound: "Taharah" },
+  "ظ": { word: "ظَفَر", meaning: "Guul", emoji: "🏆", sound: "Zafar" },
+  "ع": { word: "عِبَادَة", meaning: "Cibaado", emoji: "⭐", sound: "Ibaadah" },
+  "غ": { word: "غُفْرَان", meaning: "Dambi dhaaf", emoji: "🤲", sound: "Ghufran" },
+  "ف": { word: "فُرْقَان", meaning: "Quraanka", emoji: "📖", sound: "Furqaan" },
+  "ق": { word: "قُرْآن", meaning: "Quraanka", emoji: "📗", sound: "Qur'aan" },
+  "ك": { word: "كَرِيم", meaning: "Karim", emoji: "💎", sound: "Kariim" },
+  "ل": { word: "لَطِيف", meaning: "Naxariis leh", emoji: "💙", sound: "Latiif" },
+  "م": { word: "مُحَمَّد", meaning: "Nabigeena ﷺ", emoji: "🌙", sound: "Muhammad" },
+  "ن": { word: "نُور", meaning: "Nuur", emoji: "⭐", sound: "Nuur" },
+  "ه": { word: "هُدَى", meaning: "Hanuunin", emoji: "🌟", sound: "Huda" },
+  "و": { word: "وَحْي", meaning: "Waxy", emoji: "📜", sound: "Wahy" },
+  "ي": { word: "يَقِين", meaning: "Xaqiiq", emoji: "💫", sound: "Yaqiin" },
 };
 
 function fallbackSpeak(text: string) {
   if (!("speechSynthesis" in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "ar-SA";
-  utter.rate = 0.85;
+  utter.rate = 0.7;
+  utter.pitch = 1.1;
+  window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utter);
 }
 
@@ -63,22 +85,8 @@ function distance(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function sampleSvgPath(pathD: string, samples: number, width: number, height: number): Point[] {
-  const svgNS = "http://www.w3.org/2000/svg";
-  const path = document.createElementNS(svgNS, "path");
-  path.setAttribute("d", scalePathToCanvas(pathD, width, height));
-
-  const total = path.getTotalLength();
-  const out: Point[] = [];
-  for (let i = 0; i <= samples; i += 1) {
-    const p = path.getPointAtLength((i / samples) * total);
-    out.push({ x: p.x, y: p.y });
-  }
-  return out;
-}
-
 function scalePathToCanvas(pathD: string, width: number, height: number) {
-  const pad = 36;
+  const pad = 40;
   const sx = (width - pad * 2) / 100;
   const sy = (height - pad * 2) / 100;
   let idx = 0;
@@ -90,9 +98,21 @@ function scalePathToCanvas(pathD: string, width: number, height: number) {
   });
 }
 
+function sampleSvgPath(pathD: string, samples: number, width: number, height: number): Point[] {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("d", scalePathToCanvas(pathD, width, height));
+  const total = path.getTotalLength();
+  const out: Point[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const p = path.getPointAtLength((i / samples) * total);
+    out.push({ x: p.x, y: p.y });
+  }
+  return out;
+}
+
 function computeTraceScore(user: Point[], reference: Point[], threshold: number) {
   if (user.length === 0 || reference.length === 0) return 0;
-
   let covered = 0;
   for (const ref of reference) {
     let min = Infinity;
@@ -100,9 +120,8 @@ function computeTraceScore(user: Point[], reference: Point[], threshold: number)
       const d = distance(ref, up);
       if (d < min) min = d;
     }
-    if (min <= threshold) covered += 1;
+    if (min <= threshold) covered++;
   }
-
   let precise = 0;
   for (const up of user) {
     let min = Infinity;
@@ -110,13 +129,14 @@ function computeTraceScore(user: Point[], reference: Point[], threshold: number)
       const d = distance(ref, up);
       if (d < min) min = d;
     }
-    if (min <= threshold) precise += 1;
+    if (min <= threshold) precise++;
   }
-
   const coverage = (covered / reference.length) * 100;
-  const precision = (precise / user.length) * 100;
-  return Math.max(0, Math.min(100, Math.round(coverage * 0.7 + precision * 0.3)));
+  const precision = user.length > 0 ? (precise / user.length) * 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(coverage * 0.65 + precision * 0.35)));
 }
+
+const CANVAS_SIZE = 300;
 
 export default function AlphabetLesson() {
   const { child, isLoading } = useChildAuth();
@@ -125,19 +145,17 @@ export default function AlphabetLesson() {
   const [curriculum, setCurriculum] = useState<AlphabetItem[]>([]);
   const [loadingCurriculum, setLoadingCurriculum] = useState(true);
   const [index, setIndex] = useState(0);
-
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [recording, setRecording] = useState(false);
-  const [repeatResult, setRepeatResult] = useState<string>("");
+  const [step, setStep] = useState<Step>("listen");
   const [traceScore, setTraceScore] = useState<number | null>(null);
-  const [traceFeedback, setTraceFeedback] = useState<string>("");
+  const [traceFeedback, setTraceFeedback] = useState<"" | "pass" | "fail">("");
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [traceAttempts, setTraceAttempts] = useState(0);
+  const [audioPlaying, setAudioPlaying] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const userPointsRef = useRef<Point[]>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const lessonAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isLoading && !child) setLocation("/child-login");
@@ -148,199 +166,168 @@ export default function AlphabetLesson() {
     fetch("/api/quran/alphabet/curriculum", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((data) => {
-        setCurriculum(Array.isArray(data.items) ? data.items : []);
+        const items = Array.isArray(data.items) ? data.items : FALLBACK_CURRICULUM;
+        setCurriculum(items.length > 0 ? items : FALLBACK_CURRICULUM);
         setLoadingCurriculum(false);
       })
       .catch(() => {
-        setCurriculum([]);
+        setCurriculum(FALLBACK_CURRICULUM);
         setLoadingCurriculum(false);
       });
   }, [child]);
 
   const current = curriculum[index];
-  const currentAudio = current?.audioUrl || (current ? `/api/audio/alphabet/${resolveLetterSlug(current)}.mp3` : "");
-  const tracingPath = current?.tracingPath || "M50 10 L50 90";
+  const letterColor = LETTER_COLORS[index % LETTER_COLORS.length];
+  const qWord = current ? (QURAN_WORDS[current.arabic] || { word: current.arabic, meaning: current.nameSomali, emoji: "⭐" }) : null;
+  const tracingPath = current?.tracingPath || `M50 15 C50 15 50 85 50 85`;
 
   const referencePoints = useMemo(() => {
-    return sampleSvgPath(tracingPath, 280, 420, 420);
+    return sampleSvgPath(tracingPath, 300, CANVAS_SIZE, CANVAS_SIZE);
   }, [tracingPath]);
 
-  useEffect(() => {
-    if (!current) return;
-    setStep(1);
-    setRepeatResult("");
-    setTraceScore(null);
-    setTraceFeedback("");
-    drawBaseCanvas();
-  }, [current]);
-
-  useEffect(() => {
-    if (!curriculum.length) return;
-    const hot = curriculum.slice(0, 6);
-    hot.forEach((item) => {
-      const audio = new Audio(item.audioUrl || `/api/audio/alphabet/${resolveLetterSlug(item)}.mp3`);
-      audio.preload = "auto";
-    });
-  }, [curriculum]);
-
-  useEffect(() => {
-    const prime = () => {
-      if (lessonAudioRef.current) return;
-      const audio = new Audio();
-      audio.preload = "auto";
-      audio.muted = true;
-      lessonAudioRef.current = audio;
-      const maybePromise = audio.play();
-      if (maybePromise && typeof maybePromise.then === "function") {
-        maybePromise
-          .then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-            audio.muted = false;
-          })
-          .catch(() => {
-            audio.muted = false;
-          });
-      }
-      window.removeEventListener("touchstart", prime);
-      window.removeEventListener("pointerdown", prime);
-    };
-
-    window.addEventListener("touchstart", prime, { passive: true });
-    window.addEventListener("pointerdown", prime, { passive: true });
-    return () => {
-      window.removeEventListener("touchstart", prime);
-      window.removeEventListener("pointerdown", prime);
-    };
-  }, []);
-
-  function resolveLetterSlug(item: AlphabetItem) {
-    return AUDIO_SLUG_BY_ARABIC[item.arabic] || item.nameSomali.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-  }
-
-  function playPronunciation() {
-    if (!current) return;
-    const audio = lessonAudioRef.current || new Audio();
-    lessonAudioRef.current = audio;
-    audio.preload = "auto";
-    audio.src = currentAudio;
-    audio.onerror = () => fallbackSpeak(current.arabic);
-    audio.load();
-    audio.play().catch(() => fallbackSpeak(current.arabic));
-  }
-
-  function goBack(fallbackPath: string) {
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-    setLocation(fallbackPath);
-  }
-
-  async function startRepeat() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
-      mediaRecorderRef.current = rec;
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      rec.start();
-      setRecording(true);
-      setRepeatResult("");
-    } catch {
-      setRepeatResult("❌ Mar kale isku day!");
-    }
-  }
-
-  async function stopRepeat() {
-    const rec = mediaRecorderRef.current;
-    if (!rec || !current) return;
-
-    const done = new Promise<void>((resolve) => {
-      rec.onstop = () => {
-        rec.stream.getTracks().forEach((t) => t.stop());
-        resolve();
-      };
-    });
-    rec.stop();
-    setRecording(false);
-    await done;
-
-    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-    const form = new FormData();
-    form.append("audio", blob, "repeat.webm");
-    form.append("letterId", String(current.id));
-
-    let correct = false;
-    try {
-      const res = await fetch("/api/quran/alphabet/recitation/check", {
-        method: "POST",
-        credentials: "include",
-        body: form,
-      });
-      const data = await res.json();
-      correct = !!data.correct;
-    } catch {
-      correct = blob.size > 12_000;
-    }
-
-    setRepeatResult(correct ? "✅ Aad u fiican!" : "❌ Mar kale isku day!");
-    if (correct) setStep(3);
-  }
-
-  function drawBaseCanvas() {
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const ratio = window.devicePixelRatio || 1;
-    const width = 420;
-    const height = 420;
-    canvas.width = width * ratio;
-    canvas.height = height * ratio;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    canvas.width = CANVAS_SIZE * ratio;
+    canvas.height = CANVAS_SIZE * ratio;
+    canvas.style.width = `${CANVAS_SIZE}px`;
+    canvas.style.height = `${CANVAS_SIZE}px`;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(0, 0, width, height);
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    ctx.strokeStyle = "#94a3b8";
-    ctx.lineWidth = 8;
-    ctx.setLineDash([12, 8]);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    const rows = 6, cols = 6;
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= rows; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, (r / rows) * CANVAS_SIZE);
+      ctx.lineTo(CANVAS_SIZE, (r / rows) * CANVAS_SIZE);
+      ctx.stroke();
+    }
+    for (let c = 0; c <= cols; c++) {
+      ctx.beginPath();
+      ctx.moveTo((c / cols) * CANVAS_SIZE, 0);
+      ctx.lineTo((c / cols) * CANVAS_SIZE, CANVAS_SIZE);
+      ctx.stroke();
+    }
+
+    const scaledPath = scalePathToCanvas(tracingPath, CANVAS_SIZE, CANVAS_SIZE);
+    const refPath = new Path2D(scaledPath);
+
+    ctx.save();
+    ctx.shadowColor = letterColor + "66";
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = letterColor + "40";
+    ctx.lineWidth = 28;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.stroke(refPath);
+    ctx.restore();
 
-    const path = new Path2D(scalePathToCanvas(tracingPath, width, height));
-    ctx.stroke(path);
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke(refPath);
     ctx.setLineDash([]);
 
+    const refs = referencePoints;
+    if (refs.length > 0) {
+      const start = refs[0];
+      const end = refs[refs.length - 1];
+
+      ctx.beginPath();
+      ctx.arc(start.x, start.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "#4ADE80";
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("1", start.x, start.y);
+
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "#FF6B6B";
+      ctx.fill();
+    }
+
     userPointsRef.current = [];
+  }, [tracingPath, referencePoints, letterColor]);
+
+  useEffect(() => {
+    if (!current) return;
+    setStep("listen");
+    setTraceScore(null);
+    setTraceFeedback("");
+    setTraceAttempts(0);
+    setShowCelebration(false);
+    setTimeout(() => autoPlayAudio(), 500);
+  }, [current]);
+
+  useEffect(() => {
+    if (step === "trace") {
+      setTimeout(() => drawCanvas(), 100);
+    }
+  }, [step, drawCanvas]);
+
+  function getAudioUrl(item: AlphabetItem) {
+    return item.audioUrl || `/api/audio/alphabet/${AUDIO_SLUG_BY_ARABIC[item.arabic] || item.nameSomali.toLowerCase()}.mp3`;
+  }
+
+  function autoPlayAudio() {
+    if (!current) return;
+    const audio = new Audio(getAudioUrl(current));
+    audio.onerror = () => fallbackSpeak(current.arabic + ".. " + current.nameSomali);
+    audioRef.current = audio;
+    setAudioPlaying(true);
+    audio.play()
+      .catch(() => fallbackSpeak(current.arabic + ".. " + current.nameSomali))
+      .finally(() => setTimeout(() => setAudioPlaying(false), 2000));
+  }
+
+  function playAudio() {
+    if (!current) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    autoPlayAudio();
   }
 
   function getPoint(e: ReactPointerEvent<HTMLCanvasElement>): Point {
     const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const ratio = window.devicePixelRatio || 1;
+    return {
+      x: (e.clientX - rect.left),
+      y: (e.clientY - rect.top),
+    };
   }
 
   function pointerDown(e: ReactPointerEvent<HTMLCanvasElement>) {
-    if (step !== 3) return;
     drawingRef.current = true;
     const p = getPoint(e);
     userPointsRef.current.push(p);
+    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function pointerMove(e: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!drawingRef.current || step !== 3) return;
+    if (!drawingRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const ratio = window.devicePixelRatio || 1;
     const points = userPointsRef.current;
     const prev = points[points.length - 1];
     const cur = getPoint(e);
@@ -352,13 +339,19 @@ export default function AlphabetLesson() {
       if (d < minDist) minDist = d;
     }
 
-    ctx.strokeStyle = minDist <= DISTANCE_THRESHOLD ? "#22c55e" : "#ef4444";
-    ctx.lineWidth = 7;
+    ctx.save();
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.strokeStyle = minDist <= DISTANCE_THRESHOLD ? "#4ADE80" : "#FF6B6B";
+    ctx.lineWidth = 10;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.shadowColor = minDist <= DISTANCE_THRESHOLD ? "#4ADE80" : "#FF6B6B";
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.moveTo(prev.x, prev.y);
     ctx.lineTo(cur.x, cur.y);
     ctx.stroke();
+    ctx.restore();
   }
 
   function pointerUp() {
@@ -367,134 +360,313 @@ export default function AlphabetLesson() {
 
   async function submitTracing() {
     if (!current) return;
+    if (userPointsRef.current.length < 5) {
+      return;
+    }
     const score = computeTraceScore(userPointsRef.current, referencePoints, DISTANCE_THRESHOLD);
     setTraceScore(score);
-
     const pass = score >= TRACE_PASS_SCORE;
-    setTraceFeedback(pass ? "✅ Aad u fiican!" : "❌ Mar kale isku day!");
+    setTraceFeedback(pass ? "pass" : "fail");
+    setTraceAttempts((a) => a + 1);
 
     try {
       await fetch("/api/quran/alphabet/tracing/score", {
-        method: "POST",
-        credentials: "include",
+        method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          letterId: current.id,
-          phase: current.phase,
-          tracingScore: score,
-        }),
+        body: JSON.stringify({ letterId: current.id, phase: current.phase, tracingScore: score }),
       });
-
       if (pass) {
         await fetch("/api/quran/alphabet/complete", {
-          method: "POST",
-          credentials: "include",
+          method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            letterId: current.id,
-            phase: current.phase,
-            completed: true,
-            tracingScore: score,
-            recitationScore: 70,
-          }),
+          body: JSON.stringify({ letterId: current.id, phase: current.phase, completed: true, tracingScore: score, recitationScore: 70 }),
         });
+        setShowCelebration(true);
+        setStep("done");
       }
-    } catch {
-      // avoid breaking child flow on network error
+    } catch { /* non-blocking */ }
+  }
+
+  function goNext() {
+    if (index < curriculum.length - 1) {
+      setIndex((p) => p + 1);
+    } else {
+      setLocation("/child-dashboard");
     }
   }
 
-  function nextLetter() {
-    if (index < curriculum.length - 1) {
-      setIndex((prev) => prev + 1);
-    }
+  function goBack() {
+    if (window.history.length > 1) window.history.back();
+    else setLocation("/child-dashboard");
   }
 
   if (isLoading || loadingCurriculum) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-600 font-bold">Waa la soo rarayaa...</div>;
-  }
-
-  if (!current) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-xl font-black text-slate-800">Casharka xuruufta wali diyaar ma aha</p>
-        <button className="px-5 py-3 rounded-xl bg-sky-600 text-white font-bold" onClick={() => setLocation("/child-dashboard")}>
-          Dib u noqo
-        </button>
+      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">📖</div>
+          <p className="text-white/60 font-bold text-lg">Waa la soo rarayaa...</p>
+        </div>
       </div>
     );
   }
 
+  if (!current) {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center gap-4 p-6">
+        <div className="text-7xl">🎉</div>
+        <p className="text-2xl font-black text-white text-center">Dhammaan xuruufta waa baratay!</p>
+        <button className="px-8 py-4 rounded-3xl bg-amber-400 text-slate-900 font-black text-xl"
+          onClick={() => setLocation("/child-dashboard")}>Dib u noqo</button>
+      </div>
+    );
+  }
+
+  const completedCount = curriculum.filter(l => l.completed).length;
+  const progressPct = Math.round((completedCount / curriculum.length) * 100);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-emerald-50 p-4 pb-24">
-      <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-sky-100 shadow-xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => goBack("/child-dashboard")} className="px-4 py-2 rounded-xl bg-slate-700 text-white font-bold text-sm">
-            Dib u noqo
+    <div className="min-h-screen bg-[#1a1a2e] relative overflow-hidden pb-10">
+      {Array.from({ length: 20 }).map((_, i) => (
+        <div key={i} className="absolute rounded-full bg-white animate-pulse pointer-events-none"
+          style={{
+            width: `${Math.random() * 3 + 1}px`,
+            height: `${Math.random() * 3 + 1}px`,
+            top: `${Math.random() * 100}%`,
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            animationDuration: `${Math.random() * 2 + 2}s`,
+            opacity: Math.random() * 0.6 + 0.2,
+          }}
+        />
+      ))}
+
+      {showCelebration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="absolute text-4xl animate-bounce"
+              style={{
+                top: `${Math.random() * 70 + 5}%`,
+                left: `${Math.random() * 80 + 10}%`,
+                animationDelay: `${i * 0.15}s`,
+                animationDuration: "0.8s",
+              }}>
+              {["⭐", "🌟", "✨", "🎉", "🎊"][i % 5]}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="relative z-10 max-w-md mx-auto px-4 pt-5">
+        <div className="flex items-center justify-between mb-5">
+          <button onClick={goBack}
+            className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold"
+            data-testid="btn-back">
+            ←
           </button>
-          <h2 className="text-2xl font-black text-slate-800">Baro Xuruufta Carabiga</h2>
-          <button onClick={() => setLocation("/alphabet-games")} className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm">
-            Ciyaaro
+          <div className="text-center">
+            <h1 className="text-white font-black text-lg">Baro Alifka</h1>
+            <p className="text-white/40 text-xs">{index + 1} / {curriculum.length}</p>
+          </div>
+          <button onClick={() => setLocation("/alphabet-games")}
+            className="px-3 py-2 rounded-2xl bg-purple-500/30 border border-purple-400/40 text-purple-300 font-bold text-xs"
+            data-testid="btn-games">
+            🎮 Ciyaaro
           </button>
         </div>
-        <p className="text-slate-500 font-semibold mb-5">Xaraf {index + 1} / {curriculum.length}</p>
 
-        <div className="mb-5 rounded-2xl border-2 border-sky-200 bg-sky-50 p-6 text-center">
-          <p className="text-7xl font-black leading-none text-slate-900">{current.arabic}</p>
-          <p className="text-lg font-bold text-slate-700 mt-3">{current.nameSomali}</p>
+        <div className="mb-4 rounded-full bg-white/10 h-2.5 overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${progressPct}%`, backgroundColor: letterColor }} />
         </div>
+        <p className="text-white/30 text-xs text-center mb-5">{completedCount} / {curriculum.length} xuruuf — {progressPct}%</p>
 
-        {step === 1 && (
-          <div className="space-y-3">
-            <button onClick={playPronunciation} className="w-full rounded-2xl bg-amber-400 text-slate-900 font-black py-4 text-lg">Dhageyso ku dhawaaqista</button>
-            <button onClick={() => setStep(2)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">Xiga: Dhageyso oo ku celi</button>
+        <div className="rounded-3xl p-6 mb-5 text-center relative overflow-hidden border border-white/10"
+          style={{ background: `linear-gradient(135deg, ${letterColor}15, ${letterColor}08)` }}>
+
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-[200px] font-black leading-none opacity-5 select-none"
+              style={{ fontFamily: "serif", color: letterColor }}>
+              {current.arabic}
+            </span>
           </div>
-        )}
 
-        {step === 2 && (
-          <div className="space-y-3">
-            {!recording ? (
-              <button onClick={startRepeat} className="w-full rounded-2xl bg-blue-600 text-white font-black py-4 text-lg">Duub oo ku celi</button>
-            ) : (
-              <button onClick={stopRepeat} className="w-full rounded-2xl bg-red-600 text-white font-black py-4 text-lg">Jooji</button>
-            )}
-            {repeatResult && <p className="text-center text-xl font-black">{repeatResult}</p>}
-            <button onClick={() => setStep(3)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">U gudub qorista</button>
-          </div>
-        )}
+          <div className="relative z-10">
+            <button onClick={playAudio}
+              className={`text-[120px] leading-none font-black drop-shadow-2xl mb-2 block mx-auto transition-transform active:scale-95 ${audioPlaying ? "animate-pulse" : ""}`}
+              style={{ fontFamily: "serif", color: letterColor, textShadow: `0 0 40px ${letterColor}80` }}
+              data-testid="btn-play-letter">
+              {current.arabic}
+            </button>
 
-        {step === 3 && (
-          <div>
-            <p className="text-slate-700 font-semibold mb-3">Raac xariiqda dhibcaha leh</p>
-            <div className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
-              <canvas
-                ref={canvasRef}
-                className="touch-none rounded-xl bg-white"
-                onPointerDown={pointerDown}
-                onPointerMove={pointerMove}
-                onPointerUp={pointerUp}
-                onPointerCancel={pointerUp}
-              />
+            <div className="flex items-center justify-center gap-3 mb-3">
+              {audioPlaying && (
+                <div className="flex gap-1 items-end h-5">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-1.5 rounded-full animate-bounce"
+                      style={{ height: `${i * 6 + 4}px`, backgroundColor: letterColor, animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              )}
+              <p className="text-3xl font-black text-white/90" style={{ fontFamily: "serif" }}>
+                {current.nameArabic}
+              </p>
             </div>
 
-            <div className="mt-3 flex gap-2">
-              <button onClick={drawBaseCanvas} className="rounded-xl px-4 py-2 bg-slate-700 text-white font-bold">Nadiifi</button>
-              <button onClick={submitTracing} className="rounded-xl px-4 py-2 bg-emerald-600 text-white font-bold">Hubi</button>
-            </div>
+            <p className="text-white/60 font-bold text-base">{current.nameSomali}</p>
 
-            {traceScore !== null && (
-              <p className="mt-3 text-lg font-black text-slate-800">Natiijo: {traceScore}% {traceFeedback}</p>
-            )}
-
-            {traceScore !== null && traceScore >= TRACE_PASS_SCORE && (
-              <div className="mt-4 flex gap-2">
-                <button onClick={nextLetter} className="rounded-xl px-5 py-3 bg-indigo-600 text-white font-bold">Xarafka xiga</button>
-                <button onClick={() => setLocation("/alphabet-games")} className="rounded-xl px-5 py-3 bg-purple-600 text-white font-bold">Tag ciyaaraha</button>
+            {qWord && (
+              <div className="mt-4 rounded-2xl px-4 py-3 border border-white/10"
+                style={{ backgroundColor: letterColor + "15" }}>
+                <p className="text-white/40 text-xs mb-1">Erayga Quraanka ah</p>
+                <p className="text-2xl font-black mb-1" style={{ fontFamily: "serif", color: letterColor, direction: "rtl" }}>
+                  {qWord.word} {qWord.emoji}
+                </p>
+                <p className="text-white/50 text-sm font-bold">{qWord.meaning}</p>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-5">
+          {(["listen", "trace", "done"] as Step[]).map((s, i) => (
+            <div key={s} className="flex-1 h-1.5 rounded-full transition-all"
+              style={{ backgroundColor: step === s ? letterColor : (["listen", "trace", "done"].indexOf(step) > i ? letterColor + "60" : "rgba(255,255,255,0.1)") }} />
+          ))}
+        </div>
+
+        {step === "listen" && (
+          <div className="space-y-3">
+            <button onClick={playAudio}
+              className="w-full rounded-3xl py-5 text-xl font-black flex items-center justify-center gap-3 active:scale-98 transition-transform border border-white/10"
+              style={{ backgroundColor: letterColor + "25", color: "white" }}
+              data-testid="btn-listen-again">
+              <span className="text-3xl">🔊</span>
+              Dhageyso Mar Kale
+            </button>
+
+            <button onClick={() => setStep("trace")}
+              className="w-full rounded-3xl py-5 text-xl font-black flex items-center justify-center gap-3 active:scale-98 transition-transform"
+              style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)`, color: "#0f172a" }}
+              data-testid="btn-go-trace">
+              <span className="text-3xl">✏️</span>
+              Hadda Qor!
+            </button>
+          </div>
+        )}
+
+        {step === "trace" && (
+          <div>
+            <div className="rounded-3xl p-4 mb-4 border border-white/10 bg-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white/70 font-bold text-sm">✏️ Raac xariiqda caddaan ah</p>
+                {traceAttempts > 0 && traceScore !== null && (
+                  <span className="text-sm font-black" style={{ color: traceFeedback === "pass" ? "#4ADE80" : "#FF6B6B" }}>
+                    {traceScore}%
+                  </span>
+                )}
+              </div>
+
+              <div className="flex justify-center">
+                <div className="rounded-2xl overflow-hidden border-2"
+                  style={{ borderColor: traceFeedback === "pass" ? "#4ADE80" : traceFeedback === "fail" ? "#FF6B6B" : letterColor + "50" }}>
+                  <canvas
+                    ref={canvasRef}
+                    className="touch-none block"
+                    style={{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px`, cursor: "crosshair" }}
+                    onPointerDown={pointerDown}
+                    onPointerMove={pointerMove}
+                    onPointerUp={pointerUp}
+                    onPointerCancel={pointerUp}
+                    data-testid="trace-canvas"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 mt-1 text-xs text-white/30">
+                <span className="w-3 h-1 rounded-full bg-green-400" /> Fiican
+                <span className="w-3 h-1 rounded-full bg-red-400 ml-2" /> Meel kale
+              </div>
+            </div>
+
+            {traceFeedback === "fail" && (
+              <div className="mb-3 rounded-2xl px-4 py-3 bg-red-500/10 border border-red-500/30 text-center">
+                <p className="text-red-300 font-bold">❌ Mar kale isku day! Raac xariiqda caddaan ah.</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => drawCanvas()}
+                className="flex-1 rounded-2xl py-4 font-bold text-white/60 border border-white/15 bg-white/5 active:scale-95 transition-transform"
+                data-testid="btn-clear">
+                🧹 Nadiifi
+              </button>
+              <button onClick={submitTracing}
+                className="flex-2 flex-grow rounded-2xl py-4 font-black text-slate-900 active:scale-95 transition-transform"
+                style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)`, minWidth: "60%" }}
+                data-testid="btn-check-trace">
+                ✅ Hubi
+              </button>
+            </div>
+
+            {traceAttempts >= 3 && traceFeedback !== "pass" && (
+              <button onClick={() => { setStep("done"); setShowCelebration(false); }}
+                className="w-full mt-3 rounded-2xl py-3 font-bold text-white/40 border border-white/10 text-sm"
+                data-testid="btn-skip">
+                Xarafka xiga →
+              </button>
+            )}
+          </div>
+        )}
+
+        {step === "done" && (
+          <div className="text-center space-y-4">
+            <div className="rounded-3xl p-8 border border-white/10"
+              style={{ backgroundColor: letterColor + "15" }}>
+              <div className="text-7xl mb-4">🌟</div>
+              <h2 className="text-3xl font-black text-white mb-2">Aad u fiican!</h2>
+              <p className="text-white/60 font-bold">
+                <span style={{ color: letterColor }} className="text-2xl">{current.arabic}</span> — {current.nameSomali}
+              </p>
+              {traceScore && (
+                <p className="text-white/40 text-sm mt-2">Natiijo: {traceScore}% ⭐</p>
+              )}
+            </div>
+
+            <button onClick={goNext}
+              className="w-full rounded-3xl py-5 text-xl font-black active:scale-98 transition-transform"
+              style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)`, color: "#0f172a" }}
+              data-testid="btn-next-letter">
+              {index < curriculum.length - 1 ? "Xarafka xiga →" : "🎉 Dhammaad!"}
+            </button>
+
+            <button onClick={() => setLocation("/alphabet-games")}
+              className="w-full rounded-3xl py-4 text-lg font-bold border border-purple-400/30 text-purple-300"
+              data-testid="btn-go-to-games">
+              🎮 Tag Ciyaaraha
+            </button>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+const FALLBACK_CURRICULUM: AlphabetItem[] = [
+  "ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"
+].map((arabic, i) => {
+  const names: Record<string, [string, string]> = {
+    "ا": ["أَلِف","Alif"], "ب": ["بَاء","Baa"], "ت": ["تَاء","Taa"], "ث": ["ثَاء","Thaa"],
+    "ج": ["جِيم","Jiim"], "ح": ["حَاء","Haa"], "خ": ["خَاء","Khaa"], "د": ["دَال","Daal"],
+    "ذ": ["ذَال","Dhaal"], "ر": ["رَاء","Raa"], "ز": ["زَاي","Zay"], "س": ["سِين","Siin"],
+    "ش": ["شِين","Shiin"], "ص": ["صَاد","Saad"], "ض": ["ضَاد","Daad"], "ط": ["طَاء","Taa'"],
+    "ظ": ["ظَاء","Dhaa'"], "ع": ["عَيْن","'Ayn"], "غ": ["غَيْن","Ghayn"], "ف": ["فَاء","Faa"],
+    "ق": ["قَاف","Qaaf"], "ك": ["كَاف","Kaaf"], "ل": ["لَام","Laam"], "م": ["مِيم","Miim"],
+    "ن": ["نُون","Nuun"], "ه": ["هَاء","Haa'"], "و": ["وَاو","Waaw"], "ي": ["يَاء","Yaa"],
+  };
+  const [nameArabic, nameSomali] = names[arabic] || [arabic, arabic];
+  return {
+    id: i + 1, arabic, nameArabic, nameSomali, phase: 1, order: i + 1,
+    tracingPath: `M50 15 C50 15 50 85 50 85`,
+  };
+});
