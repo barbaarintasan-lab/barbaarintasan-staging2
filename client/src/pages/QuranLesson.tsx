@@ -744,7 +744,7 @@ export default function QuranLesson() {
             ) : (
               <div className="bg-gradient-to-br from-orange-500/15 to-amber-500/10 rounded-3xl p-6 border-2 border-orange-400/30 text-center" data-testid="result-retry">
                 <div className="text-6xl mb-3">&#x26A0;&#xFE0F;</div>
-                <h3 className="text-orange-300 font-bold text-2xl mb-2">Qayb khaldan</h3>
+                <h3 className="text-orange-300 font-bold text-2xl mb-2">Waad Khaladay</h3>
                 <p className="text-white/80 text-lg mb-5" data-testid="text-feedback">{checkResult.message}</p>
                 <div className="flex gap-3">
                   <button onClick={playAyah}
