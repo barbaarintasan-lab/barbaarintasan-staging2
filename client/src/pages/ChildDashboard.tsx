@@ -76,23 +76,16 @@ export default function ChildDashboard() {
     ? openCards
     : [openCards[1], openCards[0]];
 
-  const lockedCards: LessonCard[] = [
-    {
-      key: "juz-29",
-      arabicTitle: "جزء تبارك",
-      englishLabel: "Juz 29",
-      subtitle: "Soo socota...",
-      icon: "🔒",
-      status: "locked",
-    },
-    {
-      key: "juz-28",
-      arabicTitle: "جزء قد سمع",
-      englishLabel: "Juz 28",
-      subtitle: "Soo socota...",
-      icon: "🔒",
-      status: "locked",
-    },
+  const comingSoonJuz: { num: number; arabic: string; name: string }[] = [
+    { num: 29, arabic: "جزء تبارك", name: "Tabaraka" },
+    { num: 28, arabic: "جزء قد سمع", name: "Qad Sami'a" },
+    { num: 27, arabic: "جزء قال فما", name: "Qala Fama" },
+    { num: 26, arabic: "جزء حم", name: "Ha Mim" },
+    { num: 25, arabic: "جزء إليه يرد", name: "Ilayhi Yuraddu" },
+    { num: 24, arabic: "جزء فمن أظلم", name: "Faman Azlamu" },
+    { num: 23, arabic: "جزء وما أبرئ", name: "Wama Ubarri'u" },
+    { num: 22, arabic: "جزء ومن يقنت", name: "Wa Man Yaqnut" },
+    { num: 21, arabic: "جزء أمن يتساء", name: "Amma Yatasaa" },
   ];
 
   const handleLogout = async () => {
@@ -197,31 +190,38 @@ export default function ChildDashboard() {
         </div>
 
         <div>
-          <p className="text-white/50 font-bold text-sm mb-3 uppercase tracking-wide">Juz-yada kale</p>
+          <p className="text-white/50 font-bold text-sm mb-3 uppercase tracking-wide">Juz-yada kale — Soo socota</p>
           <div className="grid grid-cols-2 gap-3">
-            {lockedCards.map((card) => (
+            {comingSoonJuz.map((juz) => (
               <div
-                key={card.key}
-                className="rounded-3xl p-5 bg-white/5 border-2 border-white/8 opacity-60 cursor-not-allowed"
-                aria-disabled="true"
-                data-testid={`card-${card.key}-locked`}
+                key={juz.num}
+                className="rounded-3xl p-5 bg-white/5 border-2 border-amber-400/20 cursor-default"
+                data-testid={`card-juz-${juz.num}`}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <Lock className="w-6 h-6 text-white/30" />
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-slate-500/20 text-slate-400 border border-slate-400/20">
-                    🔒 Xidhan
+                  <span className="text-2xl">📖</span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-400/30">
+                    🕐 Soo socota
                   </span>
                 </div>
                 <p
-                  className="text-xl font-black text-white/60 leading-none mb-1"
+                  className="text-lg font-black text-white/80 leading-none mb-1"
                   style={{ fontFamily: "serif", direction: "rtl" }}
                 >
-                  {card.arabicTitle}
+                  {juz.arabic}
                 </p>
-                <p className="text-sm font-bold text-white/50">{card.englishLabel}</p>
-                <p className="text-xs text-white/30 mt-2">{card.subtitle}</p>
+                <p className="text-sm font-bold text-white/60">Juz {juz.num}</p>
+                <p className="text-xs text-white/30 mt-1">{juz.name}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 rounded-3xl p-4 bg-white/3 border border-white/8 flex items-center gap-3 opacity-50">
+            <Lock className="w-5 h-5 text-white/30 shrink-0" />
+            <div>
+              <p className="text-white/40 text-sm font-bold">Juz 1 – 20</p>
+              <p className="text-white/25 text-xs">Mustaqbalka la furayo</p>
+            </div>
           </div>
         </div>
       </div>
