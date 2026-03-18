@@ -11266,6 +11266,37 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   }
 
+  const FALLBACK_ALPHABET_CURRICULUM: Array<{ arabic: string; nameArabic: string; nameSomali: string; phase: number; order: number; audioUrl: string; tracingPath: string }> = [
+    { arabic: "ا", nameArabic: "ألف", nameSomali: "Alif", phase: 1, order: 1, audioUrl: "/api/audio/alphabet/alif.mp3", tracingPath: "M50 10 L50 90" },
+    { arabic: "ب", nameArabic: "باء", nameSomali: "Ba", phase: 1, order: 2, audioUrl: "/api/audio/alphabet/ba.mp3", tracingPath: "M20 45 Q50 20 80 45 Q50 70 20 45 M50 75 L50 85" },
+    { arabic: "ت", nameArabic: "تاء", nameSomali: "Ta", phase: 1, order: 3, audioUrl: "/api/audio/alphabet/ta.mp3", tracingPath: "M20 50 Q50 25 80 50 Q50 75 20 50 M40 18 L40 20 M60 18 L60 20" },
+    { arabic: "ث", nameArabic: "ثاء", nameSomali: "Tha", phase: 1, order: 4, audioUrl: "/api/audio/alphabet/tha.mp3", tracingPath: "M20 50 Q50 25 80 50 Q50 75 20 50 M35 18 L35 20 M50 14 L50 16 M65 18 L65 20" },
+    { arabic: "ج", nameArabic: "جيم", nameSomali: "Jeem", phase: 1, order: 5, audioUrl: "/api/audio/alphabet/jeem.mp3", tracingPath: "M72 28 Q50 8 28 28 Q18 48 34 66 Q52 82 72 60 Q76 48 64 42 M50 82 L50 84" },
+    { arabic: "ح", nameArabic: "حاء", nameSomali: "Ha", phase: 1, order: 6, audioUrl: "/api/audio/alphabet/ha.mp3", tracingPath: "M72 28 Q50 8 28 28 Q18 48 34 66 Q52 82 72 60 Q76 48 64 42" },
+    { arabic: "خ", nameArabic: "خاء", nameSomali: "Kha", phase: 1, order: 7, audioUrl: "/api/audio/alphabet/kha.mp3", tracingPath: "M72 28 Q50 8 28 28 Q18 48 34 66 Q52 82 72 60 Q76 48 64 42 M52 10 L52 12" },
+    { arabic: "د", nameArabic: "دال", nameSomali: "Dal", phase: 2, order: 1, audioUrl: "/api/audio/alphabet/dal.mp3", tracingPath: "M28 25 Q62 25 68 46 Q60 70 34 80" },
+    { arabic: "ذ", nameArabic: "ذال", nameSomali: "Dhal", phase: 2, order: 2, audioUrl: "/api/audio/alphabet/dhal.mp3", tracingPath: "M28 25 Q62 25 68 46 Q60 70 34 80 M48 8 L48 10" },
+    { arabic: "ر", nameArabic: "راء", nameSomali: "Ra", phase: 2, order: 3, audioUrl: "/api/audio/alphabet/ra.mp3", tracingPath: "M26 32 Q60 44 56 82" },
+    { arabic: "ز", nameArabic: "زاي", nameSomali: "Zay", phase: 2, order: 4, audioUrl: "/api/audio/alphabet/zay.mp3", tracingPath: "M26 32 Q60 44 56 82 M46 12 L46 14" },
+    { arabic: "س", nameArabic: "سين", nameSomali: "Seen", phase: 2, order: 5, audioUrl: "/api/audio/alphabet/seen.mp3", tracingPath: "M14 58 Q24 38 34 58 Q44 78 54 58 Q64 38 76 58" },
+    { arabic: "ش", nameArabic: "شين", nameSomali: "Sheen", phase: 2, order: 6, audioUrl: "/api/audio/alphabet/sheen.mp3", tracingPath: "M14 58 Q24 38 34 58 Q44 78 54 58 Q64 38 76 58 M32 18 L32 20 M46 12 L46 14 M60 18 L60 20" },
+    { arabic: "ص", nameArabic: "صاد", nameSomali: "Sad", phase: 3, order: 1, audioUrl: "/api/audio/alphabet/sad.mp3", tracingPath: "M18 36 L70 36 Q82 48 70 60 L18 60 M70 60 Q80 72 72 86" },
+    { arabic: "ض", nameArabic: "ضاد", nameSomali: "Dad", phase: 3, order: 2, audioUrl: "/api/audio/alphabet/dad.mp3", tracingPath: "M18 36 L70 36 Q82 48 70 60 L18 60 M70 60 Q80 72 72 86 M40 14 L40 16" },
+    { arabic: "ط", nameArabic: "طاء", nameSomali: "Taa", phase: 3, order: 3, audioUrl: "/api/audio/alphabet/taa.mp3", tracingPath: "M26 18 L26 86 M26 40 L70 40 Q82 50 70 60 L26 60" },
+    { arabic: "ظ", nameArabic: "ظاء", nameSomali: "Zaa", phase: 3, order: 4, audioUrl: "/api/audio/alphabet/zaa.mp3", tracingPath: "M26 18 L26 86 M26 40 L70 40 Q82 50 70 60 L26 60 M48 8 L48 10" },
+    { arabic: "ع", nameArabic: "عين", nameSomali: "Ain", phase: 3, order: 5, audioUrl: "/api/audio/alphabet/ain.mp3", tracingPath: "M70 24 Q44 6 26 26 Q20 46 40 56 Q54 64 62 74 Q48 88 26 76" },
+    { arabic: "غ", nameArabic: "غين", nameSomali: "Ghain", phase: 3, order: 6, audioUrl: "/api/audio/alphabet/ghain.mp3", tracingPath: "M70 24 Q44 6 26 26 Q20 46 40 56 Q54 64 62 74 Q48 88 26 76 M48 8 L48 10" },
+    { arabic: "ف", nameArabic: "فاء", nameSomali: "Fa", phase: 4, order: 1, audioUrl: "/api/audio/alphabet/fa.mp3", tracingPath: "M20 52 Q42 24 70 38 Q78 56 62 68 Q40 76 20 52 M46 20 L46 22" },
+    { arabic: "ق", nameArabic: "قاف", nameSomali: "Qaf", phase: 4, order: 2, audioUrl: "/api/audio/alphabet/qaf.mp3", tracingPath: "M20 52 Q42 24 70 38 Q78 56 62 68 Q40 76 20 52 M40 18 L40 20 M54 18 L54 20" },
+    { arabic: "ك", nameArabic: "كاف", nameSomali: "Kaf", phase: 4, order: 3, audioUrl: "/api/audio/alphabet/kaf.mp3", tracingPath: "M28 14 L28 86 M28 50 L62 30 M28 50 L62 74" },
+    { arabic: "ل", nameArabic: "لام", nameSomali: "Lam", phase: 4, order: 4, audioUrl: "/api/audio/alphabet/lam.mp3", tracingPath: "M46 10 L46 90" },
+    { arabic: "م", nameArabic: "ميم", nameSomali: "Meem", phase: 4, order: 5, audioUrl: "/api/audio/alphabet/meem.mp3", tracingPath: "M22 54 Q38 28 60 36 Q74 48 62 66 Q44 80 22 54" },
+    { arabic: "ن", nameArabic: "نون", nameSomali: "Noon", phase: 4, order: 6, audioUrl: "/api/audio/alphabet/noon.mp3", tracingPath: "M18 52 Q44 28 72 46 Q58 72 20 58 M48 20 L48 22" },
+    { arabic: "ه", nameArabic: "هاء", nameSomali: "Ha2", phase: 4, order: 7, audioUrl: "/api/audio/alphabet/ha2.mp3", tracingPath: "M34 26 Q20 44 34 62 Q48 78 62 62 Q76 46 62 28 Q48 14 34 26" },
+    { arabic: "و", nameArabic: "واو", nameSomali: "Waw", phase: 4, order: 8, audioUrl: "/api/audio/alphabet/waw.mp3", tracingPath: "M38 24 Q58 30 60 50 Q58 72 40 82 Q24 70 30 46" },
+    { arabic: "ي", nameArabic: "ياء", nameSomali: "Ya", phase: 4, order: 9, audioUrl: "/api/audio/alphabet/ya.mp3", tracingPath: "M18 50 Q42 28 72 46 Q56 70 20 58 M36 82 L36 84 M54 82 L54 84" },
+  ];
+
   function getPublicRootForAudio() {
     const roots = [
       path.join(process.cwd(), "dist", "public"),
@@ -11371,9 +11402,20 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         return res.status(400).json({ error: "phase waa inuu noqdaa 1 ilaa 4" });
       }
 
+      let allLetters = await db.select().from(alphabetLetters).orderBy(alphabetLetters.phase, alphabetLetters.order);
+
+      if (allLetters.length === 0) {
+        try {
+          await db.insert(alphabetLetters).values(FALLBACK_ALPHABET_CURRICULUM as any);
+          allLetters = await db.select().from(alphabetLetters).orderBy(alphabetLetters.phase, alphabetLetters.order);
+        } catch (seedError) {
+          console.error("[ALPHABET] Auto-seed warning:", seedError);
+        }
+      }
+
       const letters = phase === undefined
-        ? await db.select().from(alphabetLetters).orderBy(alphabetLetters.phase, alphabetLetters.order)
-        : await db.select().from(alphabetLetters).where(eq(alphabetLetters.phase, phase)).orderBy(alphabetLetters.phase, alphabetLetters.order);
+        ? allLetters
+        : allLetters.filter((letter) => letter.phase === phase);
 
       const progressRows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
       const byLetterId = new Map(progressRows.map((p) => [p.letterId, p]));

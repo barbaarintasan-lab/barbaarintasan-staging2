@@ -69,6 +69,7 @@ const ParentTips = lazy(() => import("@/pages/ParentTips"));
 const MeetWatch = lazy(() => import("@/pages/MeetWatch"));
 const ChildLogin = lazy(() => import("@/pages/ChildLogin"));
 const ChildDashboard = lazy(() => import("@/pages/ChildDashboard"));
+const QuranFolders = lazy(() => import("@/pages/QuranFolders"));
 const QuranLesson = lazy(() => import("@/pages/QuranLesson"));
 const AlphabetLesson = lazy(() => import("@/pages/AlphabetLesson"));
 const AlphabetGames = lazy(() => import("@/pages/AlphabetGames"));
@@ -207,6 +208,7 @@ function Router() {
     "/reset-password",
     "/child-login",
     "/child-dashboard",
+    "/quran-folders",
     "/quran-lesson",
     "/alphabet-lesson",
     "/alphabet-games",
@@ -284,6 +286,7 @@ function Router() {
             <Route path="/install" component={Install} />
             <Route path="/child-login" component={ChildLogin} />
             <Route path="/child-dashboard" component={ChildDashboard} />
+            <Route path="/quran-folders" component={QuranFolders} />
             <Route path="/quran-lesson/:surahNumber" component={QuranLesson} />
             <Route path="/alphabet-lesson" component={AlphabetLesson} />
             <Route path="/alphabet-games" component={AlphabetGames} />
