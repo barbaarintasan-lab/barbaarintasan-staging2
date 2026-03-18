@@ -11207,6 +11207,65 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     tokensEarned: z.coerce.number().int().min(0).optional().default(0),
   });
 
+  async function getAlphabetUnlockState(childId: string) {
+    const rows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
+    const completedRows = rows.filter((row) => row.completed);
+    const bestLessonScore = completedRows.reduce((best, row) => Math.max(best, row.recitationScore || 0, row.tracingScore || 0), 0);
+    const gamesUnlocked = completedRows.some((row) => Math.max(row.recitationScore || 0, row.tracingScore || 0) >= 70);
+
+    return {
+      rows,
+      completedRows,
+      bestLessonScore,
+      gamesUnlocked,
+      completedLetters: completedRows.length,
+    };
+  }
+
+  async function applyChildRewardDelta(
+    childId: string,
+    rewards: { tokens?: number; coins?: number; stars?: number },
+    source: string,
+    sourceId: string,
+  ) {
+    const tokenDelta = rewards.tokens ?? 0;
+    const coinDelta = rewards.coins ?? 0;
+    const starDelta = rewards.stars ?? 0;
+
+    if (tokenDelta <= 0 && coinDelta <= 0 && starDelta <= 0) {
+      return;
+    }
+
+    const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+
+    if (balance) {
+      await db.update(childRewardBalances).set({
+        totalTokens: balance.totalTokens + tokenDelta,
+        totalCoins: balance.totalCoins + coinDelta,
+        totalStars: balance.totalStars + starDelta,
+        updatedAt: new Date(),
+      }).where(eq(childRewardBalances.childId, childId));
+    } else {
+      await db.insert(childRewardBalances).values({
+        childId,
+        totalTokens: tokenDelta,
+        totalCoins: coinDelta,
+        totalStars: starDelta,
+        tokensUsed: 0,
+      });
+    }
+
+    if (tokenDelta > 0) {
+      await db.insert(childRewardLedger).values({ childId, type: "token", amount: tokenDelta, source, sourceId });
+    }
+    if (coinDelta > 0) {
+      await db.insert(childRewardLedger).values({ childId, type: "coin", amount: coinDelta, source, sourceId });
+    }
+    if (starDelta > 0) {
+      await db.insert(childRewardLedger).values({ childId, type: "star", amount: starDelta, source, sourceId });
+    }
+  }
+
   function getPublicRootForAudio() {
     const roots = [
       path.join(process.cwd(), "dist", "public"),
@@ -11341,12 +11400,15 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   app.get("/api/quran/alphabet/progress", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
-      const rows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
+      const unlockState = await getAlphabetUnlockState(childId);
+      const rows = unlockState.rows;
+      const [{ count: totalLetters }] = await db.select({ count: sql<number>`count(*)` }).from(alphabetLetters);
 
-      const total = rows.length;
+      const total = Number(totalLetters || 0);
       const completed = rows.filter((r) => r.completed).length;
-      const avgTracing = total > 0 ? Math.round(rows.reduce((s, r) => s + (r.tracingScore || 0), 0) / total) : 0;
-      const avgRecitation = total > 0 ? Math.round(rows.reduce((s, r) => s + (r.recitationScore || 0), 0) / total) : 0;
+      const attempted = rows.length;
+      const avgTracing = attempted > 0 ? Math.round(rows.reduce((s, r) => s + (r.tracingScore || 0), 0) / attempted) : 0;
+      const avgRecitation = attempted > 0 ? Math.round(rows.reduce((s, r) => s + (r.recitationScore || 0), 0) / attempted) : 0;
 
       return res.json({
         summary: {
@@ -11354,6 +11416,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           completedLetters: completed,
           avgTracingScore: avgTracing,
           avgRecitationScore: avgRecitation,
+          bestLessonScore: unlockState.bestLessonScore,
+          gamesUnlocked: unlockState.gamesUnlocked,
+          gameUnlockRequirement: 70,
         },
         items: rows,
       });
@@ -11380,6 +11445,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       const [existing] = await db.select().from(alphabetProgress).where(
         and(eq(alphabetProgress.childId, childId), eq(alphabetProgress.letterId, letterId))
       );
+      const wasCompleted = existing?.completed ?? false;
 
       let saved;
       if (existing) {
@@ -11406,6 +11472,10 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           completedAt: completed ? new Date() : null,
         }).returning();
         saved = created;
+      }
+
+      if (!wasCompleted && saved?.completed) {
+        await applyChildRewardDelta(childId, { tokens: 1, stars: 1 }, "alphabet_completion", `${phase}:${letterId}`);
       }
 
       return res.json({ item: saved });
@@ -11465,6 +11535,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
   app.get("/api/quran/alphabet/games/data/:type", requireChildAuth, async (req: Request, res: Response) => {
     try {
+      const childId = req.session.childId!;
       const gameType = String(req.params.type || "").toLowerCase();
       if (!["matching", "tracing", "recitation", "quiz"].includes(gameType)) {
         return res.status(400).json({ error: "Nooca game-ka lama aqoon" });
@@ -11474,6 +11545,15 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       const phase = phaseRaw === undefined ? 1 : Number.parseInt(String(phaseRaw), 10);
       if (!Number.isInteger(phase) || phase < 1 || phase > 4) {
         return res.status(400).json({ error: "phase waa inuu noqdaa 1 ilaa 4" });
+      }
+
+      const unlockState = await getAlphabetUnlockState(childId);
+      if (!unlockState.gamesUnlocked) {
+        return res.status(403).json({
+          error: "Dhamee casharka oo hel 70% si ciyaaraha u furmaan",
+          gamesUnlocked: false,
+          bestLessonScore: unlockState.bestLessonScore,
+        });
       }
 
       const letters = await db.select().from(alphabetLetters).where(eq(alphabetLetters.phase, phase)).orderBy(alphabetLetters.order);
@@ -11499,16 +11579,29 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         return res.status(400).json({ error: "Xogta la soo diray sax ma aha", details: parsed.error.flatten() });
       }
 
-      const { gameType, phase, score, tokensEarned } = parsed.data;
+      const unlockState = await getAlphabetUnlockState(childId);
+      if (!unlockState.gamesUnlocked) {
+        return res.status(403).json({
+          error: "Dhamee casharka oo hel 70% si ciyaaraha loo kaydiyo",
+          gamesUnlocked: false,
+          bestLessonScore: unlockState.bestLessonScore,
+        });
+      }
+
+      const { gameType, phase, score } = parsed.data;
+      const tokenGrant = score >= 95 ? 2 : score >= 80 ? 1 : 0;
+      const coinGrant = score >= 90 ? 3 : score >= 70 ? 2 : score >= 50 ? 1 : 0;
       const [saved] = await db.insert(alphabetGameScores).values({
         childId,
         gameType,
         phase,
         score,
-        tokensEarned,
+        tokensEarned: tokenGrant,
       }).returning();
 
-      return res.status(201).json({ item: saved });
+      await applyChildRewardDelta(childId, { tokens: tokenGrant, coins: coinGrant }, "alphabet_game", `${gameType}:${phase}`);
+
+      return res.status(201).json({ item: saved, tokensEarned: tokenGrant, coinsEarned: coinGrant });
     } catch (error: any) {
       console.error("[ALPHABET] Game score error:", error);
       return res.status(500).json({ error: "Khalad ayaa dhacay" });
@@ -11982,12 +12075,15 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
       const childId = req.session.childId!;
       const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
       const gameScores = await db.select().from(childGameScores).where(eq(childGameScores.childId, childId));
+      const alphabetRows = await db.select().from(alphabetProgress).where(eq(alphabetProgress.childId, childId));
+      const alphabetGameRows = await db.select().from(alphabetGameScores).where(eq(alphabetGameScores.childId, childId));
       const badges = await db.select().from(childBadges).where(eq(childBadges.childId, childId));
       const [balance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
 
       const totalStars = balance?.totalStars ?? progress.reduce((s, p) => s + (p.starsEarned || 0), 0);
       const totalTrophies = progress.filter(p => p.completed).length;
       const totalCoins = balance?.totalCoins ?? gameScores.reduce((s, g) => s + (g.coinsEarned || 0), 0);
+      const totalTokens = balance?.totalTokens ?? alphabetGameRows.reduce((s, g) => s + (g.tokensEarned || 0), 0);
       const streak = await getChildGameStreak(childId);
 
       const today = new Date();
@@ -12001,7 +12097,9 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
         aayahStars: totalStars,
         surahTrophies: totalTrophies,
         gameCoins: totalCoins,
-        gameTokens: totalTrophies,
+        gameTokens: totalTokens,
+        alphabetLettersCompleted: alphabetRows.filter((row) => row.completed).length,
+        alphabetGamesPlayed: alphabetGameRows.length,
         gamesRemainingToday: 999,
         maxGamesPerDay: 999,
         badges: badges.map(b => ({ key: b.badgeKey, name: b.badgeName, icon: b.badgeIcon, color: b.badgeColor, earnedAt: b.earnedAt })),

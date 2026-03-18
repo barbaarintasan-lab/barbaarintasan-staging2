@@ -3,13 +3,13 @@ import { calculateScore, getPerformanceLevel } from "../../utils/gameScoring";
 import { isGameUnlocked } from "../../utils/unlock";
 
 const LETTER_POOL = [
-  { letter: "ا", audio: "/audio/alphabet/alif.mp3" },
-  { letter: "ب", audio: "/audio/alphabet/baa.mp3" },
-  { letter: "ت", audio: "/audio/alphabet/taa.mp3" },
-  { letter: "ث", audio: "/audio/alphabet/thaa.mp3" },
-  { letter: "ج", audio: "/audio/alphabet/jeem.mp3" },
-  { letter: "ح", audio: "/audio/alphabet/haa.mp3" },
-  { letter: "خ", audio: "/audio/alphabet/khaa.mp3" },
+  { letter: "ا", audio: "/api/audio/alphabet/alif.mp3" },
+  { letter: "ب", audio: "/api/audio/alphabet/ba.mp3" },
+  { letter: "ت", audio: "/api/audio/alphabet/ta.mp3" },
+  { letter: "ث", audio: "/api/audio/alphabet/tha.mp3" },
+  { letter: "ج", audio: "/api/audio/alphabet/jeem.mp3" },
+  { letter: "ح", audio: "/api/audio/alphabet/ha.mp3" },
+  { letter: "خ", audio: "/api/audio/alphabet/kha.mp3" },
 ];
 
 const QUESTION_COUNT_BY_LEVEL = {

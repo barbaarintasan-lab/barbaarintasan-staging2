@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import LetterMatch from "@/components/games/LetterMatch";
 import HarakatGame from "@/components/games/HarakatGame";
@@ -9,19 +9,37 @@ type GameKey = "letter_match" | "harakat" | "word_builder";
 export default function AlphabetGames() {
   const [, setLocation] = useLocation();
   const [selected, setSelected] = useState<GameKey>("letter_match");
+  const [loadingProgress, setLoadingProgress] = useState(true);
+  const [lessonUnlockScore, setLessonUnlockScore] = useState(0);
+  const [gamesUnlocked, setGamesUnlocked] = useState(false);
   const [scores, setScores] = useState<Record<GameKey, number>>({
     letter_match: 0,
     harakat: 0,
     word_builder: 0,
   });
 
+  useEffect(() => {
+    fetch("/api/quran/alphabet/progress", { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        const summary = data?.summary;
+        setGamesUnlocked(!!summary?.gamesUnlocked);
+        setLessonUnlockScore(Number(summary?.bestLessonScore || 0));
+      })
+      .catch(() => {
+        setGamesUnlocked(false);
+        setLessonUnlockScore(0);
+      })
+      .finally(() => setLoadingProgress(false));
+  }, []);
+
   const unlocked = useMemo(() => {
     return {
-      letter_match: true,
-      harakat: scores.letter_match >= 70,
-      word_builder: scores.harakat >= 70,
+      letter_match: gamesUnlocked,
+      harakat: gamesUnlocked,
+      word_builder: gamesUnlocked,
     };
-  }, [scores]);
+  }, [gamesUnlocked]);
 
   function handleScore(game: GameKey, value: number) {
     setScores((prev) => ({ ...prev, [game]: Math.max(prev[game], value) }));
@@ -55,12 +73,16 @@ export default function AlphabetGames() {
           </button>
         </div>
 
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          {loadingProgress ? "Checking lesson progress..." : gamesUnlocked ? `Games unlocked. Best lesson score: ${lessonUnlockScore}%` : `Finish a lesson with 70% to unlock games. Current best: ${lessonUnlockScore}%`}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-5">
           <button
-            className={`px-3 py-3 rounded-xl font-bold ${selected === "letter_match" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
-            onClick={() => setSelected("letter_match")}
+            className={`px-3 py-3 rounded-xl font-bold ${selected === "letter_match" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"} ${!unlocked.letter_match ? "opacity-50" : ""}`}
+            onClick={() => unlocked.letter_match && setSelected("letter_match")}
           >
-            Letter Match ({scores.letter_match}%)
+            Letter Match ({scores.letter_match}%) {unlocked.letter_match ? "" : "LOCKED"}
           </button>
 
           <button
@@ -81,21 +103,21 @@ export default function AlphabetGames() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           {selected === "letter_match" && (
             <LetterMatch
-              lesson={{ completed: true, score: 100 }}
+              lesson={{ completed: unlocked.letter_match, score: lessonUnlockScore }}
               onFinish={(score: number) => handleScore("letter_match", score)}
             />
           )}
 
           {selected === "harakat" && unlocked.harakat && (
             <HarakatGame
-              lesson={{ completed: unlocked.harakat, score: scores.letter_match }}
+              lesson={{ completed: unlocked.harakat, score: lessonUnlockScore }}
               onFinish={(score: number) => handleScore("harakat", score)}
             />
           )}
 
           {selected === "word_builder" && unlocked.word_builder && (
             <WordBuilder
-              lesson={{ completed: unlocked.word_builder, score: scores.harakat }}
+              lesson={{ completed: unlocked.word_builder, score: lessonUnlockScore }}
               onFinish={(score: number) => handleScore("word_builder", score)}
             />
           )}
