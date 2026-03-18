@@ -538,15 +538,6 @@ export default function QuranLesson() {
         </div>
       )}
 
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div key={i} className="absolute rounded-full bg-white animate-pulse" style={{
-            width: Math.random() * 3 + 1 + "px", height: Math.random() * 3 + 1 + "px",
-            top: Math.random() * 100 + "%", left: Math.random() * 100 + "%",
-            animationDelay: Math.random() * 3 + "s", opacity: Math.random() * 0.4 + 0.1,
-          }} />
-        ))}
-      </div>
 
       <div className="relative z-10">
         <div className="flex items-center gap-3 px-4 pt-6 pb-4">

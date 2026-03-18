@@ -123,49 +123,6 @@ export default function ChildDashboard() {
 
   return (
     <div className="min-h-screen bg-[#0d1117] relative">
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-4px); }
-        }
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 10px var(--glow), 0 0 20px var(--glow)33; }
-          50% { box-shadow: 0 0 20px var(--glow), 0 0 40px var(--glow)66; }
-        }
-        .card-open { animation: float 4s ease-in-out infinite; }
-        .card-shimmer::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
-          background-size: 200% 100%;
-          animation: shimmer 3s infinite;
-          border-radius: inherit;
-          pointer-events: none;
-        }
-        .star-bg > div { position: absolute; border-radius: 50%; background: white; animation: pulse 3s infinite; }
-      `}</style>
-
-      <div className="absolute inset-0 pointer-events-none overflow-hidden star-bg">
-        {Array.from({ length: 40 }).map((_, i) => (
-          <div
-            key={i}
-            style={{
-              width: (Math.random() * 2.5 + 0.5) + "px",
-              height: (Math.random() * 2.5 + 0.5) + "px",
-              top: Math.random() * 100 + "%",
-              left: Math.random() * 100 + "%",
-              animationDelay: Math.random() * 4 + "s",
-              animationDuration: Math.random() * 2 + 2 + "s",
-              opacity: Math.random() * 0.5 + 0.1,
-            }}
-          />
-        ))}
-      </div>
 
       <div className="relative z-10 max-w-xl mx-auto px-4 pt-6 pb-28">
         <div className="flex items-center justify-between mb-6">

@@ -172,21 +172,6 @@ export default function QuranFolders() {
   return (
     <div className="min-h-screen bg-[#1a1a2e] relative" data-testid="quran-folders">
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 25 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white animate-pulse"
-            style={{
-              width: Math.random() * 3 + 1 + "px",
-              height: Math.random() * 3 + 1 + "px",
-              top: Math.random() * 100 + "%",
-              left: Math.random() * 100 + "%",
-              animationDelay: Math.random() * 3 + "s",
-              animationDuration: Math.random() * 2 + 2 + "s",
-              opacity: Math.random() * 0.5 + 0.2,
-            }}
-          />
-        ))}
       </div>
 
       <div className="relative z-10 px-4 pt-6 pb-4">

@@ -12,7 +12,6 @@ import { OfflineProvider } from "@/contexts/OfflineContext";
 import { ChildAuthProvider } from "@/contexts/ChildAuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RefreshCw, Loader2 } from "lucide-react";
-const logoImage = "/bsa-logo.png";
 import { Analytics } from "@/components/Analytics";
 import { useLocation, useParams } from "wouter";
 
@@ -85,11 +84,7 @@ const VoiceSpaces = lazy(() => import("@/components/VoiceSpaces").then(m => ({ d
 function PageLoader() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-white">
-      <div className="text-center">
-        <img src={logoImage} alt="Barbaarintasan Academy" className="w-20 h-20 mx-auto mb-4 animate-pulse" />
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
-        <p className="text-sm text-gray-500">Sug wax yar waa la dajinayaa...</p>
-      </div>
+      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
     </div>
   );
 }
