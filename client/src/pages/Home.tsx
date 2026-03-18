@@ -2547,7 +2547,7 @@ export default function Home() {
                   <Link href="/child-login">
                     <button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-children-quran">
                       <BookOpen className="w-5 h-5" />
-                      Baro Quraanka
+                      Bar Ilmahaaga Quraanka
                     </button>
                   </Link>
                 </div>
@@ -2565,7 +2565,7 @@ export default function Home() {
                   <Link href="/child-login">
                     <button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg active:scale-[0.98] transition-all" data-testid="button-children-quran-no-enroll">
                       <BookOpen className="w-5 h-5" />
-                      Baro Quraanka
+                      Bar Ilmahaaga Quraanka
                     </button>
                   </Link>
                 </div>
