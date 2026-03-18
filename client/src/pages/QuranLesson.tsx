@@ -288,6 +288,12 @@ export default function QuranLesson() {
   }, []);
 
   const startRecording = useCallback(async () => {
+    // Stop Sheikh audio if playing so mic can record cleanly
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    if (preloadRef.current) { preloadRef.current.pause(); }
+    setIsPlaying(false);
+    setIsLoadingAudio(false);
+
     const createRecorder = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -921,7 +927,7 @@ export default function QuranLesson() {
                 </button>
 
                 <button onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isChecking || isPlaying || !canRecord || autoAdvancing}
+                  disabled={isChecking || !canRecord || autoAdvancing}
                   className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                     isRecording ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50 scale-110" :
                     isChecking || autoAdvancing ? "bg-white/10 text-white/30" :
