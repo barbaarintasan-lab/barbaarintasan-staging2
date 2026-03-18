@@ -115,7 +115,7 @@ export default function ChildDashboard() {
     if (juz.num === 30) {
       setLocation("/quran-folders");
     } else {
-      setLocation(`/quran-lesson/${juz.surahStart}`);
+      setLocation(`/quran-juz/${juz.num}`);
     }
   };
 

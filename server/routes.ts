@@ -11182,6 +11182,76 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
+  app.get("/api/quran/juz/:juzNum/surahs", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const juzNum = parseInt(req.params.juzNum);
+      if (isNaN(juzNum) || juzNum < 1 || juzNum > 30) {
+        return res.status(400).json({ error: "Juz number 1–30 ah u isticmaal" });
+      }
+      const childId = req.session.childId!;
+      const { JUZ_SURAH_RANGES } = await import("./quranLessons");
+      const range = JUZ_SURAH_RANGES[juzNum];
+      if (!range) return res.status(404).json({ error: "Juz la heli waay" });
+      const [startSurah, endSurah] = range;
+
+      const fsModule = await import("fs");
+      const surahs: {
+        number: number; name: string; englishName: string; ayahCount: number;
+        completed: boolean; unlocked: boolean; ayahsCompleted: number; progressPercent: number;
+      }[] = [];
+
+      for (let n = startSurah; n <= endSurah; n++) {
+        const padded = String(n).padStart(3, "0");
+        const filePath = resolveQuranJsonPath(`${padded}.json`);
+        let name = `سورة ${n}`;
+        let englishName = `Surah ${n}`;
+        let ayahCount = 0;
+        try {
+          const raw = fsModule.default.readFileSync(filePath, "utf-8");
+          const parsed = JSON.parse(raw);
+          name = parsed.name || name;
+          englishName = parsed.englishName || parsed.englishNameTranslation || englishName;
+          ayahCount = Array.isArray(parsed.ayahs) ? parsed.ayahs.length : 0;
+        } catch {}
+        surahs.push({ number: n, name, englishName, ayahCount, completed: false, unlocked: false, ayahsCompleted: 0, progressPercent: 0 });
+      }
+
+      const progressRows = await db.select().from(quranLessonProgress).where(
+        and(eq(quranLessonProgress.childId, childId))
+      );
+      const ayahCountBySurah: Record<number, { total: number; completed: number }> = {};
+      for (const row of progressRows) {
+        if (!ayahCountBySurah[row.surahNumber]) ayahCountBySurah[row.surahNumber] = { total: 0, completed: 0 };
+        ayahCountBySurah[row.surahNumber].total++;
+        if (row.completed) ayahCountBySurah[row.surahNumber].completed++;
+      }
+
+      const completedSet = new Set<number>();
+      for (const s of surahs) {
+        const c = ayahCountBySurah[s.number];
+        if (c && s.ayahCount > 0 && c.completed >= s.ayahCount) completedSet.add(s.number);
+      }
+
+      const enriched = surahs.map((s, idx) => {
+        const c = ayahCountBySurah[s.number];
+        const isCompleted = completedSet.has(s.number);
+        const isUnlocked = idx === 0 || completedSet.has(surahs[idx - 1].number);
+        return {
+          ...s,
+          completed: isCompleted,
+          unlocked: isUnlocked || isCompleted,
+          ayahsCompleted: c?.completed || 0,
+          progressPercent: s.ayahCount > 0 && c ? Math.round((c.completed / s.ayahCount) * 100) : 0,
+        };
+      });
+
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("[QURAN JUZ] surahs error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
   // ==========================================
   // Quraanka Caruurta - Arabic Alphabet API
   // ==========================================

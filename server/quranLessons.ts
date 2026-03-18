@@ -103,3 +103,12 @@ export const ENCOURAGEMENT_MESSAGES = [
 export function getRandomEncouragement(): string {
   return ENCOURAGEMENT_MESSAGES[Math.floor(Math.random() * ENCOURAGEMENT_MESSAGES.length)];
 }
+
+export const JUZ_SURAH_RANGES: Record<number, [number, number]> = {
+  1: [1, 1],   2: [2, 2],   3: [3, 3],   4: [4, 4],   5: [5, 5],
+  6: [6, 6],   7: [7, 7],   8: [8, 8],   9: [9, 9],   10: [10, 10],
+  11: [11, 11], 12: [12, 12], 13: [13, 14], 14: [15, 16], 15: [17, 17],
+  16: [18, 20], 17: [21, 22], 18: [23, 24], 19: [25, 26], 20: [27, 28],
+  21: [29, 32], 22: [33, 35], 23: [36, 38], 24: [39, 40], 25: [41, 45],
+  26: [46, 50], 27: [51, 57], 28: [58, 66], 29: [67, 77], 30: [78, 114],
+};
