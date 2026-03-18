@@ -464,9 +464,8 @@ export default function QuranLesson() {
 
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
-  // Adaptive: if child struggled (≥2 mistakes) require 5 listens, else 3
   const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
-  const MIN_LISTENS = currentAyahMistakes >= 2 ? 5 : 3;
+  const MIN_LISTENS = 1;
   const canRecord = listenCount >= MIN_LISTENS && !isCurrentCompleted && !autoAdvancing;
 
   if (authLoading || surahLoading) {
@@ -728,9 +727,7 @@ export default function QuranLesson() {
 
               {!canRecord && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && !isCurrentCompleted && !autoAdvancing && (
                 <p className="text-center text-[#4ECDC4]/70 text-sm mt-4 px-2">
-                  {listenCount === 0
-                    ? "👆 Riix badhanka codka si aad u dhageyso Macalinka"
-                    : `🎧 Ku celi ${MIN_LISTENS - listenCount} jeer si aad u xifdi, ka dibna mic-ka riix`}
+                  👆 Riix badhanka codka si aad u dhageyso Macalinka
                 </p>
               )}
 
