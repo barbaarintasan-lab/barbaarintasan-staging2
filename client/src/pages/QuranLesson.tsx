@@ -1237,21 +1237,43 @@ export default function QuranLesson() {
                 Suurada oo dhan waa bartay — hadda dhageyso oo dib u akhriso!
               </p>
 
-              {/* Full surah text display */}
-              <div className="bg-black/30 rounded-2xl p-4 mb-4 text-right max-h-64 overflow-y-auto border border-[#FFD93D]/20">
-                {surah?.ayahs.map((ayah, i) => (
-                  <p key={ayah.number}
-                    className={`font-arabic text-xl leading-loose mb-2 transition-all duration-300 ${
-                      reviewPlaying && reviewAyahIndex === i
-                        ? "text-[#FFD93D] text-2xl"
-                        : "text-white/80"
-                    }`}
-                    dir="rtl"
-                  >
-                    {ayah.text} {ayah.number === 1 && surahNumber !== 9 ? "" : `﴿${ayah.number}﴾`}
-                  </p>
-                ))}
-              </div>
+              {/* Full surah text display - only show when failed */}
+              {reviewState === "failed" && (
+                <div className="bg-black/30 rounded-2xl p-4 mb-4 text-right max-h-64 overflow-y-auto border border-[#FFD93D]/20">
+                  {surah?.ayahs.map((ayah, i) => (
+                    <p key={ayah.number}
+                      className="font-arabic text-xl leading-loose mb-2 text-white/80"
+                      dir="rtl"
+                    >
+                      {ayah.text} {ayah.number === 1 && surahNumber !== 9 ? "" : `﴿${ayah.number}﴾`}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Visual feedback during other states */}
+              {reviewState !== "failed" && (
+                <div className="bg-black/30 rounded-2xl p-8 mb-4 text-center border border-[#FFD93D]/20">
+                  {reviewState === "listening" && (
+                    <>
+                      <div className="text-5xl mb-3">👂</div>
+                      <p className="text-white/60 text-sm">Dhageyso si fiican</p>
+                    </>
+                  )}
+                  {reviewState === "ready" && (
+                    <>
+                      <div className="text-5xl mb-3">🎤</div>
+                      <p className="text-white/60 text-sm">Diyaar u ahow inaad akhrisho</p>
+                    </>
+                  )}
+                  {(reviewState === "recording" || reviewState === "checking") && (
+                    <>
+                      <div className="text-5xl mb-3">🎙️</div>
+                      <p className="text-white/60 text-sm">Akhri hadda...</p>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col gap-3">
                 {reviewState === "listening" && !reviewPlaying && (
@@ -1342,6 +1364,17 @@ export default function QuranLesson() {
                 {[1, 2, 3].map(i => <Star key={i} className="w-10 h-10 text-[#FFD93D] fill-[#FFD93D]" />)}
               </div>
               <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => { 
+                    setFullSurahReview(true); 
+                    setReviewState("listening");
+                    setSurahComplete(false);
+                  }}
+                  className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-lg rounded-2xl hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  data-testid="button-practice-again"
+                >
+                  🔁 Dib u ciyaar
+                </button>
                 {nextSurahNumber && (
                   <button onClick={() => setLocation(`/quran-lesson/${nextSurahNumber}`)}
                     className="w-full py-4 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-lg rounded-2xl hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
