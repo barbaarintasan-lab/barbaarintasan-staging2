@@ -40,6 +40,101 @@ import { videoProxyRouter } from "./videoProxy";
 // STRIPE DISABLED
 // import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
+// Middleware to check if child is authenticated
+function requireChildAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.childId) {
+    return res.status(401).json({ error: "Child authentication required" });
+  }
+  next();
+}
+
+/**
+ * POST /api/quran/lesson/submit
+ * Soft Pass Feature: Auto-pass on 4th+ attempt to prevent discouragement
+ * Attempts 1-3: Show actual correctness
+ * Attempt 4+: Auto-pass (show correct) so child can move forward
+ */
+async function submitQuranLesson(req: Request, res: Response) {
+  try {
+    const childId = req.session.childId;
+    const { surahNumber, ayahNumber, isCorrect } = req.body;
+
+    if (!childId || !surahNumber || ayahNumber === undefined) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    // Get current progress
+    const existing = await db
+      .select()
+      .from(quranLessonProgress)
+      .where(
+        and(
+          eq(quranLessonProgress.childId, childId),
+          eq(quranLessonProgress.surahNumber, surahNumber),
+          eq(quranLessonProgress.ayahNumber, ayahNumber)
+        )
+      )
+      .limit(1);
+
+    const record = existing[0];
+    const currentAttempt = (record?.attempts ?? 0) + 1;
+
+    // Soft Pass Logic: On 4th+ attempt, auto-pass
+    let isPassed = false;
+    let isSoftPass = false;
+
+    if (currentAttempt >= 4) {
+      isPassed = true;
+      isSoftPass = true;
+    } else {
+      isPassed = isCorrect === true;
+    }
+
+    // Update progress
+    if (record) {
+      await db
+        .update(quranLessonProgress)
+        .set({
+          attempts: currentAttempt,
+          lastScore: isPassed ? 100 : 0,
+          lastAttemptAt: new Date(),
+          completed: !record.completed && isPassed ? true : record.completed,
+          completedAt: !record.completed && isPassed ? new Date() : record.completedAt,
+        })
+        .where(
+          and(
+            eq(quranLessonProgress.childId, childId),
+            eq(quranLessonProgress.surahNumber, surahNumber),
+            eq(quranLessonProgress.ayahNumber, ayahNumber)
+          )
+        );
+    } else {
+      await db.insert(quranLessonProgress).values({
+        childId,
+        surahNumber,
+        ayahNumber,
+        attempts: currentAttempt,
+        lastScore: isPassed ? 100 : 0,
+        bestScore: isPassed ? 100 : 0,
+        completed: isPassed,
+        completedAt: isPassed ? new Date() : null,
+        lastAttemptAt: new Date(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      isPassed,
+      isSoftPass,
+      attemptNumber: currentAttempt,
+      message: isSoftPass ? "Saxday! (Ku sahamaynay oo sii wad)" : isPassed ? "Sax!" : "Calaf, mar kale isku day",
+    });
+  } catch (error) {
+    console.error("Quran lesson error:", error);
+    return res.status(500).json({ error: "Failed to submit" });
+  }
+}
+
 const recordingUpload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }
@@ -20222,6 +20317,11 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       res.status(500).json({ error: "Failed to process payment" });
     }
   });
+
+  // ============================================
+  // Quran Lesson API - Soft Pass Feature
+  // ============================================
+  app.post("/api/quran/lesson/submit", requireChildAuth, submitQuranLesson);
 
   const httpServer = createServer(app);
 
