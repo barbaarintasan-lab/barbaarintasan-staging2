@@ -11,10 +11,10 @@ export interface QuranCurriculumSurah {
 }
 
 export const PHASE_LABELS: Record<Phase, { somali: string; english: string; emoji: string }> = {
-  1: { somali: "Bilowga (Aad u fudud)", english: "Ultra Beginner", emoji: "🌱" },
-  2: { somali: "Sii wadista", english: "Beginner Expansion", emoji: "🌿" },
+  1: { somali: "Bilow (Aad u fudud)", english: "Ultra Beginner", emoji: "🌱" },
+  2: { somali: "Sii wad", english: "Beginner Expansion", emoji: "🌿" },
   3: { somali: "Dhexe", english: "Intermediate", emoji: "🌳" },
-  4: { somali: "Kor u kaca", english: "Moving Up", emoji: "🌟" },
+  4: { somali: "Kor u kacday", english: "Moving Up", emoji: "🌟" },
   5: { somali: "Heer sare (Juz Amma dhamaad)", english: "Advanced", emoji: "🏆" },
 };
 
@@ -93,11 +93,11 @@ export const CURRICULUM_ORDER = JUZ_AMMA_CURRICULUM.map(s => s.number);
 export const DAILY_ATTEMPT_LIMIT = 30;
 
 export const ENCOURAGEMENT_MESSAGES = [
-  "Isku day mar kale, adigaa kartaa! 💪",
-  "Waa ku dhow tahay! Sii wad! 🌟",
-  "Qayb khaldan, laakiin adigaa fiican! ⭐",
+  "Isku day mar kale, waad keeni doontaa! 💪",
+  "Waa ku dhow tahay hadda! Sii wad! 🌟",
+  "Waad khalday, laakiin waad fiican Tahay! ⭐",
   "Dhageyso aayada oo isku day mar kale! 🎧",
-  "Waxaad si fiican u wadataa! Hal mar kale! 🌙",
+  "Waxaad si fiican u wadaa xifdiga! Hal mar oo kale ku celi! 🌙",
 ];
 
 export function getRandomEncouragement(): string {
