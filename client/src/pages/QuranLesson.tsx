@@ -673,7 +673,7 @@ export default function QuranLesson() {
 
               {!canRecordHidden && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && (
                 <p className="text-center text-[#4ECDC4]/70 text-sm mt-4">
-                  Marka hore dhagayso Sheekha, kadibna riix badhanka qari aayad
+                  Marka hore dhagayso Macalinka, ku celcesho oo xifdi Aayda, kadibna riix badhanka kore ee Jaalada ah, qari aayadda oo ka soo bax
                 </p>
               )}
 
