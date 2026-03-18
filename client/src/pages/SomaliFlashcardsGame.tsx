@@ -265,7 +265,7 @@ export default function SomaliFlashcardsGame() {
         <XCircle className="w-12 h-12 text-red-400 mb-4" />
         <p className="text-white/70 text-center mb-4">{error || "Xogta lama helin"}</p>
         <button
-          onClick={() => setLocation("/child-login")}
+          onClick={() => setLocation(`/quran-lesson/${surahNumber}`)}
           className="bg-[#FFD93D] text-[#1a1a2e] px-6 py-2 rounded-xl font-bold"
           data-testid="button-back-dashboard"
         >
@@ -292,7 +292,7 @@ export default function SomaliFlashcardsGame() {
           Bilow Ciyaarta 🚀
         </button>
         <button
-          onClick={() => setLocation("/child-login")}
+          onClick={() => setLocation(`/quran-lesson/${surahNumber}`)}
           className="text-white/30 mt-4 text-sm"
           data-testid="button-back"
         >
@@ -344,7 +344,7 @@ export default function SomaliFlashcardsGame() {
           <RotateCcw className="w-4 h-4" /> Markale celi
         </button>
         <button
-          onClick={() => setLocation("/child-login")}
+          onClick={() => setLocation(`/quran-lesson/${surahNumber}`)}
           className="text-white/35 text-sm"
           data-testid="button-finish"
         >
@@ -359,7 +359,7 @@ export default function SomaliFlashcardsGame() {
     <div className="min-h-screen bg-[#1a1a2e] relative" data-testid="game-somali-flashcards">
       <div className="sticky top-0 z-20 bg-[#1a1a2e]/95 backdrop-blur-sm border-b border-white/5 px-4 py-3">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setLocation("/child-login")} className="text-white/40 p-1" data-testid="button-back-game">
+          <button onClick={() => setLocation(`/quran-lesson/${surahNumber}`)} className="text-white/40 p-1" data-testid="button-back-game">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 text-white/60 text-sm">

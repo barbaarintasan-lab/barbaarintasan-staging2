@@ -27,6 +27,14 @@ interface ReciterOption {
   nameAr: string;
 }
 
+interface RewardSummary {
+  aayahStars: number;
+  surahTrophies: number;
+  gameCoins: number;
+  gameTokens: number;
+  badges: Array<{ key: string; name: string; icon: string }>;
+}
+
 const RECITERS: ReciterOption[] = [
   { id: "husary_muallim", name: "Al-Husary (Muallim)", nameAr: "الحصري - المعلم" },
   { id: "abdul_basit", name: "Abdul Basit (Mujawwad)", nameAr: "عبد الباسط - مجوّد" },
@@ -70,6 +78,7 @@ export default function QuranLesson() {
     try { return localStorage.getItem("quran_reciter") || "husary_muallim"; } catch { return "husary_muallim"; }
   });
   const [showReciterPicker, setShowReciterPicker] = useState(false);
+  const [rewardSummary, setRewardSummary] = useState<RewardSummary | null>(null);
 
   const [listenCount, setListenCount] = useState(0);
   const [isAyahHidden, setIsAyahHidden] = useState(false);
@@ -93,6 +102,25 @@ export default function QuranLesson() {
       })
       .catch(() => {});
   }, [surahNumber, child]);
+
+  useEffect(() => {
+    if (!child) return;
+    fetch("/api/quran/rewards", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setRewardSummary({
+          aayahStars: Number(data.aayahStars || 0),
+          surahTrophies: Number(data.surahTrophies || 0),
+          gameCoins: Number(data.gameCoins || 0),
+          gameTokens: Number(data.gameTokens || 0),
+          badges: Array.isArray(data.badges) ? data.badges : [],
+        });
+      })
+      .catch(() => {
+        setRewardSummary(null);
+      });
+  }, [child, surahComplete]);
 
   useEffect(() => {
     if (sessionExpired || surahComplete) return;
@@ -793,6 +821,81 @@ export default function QuranLesson() {
                 >
                   Ku noqo Casharrada
                 </button>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-3xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-white font-black text-lg">Ciyaaraha Juz Amma</h4>
+                <span className="text-white/50 text-xs">Furan marka suuraddu dhammaato</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => setLocation(`/quran-game/word-puzzle/${surahNumber}`)}
+                  className="rounded-2xl px-4 py-3 bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 font-bold"
+                  data-testid="button-open-word-puzzle"
+                >
+                  Xarafaha Aayada
+                </button>
+                <button
+                  onClick={() => setLocation(`/quran-game/memory-match/${surahNumber}`)}
+                  className="rounded-2xl px-4 py-3 bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-bold"
+                  data-testid="button-open-memory-match"
+                >
+                  Aayah Xusuus
+                </button>
+                <button
+                  onClick={() => setLocation(`/quran-game/surah-quiz/${surahNumber}`)}
+                  className="rounded-2xl px-4 py-3 bg-amber-500/20 border border-amber-400/40 text-amber-200 font-bold"
+                  data-testid="button-open-surah-quiz"
+                >
+                  Suurad Quiz
+                </button>
+                <button
+                  onClick={() => setLocation(`/quran-game/somali-flashcards/${surahNumber}`)}
+                  className="rounded-2xl px-4 py-3 bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-200 font-bold"
+                  data-testid="button-open-somali-flashcards"
+                >
+                  Somali Flashcards
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-3xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <h4 className="text-white font-black text-lg mb-3">Abaalmarin iyo Hadiyad</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <div className="rounded-2xl bg-white/10 p-3 text-center">
+                  <p className="text-xs text-white/60">Aayah Stars</p>
+                  <p className="text-lg font-black text-[#FFD93D]">{rewardSummary?.aayahStars ?? 0}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3 text-center">
+                  <p className="text-xs text-white/60">Surah Trophies</p>
+                  <p className="text-lg font-black text-emerald-300">{rewardSummary?.surahTrophies ?? 0}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3 text-center">
+                  <p className="text-xs text-white/60">Game Coins</p>
+                  <p className="text-lg font-black text-amber-300">{rewardSummary?.gameCoins ?? 0}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3 text-center">
+                  <p className="text-xs text-white/60">Tokens</p>
+                  <p className="text-lg font-black text-cyan-300">{rewardSummary?.gameTokens ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-3">
+                <p className="text-sm font-bold text-white mb-2">Badges aad heshay</p>
+                {rewardSummary?.badges?.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {rewardSummary.badges.slice(0, 6).map((badge) => (
+                      <span key={badge.key} className="rounded-full bg-white/10 border border-white/20 px-3 py-1 text-xs text-white/90 font-bold">
+                        {badge.icon} {badge.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-white/60">Weli badge maadan helin, sii wad dadaalka.</p>
+                )}
               </div>
             </div>
           </div>

@@ -107,11 +107,9 @@ export default function QuranFolders() {
 
                 <div className="p-4 md:p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map((surah) => (
-                    <button
+                    <div
                       key={surah.number}
-                      disabled={!surah.unlocked}
-                      onClick={() => surah.unlocked && setLocation(`/quran-lesson/${surah.number}`)}
-                      className={`text-left rounded-2xl p-4 border transition ${surah.unlocked ? "bg-white/10 border-white/20 hover:bg-white/15" : "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"}`}
+                      className={`text-left rounded-2xl p-4 border transition ${surah.unlocked ? "bg-white/10 border-white/20 hover:bg-white/15" : "bg-white/5 border-white/10 opacity-60"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -123,6 +121,24 @@ export default function QuranFolders() {
                           {surah.unlocked ? "Open" : "Locked"}
                         </span>
                       </div>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          disabled={!surah.unlocked}
+                          onClick={() => surah.unlocked && setLocation(`/quran-lesson/${surah.number}`)}
+                          className={`rounded-xl px-3 py-2 text-sm font-bold ${surah.unlocked ? "bg-[#FFD93D]/20 text-[#FFD93D] border border-[#FFD93D]/40" : "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"}`}
+                        >
+                          Fur casharka
+                        </button>
+                        <button
+                          disabled={!surah.completed}
+                          onClick={() => surah.completed && setLocation(`/quran-game/surah-quiz/${surah.number}`)}
+                          className={`rounded-xl px-3 py-2 text-sm font-bold ${surah.completed ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40" : "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"}`}
+                        >
+                          Ciyaar Juz
+                        </button>
+                      </div>
+
                       {typeof surah.progressPercent === "number" && (
                         <div className="mt-3">
                           <div className="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -131,7 +147,7 @@ export default function QuranFolders() {
                           <p className="text-white/60 text-xs mt-1">Progress: {surah.progressPercent}%</p>
                         </div>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </div>
               </details>
