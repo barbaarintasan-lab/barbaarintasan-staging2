@@ -41,6 +41,14 @@ export default function AlphabetGames() {
     };
   }, [gamesUnlocked]);
 
+  function goBack(fallbackPath: string) {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    setLocation(fallbackPath);
+  }
+
   function handleScore(game: GameKey, value: number) {
     setScores((prev) => ({ ...prev, [game]: Math.max(prev[game], value) }));
     const gameTypeMap: Record<GameKey, "matching" | "tracing" | "quiz"> = {
@@ -67,14 +75,14 @@ export default function AlphabetGames() {
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-cyan-50 p-4 pb-24">
       <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-black text-slate-800">Alphabet Games</h1>
-          <button onClick={() => setLocation("/alphabet-lesson")} className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-sm">
-            Back to lesson
+          <h1 className="text-2xl font-black text-slate-800">Ciyaaraha Xuruufta</h1>
+          <button onClick={() => goBack("/alphabet-lesson")} className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-sm">
+            Dib u noqo
           </button>
         </div>
 
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-          {loadingProgress ? "Checking lesson progress..." : gamesUnlocked ? `Games unlocked. Best lesson score: ${lessonUnlockScore}%` : `Finish a lesson with 70% to unlock games. Current best: ${lessonUnlockScore}%`}
+          {loadingProgress ? "Horumarka casharka waa la hubinayaa..." : gamesUnlocked ? `Ciyaaraha waa furmeen. Natiijada ugu fiican: ${lessonUnlockScore}%` : `Dhamee cashar leh 70% si ciyaaruhu u furmaan. Ugu fiican hadda: ${lessonUnlockScore}%`}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-5">
@@ -82,21 +90,21 @@ export default function AlphabetGames() {
             className={`px-3 py-3 rounded-xl font-bold ${selected === "letter_match" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"} ${!unlocked.letter_match ? "opacity-50" : ""}`}
             onClick={() => unlocked.letter_match && setSelected("letter_match")}
           >
-            Letter Match ({scores.letter_match}%) {unlocked.letter_match ? "" : "LOCKED"}
+            Isku-aadi Xarafka ({scores.letter_match}%) {unlocked.letter_match ? "" : "XIRAN"}
           </button>
 
           <button
             className={`px-3 py-3 rounded-xl font-bold ${selected === "harakat" ? "bg-emerald-600 text-white" : "bg-emerald-100 text-emerald-900"} ${!unlocked.harakat ? "opacity-50" : ""}`}
             onClick={() => unlocked.harakat && setSelected("harakat")}
           >
-            Harakat ({scores.harakat}%) {unlocked.harakat ? "" : "LOCKED"}
+            Xarakaat ({scores.harakat}%) {unlocked.harakat ? "" : "XIRAN"}
           </button>
 
           <button
             className={`px-3 py-3 rounded-xl font-bold ${selected === "word_builder" ? "bg-violet-600 text-white" : "bg-violet-100 text-violet-900"} ${!unlocked.word_builder ? "opacity-50" : ""}`}
             onClick={() => unlocked.word_builder && setSelected("word_builder")}
           >
-            Word Builder ({scores.word_builder}%) {unlocked.word_builder ? "" : "LOCKED"}
+            Dhis Ereyga ({scores.word_builder}%) {unlocked.word_builder ? "" : "XIRAN"}
           </button>
         </div>
 

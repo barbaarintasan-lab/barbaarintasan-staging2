@@ -73,18 +73,18 @@ export default function HarakatGame({ lesson = { completed: false, score: 0 }, l
     <div className="relative rounded-3xl bg-white p-5 shadow-xl border border-emerald-100">
       {!unlocked && (
         <div className="absolute inset-0 z-10 bg-white/85 backdrop-blur-[1px] rounded-3xl flex items-center justify-center p-6 text-center">
-          <p className="text-lg font-bold text-slate-700">Finish lesson with 70% to unlock</p>
+          <p className="text-lg font-bold text-slate-700">Dhamee cashar leh 70% si loo furo</p>
         </div>
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-2xl font-black text-emerald-700">Harakat Game</h3>
-        <span className="text-sm font-bold text-slate-600">Level: {level}</span>
+        <h3 className="text-2xl font-black text-emerald-700">Ciyaarta Xarakaat</h3>
+        <span className="text-sm font-bold text-slate-600">Heer: {level}</span>
       </div>
 
       {!isFinished ? (
         <>
-          <p className="text-sm font-semibold text-slate-500 mb-2">Round {roundIndex + 1} / {totalQuestions}</p>
+          <p className="text-sm font-semibold text-slate-500 mb-2">Wareegga {roundIndex + 1} / {totalQuestions}</p>
           <div className="mb-5 rounded-2xl bg-emerald-50 border-2 border-emerald-200 py-8 text-center">
             <p className="text-6xl md:text-7xl font-black text-slate-900" dir="rtl">{currentRound?.letter}</p>
           </div>
@@ -113,20 +113,20 @@ export default function HarakatGame({ lesson = { completed: false, score: 0 }, l
           {showFeedback && (
             <div className="mt-5 text-center">
               <p className={`text-xl font-black ${selected === currentRound.correctHarakat ? "text-green-600" : "text-red-600"}`}>
-                {selected === currentRound.correctHarakat ? "✔ Correct" : "✖ Wrong"}
+                {selected === currentRound.correctHarakat ? "✔ Sax" : "✖ Qalad"}
               </p>
               <button onClick={nextRound} className="mt-3 rounded-xl bg-indigo-600 text-white font-bold px-5 py-3">
-                Next
+                Xiga
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="text-center py-4">
-          <p className="text-2xl font-black text-slate-800">Score: {finalScore}%</p>
+          <p className="text-2xl font-black text-slate-800">Natiijo: {finalScore}%</p>
           <p className="text-lg font-bold text-slate-600 mt-1">{performance}</p>
           <button onClick={restart} className="mt-4 rounded-xl bg-emerald-600 text-white font-bold px-5 py-3">
-            Play Again
+            Mar kale ciyaar
           </button>
         </div>
       )}

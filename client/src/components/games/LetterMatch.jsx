@@ -48,6 +48,7 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
   const maxPoints = totalQuestions * 10;
   const isFinished = roundIndex >= totalQuestions;
   const reportedRef = useRef(false);
+  const audioRef = useRef(null);
 
   const finalScore = useMemo(() => calculateScore(points, maxPoints), [points, maxPoints]);
   const performance = useMemo(() => getPerformanceLevel(finalScore), [finalScore]);
@@ -59,16 +60,58 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
     }
   }, [isFinished, finalScore, onFinish]);
 
-  function playAudio() {
-    if (!currentRound) return;
-    const audio = new Audio(currentRound.correctLetter.audio);
+  useEffect(() => {
+    const prime = () => {
+      if (audioRef.current) return;
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.muted = true;
+      audioRef.current = audio;
+      const maybePromise = audio.play();
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+          })
+          .catch(() => {
+            audio.muted = false;
+          });
+      }
+      window.removeEventListener("touchstart", prime);
+      window.removeEventListener("pointerdown", prime);
+    };
+
+    window.addEventListener("touchstart", prime, { passive: true });
+    window.addEventListener("pointerdown", prime, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", prime);
+      window.removeEventListener("pointerdown", prime);
+    };
+  }, []);
+
+  function playAudio(audioUrl) {
+    if (!audioUrl) return;
+    const audio = audioRef.current || new Audio();
+    audioRef.current = audio;
+    audio.src = audioUrl;
+    audio.preload = "auto";
+    audio.load();
     audio.play().catch(() => {
       // Audio can fail in browsers without user interaction.
     });
   }
 
+  function playQuestionAudio() {
+    if (!currentRound) return;
+    playAudio(currentRound.correctLetter.audio);
+  }
+
   function handleSelect(letterObj) {
     if (!currentRound || showFeedback) return;
+
+    playAudio(letterObj.audio);
 
     setSelected(letterObj.letter);
     const correct = letterObj.letter === currentRound.correctLetter.letter;
@@ -98,23 +141,24 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
     <div className="relative rounded-3xl bg-white p-5 shadow-xl border border-sky-100">
       {!unlocked && (
         <div className="absolute inset-0 z-10 bg-white/85 backdrop-blur-[1px] rounded-3xl flex items-center justify-center p-6 text-center">
-          <p className="text-lg font-bold text-slate-700">Finish lesson with 70% to unlock</p>
+          <p className="text-lg font-bold text-slate-700">Dhamee cashar leh 70% si loo furo</p>
         </div>
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-2xl font-black text-sky-800">Letter Match</h3>
-        <span className="text-sm font-bold text-slate-600">Level: {level}</span>
+        <h3 className="text-2xl font-black text-sky-800">Isku-aadi Xarafka</h3>
+        <span className="text-sm font-bold text-slate-600">Heer: {level}</span>
       </div>
 
       {!isFinished ? (
         <>
-          <p className="text-sm font-semibold text-slate-500 mb-3">Round {roundIndex + 1} / {totalQuestions}</p>
+          <p className="text-sm font-semibold text-slate-500 mb-3">Wareegga {roundIndex + 1} / {totalQuestions}</p>
           <button
-            onClick={playAudio}
+            onClick={playQuestionAudio}
+            onTouchStart={playQuestionAudio}
             className="mb-5 w-full rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold py-4 text-lg"
           >
-            Play Letter Audio
+            Dhageyso codka xarafka
           </button>
 
           <div className="grid grid-cols-3 gap-3">
@@ -141,23 +185,23 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
           {showFeedback && (
             <div className="mt-5 text-center">
               <p className={`text-xl font-black ${selected === currentRound.correctLetter.letter ? "text-green-600" : "text-red-600"}`}>
-                {selected === currentRound.correctLetter.letter ? "✔ Correct" : "✖ Wrong"}
+                {selected === currentRound.correctLetter.letter ? "✔ Sax" : "✖ Qalad"}
               </p>
               <button
                 onClick={nextRound}
                 className="mt-3 rounded-xl bg-indigo-600 text-white font-bold px-5 py-3"
               >
-                Next
+                Xiga
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="text-center py-4">
-          <p className="text-2xl font-black text-slate-800">Score: {finalScore}%</p>
+          <p className="text-2xl font-black text-slate-800">Natiijo: {finalScore}%</p>
           <p className="text-lg font-bold text-slate-600 mt-1">{performance}</p>
           <button onClick={restart} className="mt-4 rounded-xl bg-sky-600 text-white font-bold px-5 py-3">
-            Play Again
+            Mar kale ciyaar
           </button>
         </div>
       )}

@@ -137,6 +137,7 @@ export default function AlphabetLesson() {
   const userPointsRef = useRef<Point[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const lessonAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isLoading && !child) setLocation("/child-login");
@@ -182,16 +183,58 @@ export default function AlphabetLesson() {
     });
   }, [curriculum]);
 
+  useEffect(() => {
+    const prime = () => {
+      if (lessonAudioRef.current) return;
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.muted = true;
+      lessonAudioRef.current = audio;
+      const maybePromise = audio.play();
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+          })
+          .catch(() => {
+            audio.muted = false;
+          });
+      }
+      window.removeEventListener("touchstart", prime);
+      window.removeEventListener("pointerdown", prime);
+    };
+
+    window.addEventListener("touchstart", prime, { passive: true });
+    window.addEventListener("pointerdown", prime, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", prime);
+      window.removeEventListener("pointerdown", prime);
+    };
+  }, []);
+
   function resolveLetterSlug(item: AlphabetItem) {
     return AUDIO_SLUG_BY_ARABIC[item.arabic] || item.nameSomali.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
   }
 
   function playPronunciation() {
     if (!current) return;
-    const audio = new Audio(currentAudio);
+    const audio = lessonAudioRef.current || new Audio();
+    lessonAudioRef.current = audio;
     audio.preload = "auto";
+    audio.src = currentAudio;
     audio.onerror = () => fallbackSpeak(current.arabic);
+    audio.load();
     audio.play().catch(() => fallbackSpeak(current.arabic));
+  }
+
+  function goBack(fallbackPath: string) {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    setLocation(fallbackPath);
   }
 
   async function startRepeat() {
@@ -368,15 +411,15 @@ export default function AlphabetLesson() {
   }
 
   if (isLoading || loadingCurriculum) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-600 font-bold">Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-slate-600 font-bold">Waa la soo rarayaa...</div>;
   }
 
   if (!current) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-xl font-black text-slate-800">Alphabet curriculum not ready</p>
+        <p className="text-xl font-black text-slate-800">Casharka xuruufta wali diyaar ma aha</p>
         <button className="px-5 py-3 rounded-xl bg-sky-600 text-white font-bold" onClick={() => setLocation("/child-dashboard")}>
-          Back
+          Dib u noqo
         </button>
       </div>
     );
@@ -386,12 +429,15 @@ export default function AlphabetLesson() {
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-emerald-50 p-4 pb-24">
       <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-sky-100 shadow-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-black text-slate-800">Arabic Alphabet</h2>
+          <button onClick={() => goBack("/child-dashboard")} className="px-4 py-2 rounded-xl bg-slate-700 text-white font-bold text-sm">
+            Dib u noqo
+          </button>
+          <h2 className="text-2xl font-black text-slate-800">Baro Xuruufta Carabiga</h2>
           <button onClick={() => setLocation("/alphabet-games")} className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm">
-            Games
+            Ciyaaro
           </button>
         </div>
-        <p className="text-slate-500 font-semibold mb-5">Letter {index + 1} / {curriculum.length}</p>
+        <p className="text-slate-500 font-semibold mb-5">Xaraf {index + 1} / {curriculum.length}</p>
 
         <div className="mb-5 rounded-2xl border-2 border-sky-200 bg-sky-50 p-6 text-center">
           <p className="text-7xl font-black leading-none text-slate-900">{current.arabic}</p>
@@ -400,26 +446,26 @@ export default function AlphabetLesson() {
 
         {step === 1 && (
           <div className="space-y-3">
-            <button onClick={playPronunciation} className="w-full rounded-2xl bg-amber-400 text-slate-900 font-black py-4 text-lg">Play pronunciation</button>
-            <button onClick={() => setStep(2)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">Next: Listen & Repeat</button>
+            <button onClick={playPronunciation} className="w-full rounded-2xl bg-amber-400 text-slate-900 font-black py-4 text-lg">Dhageyso ku dhawaaqista</button>
+            <button onClick={() => setStep(2)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">Xiga: Dhageyso oo ku celi</button>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-3">
             {!recording ? (
-              <button onClick={startRepeat} className="w-full rounded-2xl bg-blue-600 text-white font-black py-4 text-lg">Repeat (Record)</button>
+              <button onClick={startRepeat} className="w-full rounded-2xl bg-blue-600 text-white font-black py-4 text-lg">Duub oo ku celi</button>
             ) : (
-              <button onClick={stopRepeat} className="w-full rounded-2xl bg-red-600 text-white font-black py-4 text-lg">Stop</button>
+              <button onClick={stopRepeat} className="w-full rounded-2xl bg-red-600 text-white font-black py-4 text-lg">Jooji</button>
             )}
             {repeatResult && <p className="text-center text-xl font-black">{repeatResult}</p>}
-            <button onClick={() => setStep(3)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">Skip to tracing</button>
+            <button onClick={() => setStep(3)} className="w-full rounded-2xl bg-emerald-600 text-white font-bold py-3">U gudub qorista</button>
           </div>
         )}
 
         {step === 3 && (
           <div>
-            <p className="text-slate-700 font-semibold mb-3">Trace the dashed shape</p>
+            <p className="text-slate-700 font-semibold mb-3">Raac xariiqda dhibcaha leh</p>
             <div className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
               <canvas
                 ref={canvasRef}
@@ -432,18 +478,18 @@ export default function AlphabetLesson() {
             </div>
 
             <div className="mt-3 flex gap-2">
-              <button onClick={drawBaseCanvas} className="rounded-xl px-4 py-2 bg-slate-700 text-white font-bold">Clear</button>
-              <button onClick={submitTracing} className="rounded-xl px-4 py-2 bg-emerald-600 text-white font-bold">Check</button>
+              <button onClick={drawBaseCanvas} className="rounded-xl px-4 py-2 bg-slate-700 text-white font-bold">Nadiifi</button>
+              <button onClick={submitTracing} className="rounded-xl px-4 py-2 bg-emerald-600 text-white font-bold">Hubi</button>
             </div>
 
             {traceScore !== null && (
-              <p className="mt-3 text-lg font-black text-slate-800">Score: {traceScore}% {traceFeedback}</p>
+              <p className="mt-3 text-lg font-black text-slate-800">Natiijo: {traceScore}% {traceFeedback}</p>
             )}
 
             {traceScore !== null && traceScore >= TRACE_PASS_SCORE && (
               <div className="mt-4 flex gap-2">
-                <button onClick={nextLetter} className="rounded-xl px-5 py-3 bg-indigo-600 text-white font-bold">Next letter</button>
-                <button onClick={() => setLocation("/alphabet-games")} className="rounded-xl px-5 py-3 bg-purple-600 text-white font-bold">Play games</button>
+                <button onClick={nextLetter} className="rounded-xl px-5 py-3 bg-indigo-600 text-white font-bold">Xarafka xiga</button>
+                <button onClick={() => setLocation("/alphabet-games")} className="rounded-xl px-5 py-3 bg-purple-600 text-white font-bold">Tag ciyaaraha</button>
               </div>
             )}
           </div>

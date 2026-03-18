@@ -127,19 +127,19 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
     <div className="relative rounded-3xl bg-white p-5 shadow-xl border border-purple-100">
       {!unlocked && (
         <div className="absolute inset-0 z-10 bg-white/85 backdrop-blur-[1px] rounded-3xl flex items-center justify-center p-6 text-center">
-          <p className="text-lg font-bold text-slate-700">Finish lesson with 70% to unlock</p>
+          <p className="text-lg font-bold text-slate-700">Dhamee cashar leh 70% si loo furo</p>
         </div>
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-2xl font-black text-purple-700">Word Builder</h3>
-        <span className="text-sm font-bold text-slate-600">Level: {level}</span>
+        <h3 className="text-2xl font-black text-purple-700">Dhis Ereyga</h3>
+        <span className="text-sm font-bold text-slate-600">Heer: {level}</span>
       </div>
 
       {!isFinished ? (
         <>
-          <p className="text-sm font-semibold text-slate-500 mb-2">Round {roundIndex + 1} / {totalQuestions}</p>
-          <p className="text-sm font-semibold text-slate-500 mb-3">Build this word</p>
+          <p className="text-sm font-semibold text-slate-500 mb-2">Wareegga {roundIndex + 1} / {totalQuestions}</p>
+          <p className="text-sm font-semibold text-slate-500 mb-3">Dhis eraygan</p>
 
           <div className="mb-4 rounded-2xl border-2 border-purple-200 bg-purple-50 py-4 px-3" dir="rtl">
             <p className="text-4xl md:text-5xl font-black text-slate-900 text-center tracking-wide">{currentRound?.word}</p>
@@ -147,7 +147,7 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
 
           <div className="mb-4 rounded-2xl border-2 border-slate-200 bg-slate-50 p-3 min-h-[86px]" dir="rtl">
             <div className="flex flex-wrap gap-2 justify-center">
-              {userOrder.length === 0 && <p className="text-slate-400 font-semibold">Tap letters below</p>}
+              {userOrder.length === 0 && <p className="text-slate-400 font-semibold">Taabo xuruufaha hoose</p>}
               {userOrder.map((letter, i) => (
                 <button
                   key={`${letter}-${i}`}
@@ -184,11 +184,11 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
 
           <div className="flex items-center justify-center gap-3">
             <button onClick={checkAnswer} className="rounded-xl bg-purple-600 text-white font-bold px-5 py-3">
-              Check
+              Hubi
             </button>
             {feedback && (
               <p className={`text-xl font-black ${feedback === "correct" ? "text-green-600" : "text-red-600"}`}>
-                {feedback === "correct" ? "✔ Correct" : "✖ Wrong"}
+                {feedback === "correct" ? "✔ Sax" : "✖ Qalad"}
               </p>
             )}
           </div>
@@ -196,17 +196,17 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
           {feedback && (
             <div className="mt-4 text-center">
               <button onClick={nextRound} className="rounded-xl bg-indigo-600 text-white font-bold px-5 py-3">
-                Next
+                Xiga
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="text-center py-4">
-          <p className="text-2xl font-black text-slate-800">Score: {finalScore}%</p>
+          <p className="text-2xl font-black text-slate-800">Natiijo: {finalScore}%</p>
           <p className="text-lg font-bold text-slate-600 mt-1">{performance}</p>
           <button onClick={restart} className="mt-4 rounded-xl bg-purple-600 text-white font-bold px-5 py-3">
-            Play Again
+            Mar kale ciyaar
           </button>
         </div>
       )}

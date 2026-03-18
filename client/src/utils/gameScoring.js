@@ -5,7 +5,7 @@ export function calculateScore(points, total) {
 }
 
 export function getPerformanceLevel(score) {
-  if (score >= 90) return "Excellent";
-  if (score >= 70) return "Good";
-  return "Needs Practice";
+  if (score >= 90) return "Aad u fiican";
+  if (score >= 70) return "Wanaagsan";
+  return "Ku celcelin badan samee";
 }
