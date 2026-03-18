@@ -434,12 +434,25 @@ export default function QuranLesson() {
           setSurahComplete(true);
           setFullSurahReview(true); // show full text + sequential audio before games
         } else {
-          // auto-advance to next ayah after 2 seconds
+          // auto-advance to next ayah after 2 seconds, then auto-play sheikh audio
           setAutoAdvancing(true);
+          const nextIdx = Math.min(currentAyahIndex + 1, totalAyahs - 1);
           setTimeout(() => {
             setAutoAdvancing(false);
-            setCurrentAyahIndex(prev => Math.min(prev + 1, totalAyahs - 1));
+            setCurrentAyahIndex(nextIdx);
             setCheckResult(null);
+            // Auto-play sheikh recitation for the new ayah
+            if (surah && surah.ayahs[nextIdx]) {
+              const nextAyahNum = surah.ayahs[nextIdx].number;
+              const url = getAudioUrl(surahNumber, nextAyahNum, selectedReciter);
+              if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+              const audio = new Audio(url);
+              audioRef.current = audio;
+              audio.onplay = () => { setIsPlaying(true); setIsLoadingAudio(false); };
+              audio.onended = () => { setIsPlaying(false); setHasListened(true); preloadNextAyah(); };
+              audio.onerror = () => { setIsPlaying(false); setIsLoadingAudio(false); };
+              setTimeout(() => audio.play().catch(() => {}), 400);
+            }
           }, 2200);
         }
       } else if (!result.completed) {
@@ -713,23 +726,58 @@ export default function QuranLesson() {
                 <p className="text-[#FFD93D] font-bold">+{finalTestResult.starsEarned} ⭐ Xiddig ayaad heshay!</p>
               </div>
             )}
-            <div className="space-y-2">
-              {!finalTestResult.passed && (
-                <button
-                  onClick={() => { setFinalTestResult(null); setReviewReadCount(0); setSessionPhase("review"); }}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-2xl font-bold active:scale-95 transition-transform"
-                  data-testid="button-retry-xifdi"
-                >
-                  🔄 Dib u isku day
-                </button>
+            <div className="space-y-3">
+              {finalTestResult.passed ? (
+                <>
+                  <button
+                    onClick={() => {
+                      // Find next uncompleted ayah to continue from
+                      let nextToLearn = currentAyahIndex;
+                      if (surah) {
+                        for (let i = currentAyahIndex; i < surah.ayahs.length; i++) {
+                          if (!ayahProgress[surah.ayahs[i].number]?.completed) {
+                            nextToLearn = i;
+                            break;
+                          }
+                        }
+                      }
+                      setFinalTestResult(null);
+                      setReviewReadCount(0);
+                      setSessionLearned([]);
+                      setSessionPhase("learning");
+                      setCurrentAyahIndex(nextToLearn);
+                    }}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform"
+                    data-testid="button-continue-hifdi"
+                  >
+                    📖 Sii wad Xifdiga
+                  </button>
+                  <button
+                    onClick={() => setLocation("/child-dashboard")}
+                    className="w-full bg-white/10 border border-white/20 text-white/70 py-3 rounded-2xl font-bold active:scale-95 transition-transform"
+                    data-testid="button-dashboard-after-xifdi"
+                  >
+                    🏠 Ku noqo Dashbordka
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setFinalTestResult(null); setReviewReadCount(0); setSessionPhase("review"); }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-2xl font-bold active:scale-95 transition-transform"
+                    data-testid="button-retry-xifdi"
+                  >
+                    🔄 Dib u isku day
+                  </button>
+                  <button
+                    onClick={() => setLocation("/child-dashboard")}
+                    className="w-full bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] py-3 rounded-2xl font-bold active:scale-95 transition-transform"
+                    data-testid="button-dashboard-after-xifdi-fail"
+                  >
+                    🏠 Ku noqo Dashbordka
+                  </button>
+                </>
               )}
-              <button
-                onClick={() => setLocation("/child-dashboard")}
-                className="w-full bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] py-3 rounded-2xl font-bold active:scale-95 transition-transform"
-                data-testid="button-dashboard-after-xifdi"
-              >
-                🏠 Ku noqo Dashboard
-              </button>
             </div>
           </div>
         ) : (
