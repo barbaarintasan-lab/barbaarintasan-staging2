@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages } from "lucide-react";
+import { Upload, Video, FileText, Plus, List, LogOut, LayoutDashboard, BookOpen, CreditCard, CheckCircle, XCircle, Clock, Film, HelpCircle, Trash2, Pencil, Home, MessageSquareQuote, MessageSquare, MessageCircle, Star, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Headphones, Send, User, Users, Search, ClipboardList, DollarSign, Edit2, Lock, X, Calendar, GripVertical, Eye, EyeOff, Sparkles, Loader2, Edit, Ban, Brain, Save, Cloud, ExternalLink, Landmark, Bell, Shield, Radio, Megaphone, GraduationCap, RefreshCw, Download, ImageIcon, Volume2, Play, Pause, Settings, Archive, Mic, Languages, BarChart3 } from "lucide-react";
 import AIModerationPanel from "@/components/AIModerationPanel";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -4255,7 +4255,7 @@ ${baseUrl}/maaweelo`;
               )}
             </Button>
             <Button
-              variant={["parents", "appointments", "parent-progress", "assessment-insights"].includes(activeTab) ? "default" : "outline"}
+              variant={["parents", "appointments", "parent-progress", "assessment-insights", "quran-analytics"].includes(activeTab) ? "default" : "outline"}
               className="flex items-center justify-center gap-1.5 h-10 text-xs sm:text-sm px-2 sm:px-3 rounded-lg shadow-sm hover:shadow-md transition-all relative"
               onClick={() => setActiveTab("parents")}
               data-testid="nav-waalidka"
@@ -4385,7 +4385,7 @@ ${baseUrl}/maaweelo`;
             )}
             
             {/* Waalidka sub-tabs */}
-            {["parents", "appointments", "parent-progress", "assessment-insights"].includes(activeTab) && (
+            {["parents", "appointments", "parent-progress", "assessment-insights", "quran-analytics"].includes(activeTab) && (
               <>
                 <Button
                   variant={activeTab === "parents" ? "secondary" : "ghost"}
@@ -4425,6 +4425,15 @@ ${baseUrl}/maaweelo`;
                   data-testid="tab-assessment-insights"
                 >
                   <Brain className="w-3 h-3 mr-1" /> Qiimaynta
+                </Button>
+                <Button
+                  variant={activeTab === "quran-analytics" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setActiveTab("quran-analytics")}
+                  data-testid="tab-quran-analytics"
+                >
+                  <BarChart3 className="w-3 h-3 mr-1" /> Ardayda Quraanka
                 </Button>
               </>
             )}
@@ -10228,6 +10237,11 @@ ${baseUrl}/maaweelo`;
               <ParentProgressTab />
             </TabsContent>
 
+            {/* Quran Analytics Tab */}
+            <TabsContent value="quran-analytics">
+              <QuranAnalyticsTab isActive={activeTab === "quran-analytics"} />
+            </TabsContent>
+
             {/* Assessment Insights Tab */}
             <TabsContent value="assessment-insights">
               <AssessmentInsightsTab />
@@ -13763,6 +13777,252 @@ function ParentProgressTab() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function QuranAnalyticsTab({ isActive }: { isActive: boolean }) {
+  const [strugglingSortBy, setStrugglingSortBy] = useState<"retry" | "score" | "activity">("retry");
+  const [strugglingPage, setStrugglingPage] = useState(1);
+  const [engagementPage, setEngagementPage] = useState(1);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const PAGE_SIZE = 10;
+
+  const { data: quranStats, isLoading: statsLoading } = useQuery({
+    queryKey: ["/api/admin/quran-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/quran-stats", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quran stats");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["/api/admin/analytics"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/analytics", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: activityData, isLoading: activityLoading } = useQuery({
+    queryKey: ["/api/admin/children-activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/children-activity", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch children activity");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: strugglingChildren = [], isLoading: strugglingLoading } = useQuery({
+    queryKey: ["/api/admin/struggling-children"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/struggling-children", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch struggling children");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: lessonFunnel, isLoading: funnelLoading } = useQuery({
+    queryKey: ["/api/admin/lesson-funnel"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/lesson-funnel", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch lesson funnel");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: surahDifficulty = [], isLoading: difficultyLoading } = useQuery({
+    queryKey: ["/api/admin/surah-difficulty"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/surah-difficulty", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch surah difficulty");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: parentEngagement = [], isLoading: parentLoading } = useQuery({
+    queryKey: ["/api/admin/parent-engagement"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/parent-engagement", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent engagement");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: usageHeatmap, isLoading: heatmapLoading } = useQuery({
+    queryKey: ["/api/admin/usage-heatmap"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/usage-heatmap", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch usage heatmap");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: liveSessions = [], isLoading: liveLoading } = useQuery({
+    queryKey: ["/api/admin/live-sessions"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/live-sessions", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch live sessions");
+      return res.json();
+    },
+    enabled: isActive,
+    refetchInterval: isActive ? 30000 : false,
+  });
+
+  const { data: rewardsAnalytics, isLoading: rewardsLoading } = useQuery({
+    queryKey: ["/api/admin/rewards-analytics"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/rewards-analytics", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch rewards analytics");
+      return res.json();
+    },
+    enabled: isActive,
+  });
+
+  const { data: alertsData, isLoading: alertsLoading } = useQuery({
+    queryKey: ["/api/admin/alerts"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/alerts", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch alerts");
+      return res.json();
+    },
+    enabled: isActive,
+    refetchInterval: isActive ? 60000 : false,
+  });
+
+  const { data: childDrilldown, isLoading: drilldownLoading } = useQuery({
+    queryKey: ["/api/admin/child-drilldown", selectedChildId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/child/${selectedChildId}/quran-drilldown`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch child drilldown");
+      return res.json();
+    },
+    enabled: isActive && !!selectedChildId,
+  });
+
+  const sortedStruggling = [...strugglingChildren].sort((a: any, b: any) => {
+    if (strugglingSortBy === "score") return (a.lastScore || 0) - (b.lastScore || 0);
+    if (strugglingSortBy === "activity") return new Date(b.lastActivity || 0).getTime() - new Date(a.lastActivity || 0).getTime();
+    return (b.retryCount || 0) - (a.retryCount || 0);
+  });
+
+  const totalStrugglingPages = Math.max(1, Math.ceil(sortedStruggling.length / PAGE_SIZE));
+  const strugglingPageRows = sortedStruggling.slice((strugglingPage - 1) * PAGE_SIZE, strugglingPage * PAGE_SIZE);
+  const totalEngagementPages = Math.max(1, Math.ceil(parentEngagement.length / PAGE_SIZE));
+  const engagementRows = parentEngagement.slice((engagementPage - 1) * PAGE_SIZE, engagementPage * PAGE_SIZE);
+
+  const dayNames = ["Axad", "Isniin", "Talaado", "Arbaco", "Khamiis", "Jimce", "Sabti"];
+  const gridMap = new Map<string, number>();
+  (usageHeatmap?.grid || []).forEach((item: any) => {
+    gridMap.set(`${item.dayOfWeek}-${item.hour}`, item.usageCount || 0);
+  });
+  const maxGridUsage = Math.max(1, ...(usageHeatmap?.grid || []).map((g: any) => g.usageCount || 0));
+
+  const difficultyBadge = (band: string) => {
+    if (band === "Hard") return <Badge className="bg-red-100 text-red-700">🔴 Hard</Badge>;
+    if (band === "Medium") return <Badge className="bg-yellow-100 text-yellow-700">🟡 Medium</Badge>;
+    return <Badge className="bg-green-100 text-green-700">🟢 Easy</Badge>;
+  };
+
+  const engagementBadge = (status: string) => {
+    if (status === "Engaged") return <Badge className="bg-green-100 text-green-700">Engaged ✅</Badge>;
+    if (status === "Low activity") return <Badge className="bg-yellow-100 text-yellow-700">Low activity ⚠️</Badge>;
+    return <Badge className="bg-gray-200 text-gray-700">Inactive ❌</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">📊 Ardayda Quraanka</h2>
+          <p className="text-sm text-gray-500">Data → Insight → Decision</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card className="border-none shadow-sm bg-blue-50"><CardContent className="p-3"><p className="text-xs text-blue-700">Children</p><p className="text-xl font-bold text-blue-900">{statsLoading ? "..." : (quranStats?.totalChildren ?? 0)}</p></CardContent></Card>
+        <Card className="border-none shadow-sm bg-indigo-50"><CardContent className="p-3"><p className="text-xs text-indigo-700">Completed Surahs</p><p className="text-xl font-bold text-indigo-900">{statsLoading ? "..." : (quranStats?.completedLessons ?? 0)}</p></CardContent></Card>
+        <Card className="border-none shadow-sm bg-green-50"><CardContent className="p-3"><p className="text-xs text-green-700">DAU</p><p className="text-xl font-bold text-green-900">{analyticsLoading ? "..." : (analytics?.child?.dau ?? 0)}</p></CardContent></Card>
+        <Card className="border-none shadow-sm bg-emerald-50"><CardContent className="p-3"><p className="text-xs text-emerald-700">WAU</p><p className="text-xl font-bold text-emerald-900">{analyticsLoading ? "..." : (analytics?.child?.wau ?? 0)}</p></CardContent></Card>
+        <Card className="border-none shadow-sm bg-orange-50"><CardContent className="p-3"><p className="text-xs text-orange-700">Drop-off</p><p className="text-xl font-bold text-orange-900">{funnelLoading ? "..." : `${lessonFunnel?.drop_off_rate ?? 0}%`}</p></CardContent></Card>
+        <Card className="border-none shadow-sm bg-purple-50"><CardContent className="p-3"><p className="text-xs text-purple-700">Avg Score</p><p className="text-xl font-bold text-purple-900">{statsLoading ? "..." : `${quranStats?.avgBestScore ?? 0}%`}</p></CardContent></Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-none shadow-md bg-white">
+          <CardHeader><CardTitle className="text-base">Drop-off Funnel</CardTitle><CardDescription>Lessons Started vs Completed</CardDescription></CardHeader>
+          <CardContent>
+            {funnelLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : (
+              <div className="space-y-3">
+                <div><div className="flex justify-between text-xs mb-1"><span>Started</span><span>{lessonFunnel?.started_lessons ?? 0}</span></div><div className="h-4 bg-blue-200 rounded"><div className="h-4 bg-blue-500 rounded" style={{ width: "100%" }} /></div></div>
+                <div><div className="flex justify-between text-xs mb-1"><span>Completed</span><span>{lessonFunnel?.completed_lessons ?? 0}</span></div><div className="h-4 bg-green-100 rounded"><div className="h-4 bg-green-500 rounded" style={{ width: `${Math.min(100, (lessonFunnel?.started_lessons || 0) > 0 ? ((lessonFunnel?.completed_lessons || 0) / lessonFunnel.started_lessons) * 100 : 0)}%` }} /></div></div>
+                <p className="text-sm text-gray-600">Drop-off rate: <span className="font-semibold">{lessonFunnel?.drop_off_rate ?? 0}%</span></p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-md bg-white">
+          <CardHeader><CardTitle className="text-base">Daily Active Children (14d)</CardTitle><CardDescription>Usage trend</CardDescription></CardHeader>
+          <CardContent>
+            {analyticsLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : (
+              <div className="space-y-2">
+                {(analytics?.dailyActiveChildren || []).map((row: any) => {
+                  const max = Math.max(1, ...(analytics?.dailyActiveChildren || []).map((r: any) => r.activeChildren || 0));
+                  const width = ((row.activeChildren || 0) / max) * 100;
+                  return <div key={row.day} className="flex items-center gap-2"><span className="text-xs text-gray-500 w-24">{row.day}</span><div className="h-3 flex-1 bg-gray-100 rounded"><div className="h-3 bg-indigo-500 rounded" style={{ width: `${width}%` }} /></div><span className="text-xs font-medium w-8 text-right">{row.activeChildren}</span></div>;
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-none shadow-md bg-white">
+        <CardHeader><CardTitle className="text-base">Struggling Children</CardTitle><CardDescription>🔴 Needs Help: retries & low score & incomplete lesson</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2"><Label className="text-xs">Sort</Label><Select value={strugglingSortBy} onValueChange={(v) => setStrugglingSortBy(v as any)}><SelectTrigger className="w-48 h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="retry">Retry Count</SelectItem><SelectItem value="score">Lowest Score</SelectItem><SelectItem value="activity">Last Activity</SelectItem></SelectContent></Select></div>
+          {strugglingLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : (<>
+            <div className="overflow-auto"><table className="w-full text-sm" data-testid="table-struggling-children"><thead><tr className="border-b text-left text-xs text-gray-500"><th className="py-2 pr-2">Child</th><th className="py-2 pr-2">Surah</th><th className="py-2 pr-2">Ayah</th><th className="py-2 pr-2">Retry</th><th className="py-2 pr-2">Score</th><th className="py-2 pr-2">Status</th><th className="py-2 pr-2">Action</th></tr></thead><tbody>{strugglingPageRows.map((row: any, idx: number) => (<tr key={`${row.childId}-${row.surahNumber}-${row.ayah}-${idx}`} className="border-b"><td className="py-2 pr-2 font-medium">{row.childName}</td><td className="py-2 pr-2">{row.surah}</td><td className="py-2 pr-2">{row.ayah}</td><td className="py-2 pr-2">{row.retryCount}</td><td className="py-2 pr-2">{row.lastScore}%</td><td className="py-2 pr-2"><Badge className="bg-red-100 text-red-700">🔴 Needs Help</Badge></td><td className="py-2 pr-2"><Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSelectedChildId(row.childId)}>Drilldown</Button></td></tr>))}</tbody></table></div>
+            <div className="flex items-center justify-between"><p className="text-xs text-gray-500">Page {strugglingPage} of {totalStrugglingPages}</p><div className="flex gap-2"><Button size="sm" variant="outline" className="h-7 text-xs" disabled={strugglingPage <= 1} onClick={() => setStrugglingPage((p) => p - 1)}>Prev</Button><Button size="sm" variant="outline" className="h-7 text-xs" disabled={strugglingPage >= totalStrugglingPages} onClick={() => setStrugglingPage((p) => p + 1)}>Next</Button></div></div>
+          </>)}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Surah Difficulty Ranking</CardTitle><CardDescription>Avg retries, score, completion rate</CardDescription></CardHeader><CardContent>{difficultyLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <div className="space-y-2 max-h-80 overflow-auto" data-testid="list-surah-difficulty">{surahDifficulty.slice(0, 20).map((row: any) => (<div key={row.surahNumber} className="p-2 rounded border border-gray-200"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium">{row.surahName}</p>{difficultyBadge(row.difficultyBand)}</div><p className="text-xs text-gray-500 mt-1">Score: {row.difficultyScore} | Retries: {row.avgRetries} | Avg: {row.avgScore}% | Completion: {row.completionRate}%</p></div>))}</div>}</CardContent></Card>
+
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Parent Engagement</CardTitle><CardDescription>Engaged / Low activity / Inactive</CardDescription></CardHeader><CardContent className="space-y-3">{parentLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : (<><div className="overflow-auto"><table className="w-full text-sm" data-testid="table-parent-engagement"><thead><tr className="border-b text-left text-xs text-gray-500"><th className="py-2 pr-2">Parent</th><th className="py-2 pr-2">Children</th><th className="py-2 pr-2">Events(30d)</th><th className="py-2 pr-2">Status</th></tr></thead><tbody>{engagementRows.map((row: any) => (<tr key={row.parentId} className="border-b"><td className="py-2 pr-2">{row.parentName}</td><td className="py-2 pr-2">{row.childrenCount}</td><td className="py-2 pr-2">{row.childEvents30d}</td><td className="py-2 pr-2">{engagementBadge(row.status)}</td></tr>))}</tbody></table></div><div className="flex items-center justify-between"><p className="text-xs text-gray-500">Page {engagementPage} of {totalEngagementPages}</p><div className="flex gap-2"><Button size="sm" variant="outline" className="h-7 text-xs" disabled={engagementPage <= 1} onClick={() => setEngagementPage((p) => p - 1)}>Prev</Button><Button size="sm" variant="outline" className="h-7 text-xs" disabled={engagementPage >= totalEngagementPages} onClick={() => setEngagementPage((p) => p + 1)}>Next</Button></div></div></>)}</CardContent></Card>
+      </div>
+
+      <Card className="border-none shadow-md bg-white">
+        <CardHeader><CardTitle className="text-base">Usage Heatmap (Day x Hour)</CardTitle><CardDescription>Goorta app-ka ugu badan la isticmaalo</CardDescription></CardHeader>
+        <CardContent>{heatmapLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <div className="overflow-auto"><div className="min-w-[720px] grid grid-cols-[100px_repeat(24,minmax(18px,1fr))] gap-1 text-[10px]"><div />{Array.from({ length: 24 }, (_, h) => (<div key={`h-${h}`} className="text-center text-gray-500">{h}</div>))}{dayNames.map((day, d) => (<><div key={`day-${d}`} className="text-xs font-medium text-gray-600 py-1">{day}</div>{Array.from({ length: 24 }, (_, h) => { const val = gridMap.get(`${d}-${h}`) || 0; const opacity = Math.max(0.08, val / maxGridUsage); return <div key={`${d}-${h}`} title={`${day} ${h}:00 - ${val}`} className="h-4 rounded" style={{ backgroundColor: `rgba(59,130,246,${opacity})` }} />; })}</>))}</div></div>}</CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Live Sessions</CardTitle><CardDescription>Who is online now</CardDescription></CardHeader><CardContent>{liveLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : liveSessions.length === 0 ? <p className="text-sm text-gray-500">No active child sessions right now.</p> : <div className="space-y-2 max-h-72 overflow-auto">{liveSessions.map((s: any) => (<div key={s.sessionId} className="p-2 border border-gray-200 rounded"><p className="text-sm font-medium">{s.childName} <span className="text-xs text-gray-500">({s.parentName})</span></p><p className="text-xs text-gray-500">Surah {s.currentSurah ?? "-"}, Ayah {s.currentAyah ?? "-"}</p></div>))}</div>}</CardContent></Card>
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Rewards Analytics</CardTitle><CardDescription>Motivation insights</CardDescription></CardHeader><CardContent>{rewardsLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <div className="space-y-2 text-sm"><p>Total rewards earned: <span className="font-semibold">{rewardsAnalytics?.totalRewardsEarned ?? 0}</span></p><p>Average rewards per child: <span className="font-semibold">{rewardsAnalytics?.avgRewardsPerChild ?? 0}</span></p><p>Most unlocked game: <span className="font-semibold">{rewardsAnalytics?.mostUnlockedGame || "N/A"}</span></p><p>Unlock count: <span className="font-semibold">{rewardsAnalytics?.mostUnlockedGameCount ?? 0}</span></p></div>}</CardContent></Card>
+      </div>
+
+      <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Smart Alerts</CardTitle><CardDescription>System-generated warnings</CardDescription></CardHeader><CardContent>{alertsLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : (alertsData?.alerts || []).length === 0 ? <p className="text-sm text-green-700">No critical alerts right now.</p> : <div className="space-y-2" data-testid="list-admin-alerts">{(alertsData?.alerts || []).map((alert: any, idx: number) => (<div key={`${alert.type}-${idx}`} className="p-3 rounded border border-amber-200 bg-amber-50 text-sm"><p className="font-semibold">{alert.type}</p><p>{alert.message}</p></div>))}</div>}</CardContent></Card>
+
+      {selectedChildId && <Card className="border-none shadow-md bg-white"><CardHeader><div className="flex items-center justify-between"><div><CardTitle className="text-base">Per Child Drilldown</CardTitle><CardDescription>Progress per surah, last mistakes, retry heatmap</CardDescription></div><Button size="sm" variant="outline" onClick={() => setSelectedChildId(null)}>Close</Button></div></CardHeader><CardContent>{drilldownLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : !childDrilldown ? <p className="text-sm text-gray-500">No data.</p> : <div className="space-y-4"><div><p className="text-sm font-semibold">{childDrilldown.child?.name}</p><p className="text-xs text-gray-500">Parent: {childDrilldown.child?.parentName}</p></div><div className="space-y-2 max-h-56 overflow-auto">{(childDrilldown.surahProgress || []).map((s: any) => { const pct = s.completed ? 100 : Math.min(95, Math.round(s.avgBestScore || s.accuracy || 0)); return <div key={`${s.surahNumber}`}><div className="flex justify-between text-xs mb-1"><span>{s.surahName || `Surah ${s.surahNumber}`}</span><span>{pct}%</span></div><div className="h-2 bg-gray-200 rounded"><div className="h-2 bg-blue-500 rounded" style={{ width: `${pct}%` }} /></div></div>; })}</div><div><p className="text-sm font-semibold mb-2">Last Mistakes</p><div className="overflow-auto max-h-52"><table className="w-full text-xs"><thead><tr className="border-b"><th className="text-left py-1">Surah</th><th className="text-left py-1">Ayah</th><th className="text-left py-1">Attempts</th><th className="text-left py-1">Last Score</th></tr></thead><tbody>{(childDrilldown.lastMistakes || []).slice(0, 20).map((m: any, idx: number) => (<tr key={`${m.surahNumber}-${m.ayahNumber}-${idx}`} className="border-b"><td className="py-1">{m.surahNumber}</td><td className="py-1">{m.ayahNumber}</td><td className="py-1">{m.attempts}</td><td className="py-1">{m.lastScore}%</td></tr>))}</tbody></table></div></div></div>}</CardContent></Card>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Most Active Children</CardTitle></CardHeader><CardContent>{activityLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <div className="space-y-1">{(activityData?.mostActive || []).slice(0, 8).map((c: any) => (<div key={`most-${c.childId}`} className="flex items-center justify-between text-sm"><span>{c.childName}</span><span className="text-gray-500">{c.totalAttempts} attempts</span></div>))}</div>}</CardContent></Card>
+        <Card className="border-none shadow-md bg-white"><CardHeader><CardTitle className="text-base">Least Active Children</CardTitle></CardHeader><CardContent>{activityLoading ? <div className="py-8 text-center text-gray-500">Loading...</div> : <div className="space-y-1">{(activityData?.leastActive || []).slice(0, 8).map((c: any) => (<div key={`least-${c.childId}`} className="flex items-center justify-between text-sm"><span>{c.childName}</span><span className="text-gray-500">{c.totalAttempts} attempts</span></div>))}</div>}</CardContent></Card>
+      </div>
     </div>
   );
 }

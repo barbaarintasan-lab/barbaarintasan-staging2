@@ -528,6 +528,26 @@ async function requireParentAuth(req: Request, res: Response, next: NextFunction
   return next();
 }
 
+const ADMIN_ANALYTICS_CACHE_TTL_MS = 60 * 1000;
+const adminAnalyticsCache = new Map<string, { expiresAt: number; data: any }>();
+
+function getCachedAdminAnalytics(key: string) {
+  const cached = adminAnalyticsCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt < Date.now()) {
+    adminAnalyticsCache.delete(key);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedAdminAnalytics(key: string, data: any) {
+  adminAnalyticsCache.set(key, {
+    expiresAt: Date.now() + ADMIN_ANALYTICS_CACHE_TTL_MS,
+    data,
+  });
+}
+
 // Check if parent has active subscription for a course
 async function checkCourseAccess(parentId: string, courseId: string): Promise<{ hasAccess: boolean; reason?: string }> {
   const course = await storage.getCourse(courseId);
@@ -8690,6 +8710,761 @@ Return a JSON object with:
     } catch (error) {
       console.error("Error fetching parent progress:", error);
       res.status(500).json({ error: "Failed to fetch parent progress" });
+    }
+  });
+
+  // Admin: Quran learning overview stats
+  app.get("/api/admin/quran-stats", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:quran-stats";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const [totalsResult, scoreResult] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            (SELECT COUNT(*) FROM children) AS total_children,
+            (SELECT COUNT(DISTINCT parent_id) FROM children) AS total_parents_with_children,
+            (SELECT COUNT(DISTINCT child_id || '-' || surah_number) FROM quran_lesson_progress WHERE attempts > 0) AS started_lessons,
+            (SELECT COUNT(*) FROM child_progress WHERE completed = true) AS completed_lessons,
+            (SELECT COUNT(*) FROM quran_lesson_progress WHERE completed = true) AS completed_ayahs,
+            (SELECT COALESCE(SUM(attempts), 0) FROM quran_lesson_progress) AS total_attempts,
+            (SELECT COUNT(DISTINCT child_id) FROM quran_lesson_progress WHERE last_attempt_at >= NOW() - INTERVAL '7 days') AS active_children_7d
+        `),
+        db.execute(sql`
+          SELECT
+            COALESCE(ROUND(AVG(best_score)::numeric, 1), 0) AS avg_best_score,
+            COALESCE(ROUND(AVG(last_score)::numeric, 1), 0) AS avg_last_score
+          FROM quran_lesson_progress
+        `),
+      ]);
+
+      const totals = (totalsResult.rows?.[0] as any) || {};
+      const scores = (scoreResult.rows?.[0] as any) || {};
+      const startedLessons = Number(totals.started_lessons || 0);
+      const completedLessons = Number(totals.completed_lessons || 0);
+      const dropOffRate = startedLessons > 0 ? Number((((startedLessons - completedLessons) / startedLessons) * 100).toFixed(1)) : 0;
+
+      const payload = {
+        totalChildren: Number(totals.total_children || 0),
+        totalParentsWithChildren: Number(totals.total_parents_with_children || 0),
+        startedLessons,
+        completedLessons,
+        completedAyahs: Number(totals.completed_ayahs || 0),
+        totalAttempts: Number(totals.total_attempts || 0),
+        activeChildren7d: Number(totals.active_children_7d || 0),
+        avgBestScore: Number(scores.avg_best_score || 0),
+        avgLastScore: Number(scores.avg_last_score || 0),
+        dropOffRate,
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching quran stats:", error);
+      res.status(500).json({ error: "Failed to fetch quran stats" });
+    }
+  });
+
+  // Admin: DAU / WAU analytics
+  app.get("/api/admin/analytics", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:quran-analytics";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const [childrenActivity, parentActivity, dailySeries] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '1 day') AS dau,
+            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '7 days') AS wau,
+            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '30 days') AS mau
+          FROM quran_lesson_progress
+          WHERE last_attempt_at IS NOT NULL
+        `),
+        db.execute(sql`
+          SELECT
+            COUNT(DISTINCT id) FILTER (WHERE COALESCE(last_active_at, last_login_at) >= NOW() - INTERVAL '1 day') AS parent_dau,
+            COUNT(DISTINCT id) FILTER (WHERE COALESCE(last_active_at, last_login_at) >= NOW() - INTERVAL '7 days') AS parent_wau
+          FROM parents
+        `),
+        db.execute(sql`
+          SELECT
+            TO_CHAR(DATE_TRUNC('day', last_attempt_at), 'YYYY-MM-DD') AS day,
+            COUNT(DISTINCT child_id) AS active_children
+          FROM quran_lesson_progress
+          WHERE last_attempt_at >= NOW() - INTERVAL '14 days'
+          GROUP BY DATE_TRUNC('day', last_attempt_at)
+          ORDER BY DATE_TRUNC('day', last_attempt_at)
+        `),
+      ]);
+
+      const c = (childrenActivity.rows?.[0] as any) || {};
+      const p = (parentActivity.rows?.[0] as any) || {};
+
+      const payload = {
+        child: {
+          dau: Number(c.dau || 0),
+          wau: Number(c.wau || 0),
+          mau: Number(c.mau || 0),
+        },
+        parent: {
+          dau: Number(p.parent_dau || 0),
+          wau: Number(p.parent_wau || 0),
+        },
+        dailyActiveChildren: (dailySeries.rows || []).map((r: any) => ({
+          day: r.day,
+          activeChildren: Number(r.active_children || 0),
+        })),
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Admin: Most/least active children
+  app.get("/api/admin/children-activity", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:children-activity";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const activity = await db.execute(sql`
+        SELECT
+          c.id AS child_id,
+          c.name AS child_name,
+          COALESCE(COUNT(qlp.id), 0) AS ayah_rows,
+          COALESCE(SUM(qlp.attempts), 0) AS total_attempts,
+          COALESCE(ROUND(AVG(qlp.best_score)::numeric, 1), 0) AS avg_score,
+          MAX(qlp.last_attempt_at) AS last_activity
+        FROM children c
+        LEFT JOIN quran_lesson_progress qlp ON qlp.child_id = c.id
+        GROUP BY c.id, c.name
+      `);
+
+      const rows = (activity.rows || []).map((r: any) => ({
+        childId: r.child_id,
+        childName: r.child_name,
+        ayahRows: Number(r.ayah_rows || 0),
+        totalAttempts: Number(r.total_attempts || 0),
+        avgScore: Number(r.avg_score || 0),
+        lastActivity: r.last_activity,
+      }));
+
+      const scored = rows
+        .map((r) => ({
+          ...r,
+          activityScore: r.totalAttempts + r.ayahRows * 2 + (r.lastActivity ? 10 : 0),
+        }))
+        .sort((a, b) => b.activityScore - a.activityScore);
+
+      const payload = {
+        mostActive: scored.slice(0, 10),
+        leastActive: [...scored].reverse().slice(0, 10),
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching children activity:", error);
+      res.status(500).json({ error: "Failed to fetch children activity" });
+    }
+  });
+
+  // Admin: Children who need support (struggling)
+  app.get("/api/admin/struggling-children", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:struggling-children";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          c.id AS child_id,
+          c.name AS child_name,
+          qlp.surah_number,
+          COALESCE(cp.surah_name, CONCAT('Surah ', qlp.surah_number::text)) AS surah_name,
+          qlp.ayah_number,
+          qlp.attempts AS retry_count,
+          qlp.last_score,
+          qlp.best_score,
+          qlp.completed,
+          qlp.last_attempt_at AS last_activity
+        FROM quran_lesson_progress qlp
+        JOIN children c ON c.id = qlp.child_id
+        LEFT JOIN child_progress cp
+          ON cp.child_id = qlp.child_id
+         AND cp.surah_number = qlp.surah_number
+        WHERE qlp.attempts > 3
+          AND (
+            qlp.last_score < 60
+            OR qlp.best_score < 60
+            OR qlp.completed = false
+          )
+        ORDER BY qlp.attempts DESC, qlp.last_attempt_at DESC NULLS LAST
+        LIMIT 200
+      `);
+
+      const payload = (result.rows || []).map((r: any) => ({
+        childId: r.child_id,
+        childName: r.child_name,
+        surahNumber: Number(r.surah_number),
+        surah: r.surah_name,
+        ayah: Number(r.ayah_number),
+        retryCount: Number(r.retry_count || 0),
+        lastScore: Number(r.last_score || 0),
+        bestScore: Number(r.best_score || 0),
+        completed: Boolean(r.completed),
+        lastActivity: r.last_activity,
+        status: "Needs Help",
+      }));
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching struggling children:", error);
+      res.status(500).json({ error: "Failed to fetch struggling children" });
+    }
+  });
+
+  // Admin: Lesson funnel (started vs completed)
+  app.get("/api/admin/lesson-funnel", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:lesson-funnel";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          (SELECT COUNT(DISTINCT child_id || '-' || surah_number) FROM quran_lesson_progress WHERE attempts > 0) AS started_lessons,
+          (SELECT COUNT(DISTINCT child_id || '-' || surah_number) FROM child_progress WHERE completed = true) AS completed_lessons
+      `);
+
+      const row = (result.rows?.[0] as any) || {};
+      const startedLessons = Number(row.started_lessons || 0);
+      const completedLessons = Number(row.completed_lessons || 0);
+      const dropOffRate = startedLessons > 0
+        ? Number((((startedLessons - completedLessons) / startedLessons) * 100).toFixed(1))
+        : 0;
+
+      const payload = {
+        started_lessons: startedLessons,
+        completed_lessons: completedLessons,
+        drop_off_rate: dropOffRate,
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching lesson funnel:", error);
+      res.status(500).json({ error: "Failed to fetch lesson funnel" });
+    }
+  });
+
+  // Admin: Surah difficulty ranking
+  app.get("/api/admin/surah-difficulty", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:surah-difficulty";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          qlp.surah_number,
+          COALESCE(MAX(cp.surah_name), CONCAT('Surah ', qlp.surah_number::text)) AS surah_name,
+          COALESCE(ROUND(AVG(GREATEST(qlp.attempts - 1, 0))::numeric, 2), 0) AS avg_retries,
+          COALESCE(ROUND(AVG(qlp.best_score)::numeric, 2), 0) AS avg_score,
+          COALESCE(ROUND(AVG(CASE WHEN qlp.completed THEN 1 ELSE 0 END)::numeric * 100, 2), 0) AS completion_rate
+        FROM quran_lesson_progress qlp
+        LEFT JOIN child_progress cp
+          ON cp.child_id = qlp.child_id
+         AND cp.surah_number = qlp.surah_number
+        GROUP BY qlp.surah_number
+        HAVING COUNT(*) > 0
+      `);
+
+      const payload = (result.rows || [])
+        .map((r: any) => {
+          const avgRetries = Number(r.avg_retries || 0);
+          const avgScore = Number(r.avg_score || 0);
+          const completionRate = Number(r.completion_rate || 0);
+          const difficultyScore = Number((avgRetries * 12 + (100 - avgScore) * 0.6 + (100 - completionRate) * 0.8).toFixed(2));
+          const difficultyBand = difficultyScore >= 60 ? "Hard" : difficultyScore >= 35 ? "Medium" : "Easy";
+
+          return {
+            surahNumber: Number(r.surah_number),
+            surahName: r.surah_name,
+            avgRetries,
+            avgScore,
+            completionRate,
+            difficultyScore,
+            difficultyBand,
+          };
+        })
+        .sort((a, b) => b.difficultyScore - a.difficultyScore);
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching surah difficulty:", error);
+      res.status(500).json({ error: "Failed to fetch surah difficulty" });
+    }
+  });
+
+  // Admin: Parent engagement score
+  app.get("/api/admin/parent-engagement", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:parent-engagement";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          p.id AS parent_id,
+          p.name AS parent_name,
+          p.email,
+          p.last_login_at,
+          p.last_active_at,
+          COUNT(DISTINCT c.id) AS children_count,
+          COUNT(qlp.id) FILTER (WHERE qlp.last_attempt_at >= NOW() - INTERVAL '30 days') AS child_events_30d,
+          MAX(qlp.last_attempt_at) AS latest_child_activity,
+          COUNT(cs.id) FILTER (WHERE cs.created_at >= NOW() - INTERVAL '30 days') AS sessions_30d
+        FROM parents p
+        LEFT JOIN children c ON c.parent_id = p.id
+        LEFT JOIN quran_lesson_progress qlp ON qlp.child_id = c.id
+        LEFT JOIN child_sessions cs ON cs.parent_id = p.id
+        GROUP BY p.id, p.name, p.email, p.last_login_at, p.last_active_at
+      `);
+
+      const payload = (result.rows || []).map((r: any) => {
+        const childEvents = Number(r.child_events_30d || 0);
+        const sessions30d = Number(r.sessions_30d || 0);
+        const latest = r.latest_child_activity ? new Date(r.latest_child_activity) : null;
+        const daysSinceLatest = latest ? (Date.now() - latest.getTime()) / (1000 * 60 * 60 * 24) : 999;
+
+        let status: "Engaged" | "Low activity" | "Inactive" = "Inactive";
+        if (childEvents >= 20 || sessions30d >= 8 || daysSinceLatest <= 7) {
+          status = "Engaged";
+        } else if (childEvents > 0 || sessions30d > 0 || daysSinceLatest <= 21) {
+          status = "Low activity";
+        }
+
+        return {
+          parentId: r.parent_id,
+          parentName: r.parent_name,
+          email: r.email,
+          lastLoginAt: r.last_login_at,
+          lastActiveAt: r.last_active_at,
+          childrenCount: Number(r.children_count || 0),
+          childEvents30d: childEvents,
+          sessions30d,
+          latestChildActivity: r.latest_child_activity,
+          status,
+        };
+      });
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching parent engagement:", error);
+      res.status(500).json({ error: "Failed to fetch parent engagement" });
+    }
+  });
+
+  // Admin: Usage heatmap (day x hour)
+  app.get("/api/admin/usage-heatmap", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:usage-heatmap";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const [byHourResult, byDayResult, gridResult] = await Promise.all([
+        db.execute(sql`
+          SELECT EXTRACT(HOUR FROM last_attempt_at)::int AS hour, COUNT(*)::int AS usage_count
+          FROM quran_lesson_progress
+          WHERE last_attempt_at IS NOT NULL
+          GROUP BY EXTRACT(HOUR FROM last_attempt_at)
+          ORDER BY hour
+        `),
+        db.execute(sql`
+          SELECT EXTRACT(DOW FROM last_attempt_at)::int AS day_of_week, COUNT(*)::int AS usage_count
+          FROM quran_lesson_progress
+          WHERE last_attempt_at IS NOT NULL
+          GROUP BY EXTRACT(DOW FROM last_attempt_at)
+          ORDER BY day_of_week
+        `),
+        db.execute(sql`
+          SELECT
+            EXTRACT(DOW FROM last_attempt_at)::int AS day_of_week,
+            EXTRACT(HOUR FROM last_attempt_at)::int AS hour,
+            COUNT(*)::int AS usage_count
+          FROM quran_lesson_progress
+          WHERE last_attempt_at IS NOT NULL
+          GROUP BY EXTRACT(DOW FROM last_attempt_at), EXTRACT(HOUR FROM last_attempt_at)
+        `),
+      ]);
+
+      const byHourMap = new Map<number, number>((byHourResult.rows || []).map((r: any) => [Number(r.hour), Number(r.usage_count)]));
+      const byDayMap = new Map<number, number>((byDayResult.rows || []).map((r: any) => [Number(r.day_of_week), Number(r.usage_count)]));
+
+      const payload = {
+        byHour: Array.from({ length: 24 }, (_, hour) => ({
+          hour,
+          usageCount: byHourMap.get(hour) || 0,
+        })),
+        byDay: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+          dayOfWeek,
+          usageCount: byDayMap.get(dayOfWeek) || 0,
+        })),
+        grid: (gridResult.rows || []).map((r: any) => ({
+          dayOfWeek: Number(r.day_of_week),
+          hour: Number(r.hour),
+          usageCount: Number(r.usage_count || 0),
+        })),
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching usage heatmap:", error);
+      res.status(500).json({ error: "Failed to fetch usage heatmap" });
+    }
+  });
+
+  // Admin: Live child sessions (optional advanced)
+  app.get("/api/admin/live-sessions", requireAuth, async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          cs.id AS session_id,
+          cs.child_id,
+          c.name AS child_name,
+          p.name AS parent_name,
+          cs.created_at,
+          cs.expires_at,
+          cs.is_active,
+          latest.surah_number AS current_surah,
+          latest.ayah_number AS current_ayah,
+          latest.last_attempt_at AS last_activity
+        FROM child_sessions cs
+        JOIN children c ON c.id = cs.child_id
+        JOIN parents p ON p.id = cs.parent_id
+        LEFT JOIN LATERAL (
+          SELECT qlp.surah_number, qlp.ayah_number, qlp.last_attempt_at
+          FROM quran_lesson_progress qlp
+          WHERE qlp.child_id = cs.child_id
+          ORDER BY qlp.last_attempt_at DESC NULLS LAST
+          LIMIT 1
+        ) latest ON true
+        WHERE cs.is_active = true
+          AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+        ORDER BY cs.created_at DESC
+      `);
+
+      res.json((result.rows || []).map((r: any) => ({
+        sessionId: r.session_id,
+        childId: r.child_id,
+        childName: r.child_name,
+        parentName: r.parent_name,
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+        isActive: Boolean(r.is_active),
+        currentSurah: r.current_surah ? Number(r.current_surah) : null,
+        currentAyah: r.current_ayah ? Number(r.current_ayah) : null,
+        lastActivity: r.last_activity,
+      })));
+    } catch (error) {
+      console.error("Error fetching live sessions:", error);
+      res.status(500).json({ error: "Failed to fetch live sessions" });
+    }
+  });
+
+  // Admin: Rewards and game analytics
+  app.get("/api/admin/rewards-analytics", requireAuth, async (_req, res) => {
+    try {
+      const cacheKey = "admin:rewards-analytics";
+      const cached = getCachedAdminAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const [rewardsResult, perChildResult, gameUnlockResult] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(amount), 0) AS total_rewards_earned,
+            COUNT(*) AS ledger_entries
+          FROM child_reward_ledger
+          WHERE amount > 0
+        `),
+        db.execute(sql`
+          SELECT
+            COALESCE(ROUND(AVG(child_total)::numeric, 2), 0) AS avg_rewards_per_child
+          FROM (
+            SELECT child_id, SUM(amount) AS child_total
+            FROM child_reward_ledger
+            WHERE amount > 0
+            GROUP BY child_id
+          ) t
+        `),
+        db.execute(sql`
+          SELECT game_type, COUNT(*)::int AS unlock_count
+          FROM child_game_unlocks
+          GROUP BY game_type
+          ORDER BY unlock_count DESC
+          LIMIT 1
+        `),
+      ]);
+
+      const rewards = (rewardsResult.rows?.[0] as any) || {};
+      const perChild = (perChildResult.rows?.[0] as any) || {};
+      const topGame = (gameUnlockResult.rows?.[0] as any) || {};
+
+      const payload = {
+        totalRewardsEarned: Number(rewards.total_rewards_earned || 0),
+        rewardLedgerEntries: Number(rewards.ledger_entries || 0),
+        avgRewardsPerChild: Number(perChild.avg_rewards_per_child || 0),
+        mostUnlockedGame: topGame.game_type || null,
+        mostUnlockedGameCount: Number(topGame.unlock_count || 0),
+      };
+
+      setCachedAdminAnalytics(cacheKey, payload);
+      res.json(payload);
+    } catch (error) {
+      console.error("Error fetching rewards analytics:", error);
+      res.status(500).json({ error: "Failed to fetch rewards analytics" });
+    }
+  });
+
+  // Admin: Child drilldown (surah progress + mistakes + retry heatmap)
+  app.get("/api/admin/child/:childId/quran-drilldown", requireAuth, async (req, res) => {
+    try {
+      const { childId } = req.params;
+
+      const [childRow, progressResult, mistakesResult, retryHeatmapResult] = await Promise.all([
+        db.execute(sql`
+          SELECT c.id, c.name, c.parent_id, p.name AS parent_name
+          FROM children c
+          LEFT JOIN parents p ON p.id = c.parent_id
+          WHERE c.id = ${childId}
+          LIMIT 1
+        `),
+        db.execute(sql`
+          SELECT
+            cp.surah_number,
+            cp.surah_name,
+            cp.completed,
+            cp.accuracy,
+            cp.stars_earned,
+            cp.completed_at,
+            COALESCE(ROUND(AVG(qlp.best_score)::numeric, 1), 0) AS avg_best_score,
+            COALESCE(SUM(qlp.attempts), 0) AS attempts
+          FROM child_progress cp
+          LEFT JOIN quran_lesson_progress qlp
+            ON qlp.child_id = cp.child_id
+           AND qlp.surah_number = cp.surah_number
+          WHERE cp.child_id = ${childId}
+          GROUP BY cp.surah_number, cp.surah_name, cp.completed, cp.accuracy, cp.stars_earned, cp.completed_at
+          ORDER BY cp.surah_number
+        `),
+        db.execute(sql`
+          SELECT surah_number, ayah_number, attempts, last_score, best_score, last_attempt_at
+          FROM quran_lesson_progress
+          WHERE child_id = ${childId}
+            AND (attempts > 2 OR last_score < 60 OR completed = false)
+          ORDER BY attempts DESC, last_attempt_at DESC NULLS LAST
+          LIMIT 50
+        `),
+        db.execute(sql`
+          SELECT surah_number, ayah_number, attempts
+          FROM quran_lesson_progress
+          WHERE child_id = ${childId}
+          ORDER BY attempts DESC
+          LIMIT 300
+        `),
+      ]);
+
+      const child = (childRow.rows?.[0] as any) || null;
+      if (!child) {
+        return res.status(404).json({ error: "Child not found" });
+      }
+
+      res.json({
+        child: {
+          id: child.id,
+          name: child.name,
+          parentId: child.parent_id,
+          parentName: child.parent_name,
+        },
+        surahProgress: (progressResult.rows || []).map((r: any) => ({
+          surahNumber: Number(r.surah_number),
+          surahName: r.surah_name,
+          completed: Boolean(r.completed),
+          accuracy: Number(r.accuracy || 0),
+          starsEarned: Number(r.stars_earned || 0),
+          completedAt: r.completed_at,
+          avgBestScore: Number(r.avg_best_score || 0),
+          attempts: Number(r.attempts || 0),
+        })),
+        lastMistakes: (mistakesResult.rows || []).map((r: any) => ({
+          surahNumber: Number(r.surah_number),
+          ayahNumber: Number(r.ayah_number),
+          attempts: Number(r.attempts || 0),
+          lastScore: Number(r.last_score || 0),
+          bestScore: Number(r.best_score || 0),
+          lastAttemptAt: r.last_attempt_at,
+        })),
+        retryHeatmap: (retryHeatmapResult.rows || []).map((r: any) => ({
+          surahNumber: Number(r.surah_number),
+          ayahNumber: Number(r.ayah_number),
+          attempts: Number(r.attempts || 0),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching child quran drilldown:", error);
+      res.status(500).json({ error: "Failed to fetch child quran drilldown" });
+    }
+  });
+
+  // Admin: Smart alert feed
+  app.get("/api/admin/alerts", requireAuth, async (_req, res) => {
+    try {
+      const [sameAyahResult, todayResult, weeklyResult, dauTodayResult, dauBaselineResult] = await Promise.all([
+        db.execute(sql`
+          SELECT surah_number, ayah_number, COUNT(DISTINCT child_id)::int AS children_count
+          FROM quran_lesson_progress
+          WHERE attempts > 3
+            AND last_score < 60
+            AND completed = false
+          GROUP BY surah_number, ayah_number
+          ORDER BY children_count DESC
+          LIMIT 1
+        `),
+        db.execute(sql`
+          SELECT
+            (SELECT COUNT(DISTINCT child_id || '-' || surah_number)
+             FROM quran_lesson_progress
+             WHERE last_attempt_at >= DATE_TRUNC('day', NOW())) AS started_today,
+            (SELECT COUNT(DISTINCT child_id || '-' || surah_number)
+             FROM child_progress
+             WHERE completed = true AND completed_at >= DATE_TRUNC('day', NOW())) AS completed_today
+        `),
+        db.execute(sql`
+          SELECT
+            COALESCE(AVG(daily_dropoff), 0) AS avg_dropoff_7d
+          FROM (
+            SELECT
+              day,
+              CASE WHEN started_cnt > 0
+                THEN ((started_cnt - completed_cnt)::numeric / started_cnt::numeric) * 100
+                ELSE 0
+              END AS daily_dropoff
+            FROM (
+              SELECT
+                day,
+                COUNT(DISTINCT started_key) AS started_cnt,
+                COUNT(DISTINCT completed_key) AS completed_cnt
+              FROM (
+                SELECT DATE_TRUNC('day', last_attempt_at) AS day, (child_id || '-' || surah_number) AS started_key, NULL::text AS completed_key
+                FROM quran_lesson_progress
+                WHERE last_attempt_at >= NOW() - INTERVAL '7 days'
+                UNION ALL
+                SELECT DATE_TRUNC('day', completed_at) AS day, NULL::text AS started_key, (child_id || '-' || surah_number) AS completed_key
+                FROM child_progress
+                WHERE completed = true AND completed_at >= NOW() - INTERVAL '7 days'
+              ) x
+              GROUP BY day
+            ) y
+          ) z
+        `),
+        db.execute(sql`
+          SELECT COUNT(DISTINCT child_id) AS dau_today
+          FROM quran_lesson_progress
+          WHERE last_attempt_at >= DATE_TRUNC('day', NOW())
+        `),
+        db.execute(sql`
+          SELECT COALESCE(AVG(dau), 0) AS avg_dau_7d
+          FROM (
+            SELECT DATE_TRUNC('day', last_attempt_at) AS day, COUNT(DISTINCT child_id)::numeric AS dau
+            FROM quran_lesson_progress
+            WHERE last_attempt_at >= NOW() - INTERVAL '7 days'
+              AND last_attempt_at < DATE_TRUNC('day', NOW())
+            GROUP BY DATE_TRUNC('day', last_attempt_at)
+          ) t
+        `),
+      ]);
+
+      const alerts: Array<{ type: string; severity: "info" | "warning" | "critical"; message: string; metric: number }> = [];
+
+      const sameAyah = (sameAyahResult.rows?.[0] as any) || null;
+      if (sameAyah && Number(sameAyah.children_count || 0) >= 10) {
+        alerts.push({
+          type: "stuck_same_ayah",
+          severity: "critical",
+          message: `${sameAyah.children_count} children are stuck on Surah ${sameAyah.surah_number}, Ayah ${sameAyah.ayah_number}`,
+          metric: Number(sameAyah.children_count || 0),
+        });
+      }
+
+      const today = (todayResult.rows?.[0] as any) || {};
+      const startedToday = Number(today.started_today || 0);
+      const completedToday = Number(today.completed_today || 0);
+      const todayDropOff = startedToday > 0 ? ((startedToday - completedToday) / startedToday) * 100 : 0;
+      const avgDropOff7d = Number(((weeklyResult.rows?.[0] as any)?.avg_dropoff_7d || 0));
+
+      if (todayDropOff > avgDropOff7d + 15) {
+        alerts.push({
+          type: "dropoff_increase",
+          severity: "warning",
+          message: `Drop-off increased today (${todayDropOff.toFixed(1)}%) vs 7-day avg (${avgDropOff7d.toFixed(1)}%)`,
+          metric: Number(todayDropOff.toFixed(1)),
+        });
+      }
+
+      const dauToday = Number(((dauTodayResult.rows?.[0] as any)?.dau_today || 0));
+      const avgDau7d = Number(((dauBaselineResult.rows?.[0] as any)?.avg_dau_7d || 0));
+      if (avgDau7d > 0 && dauToday < avgDau7d * 0.7) {
+        alerts.push({
+          type: "usage_drop",
+          severity: "warning",
+          message: `Usage dropped by ${((1 - dauToday / avgDau7d) * 100).toFixed(1)}% today`,
+          metric: dauToday,
+        });
+      }
+
+      res.json({
+        alerts,
+        metrics: {
+          startedToday,
+          completedToday,
+          todayDropOff: Number(todayDropOff.toFixed(1)),
+          avgDropOff7d: Number(avgDropOff7d.toFixed(1)),
+          dauToday,
+          avgDau7d: Number(avgDau7d.toFixed(1)),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching alerts:", error);
+      res.status(500).json({ error: "Failed to fetch alerts" });
     }
   });
 
