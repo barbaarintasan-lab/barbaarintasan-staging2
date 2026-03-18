@@ -280,28 +280,39 @@ export default function AlphabetLesson() {
     }
   }, [step, drawCanvas]);
 
-  function getAudioUrl(item: AlphabetItem) {
-    return item.audioUrl || `/api/audio/alphabet/${AUDIO_SLUG_BY_ARABIC[item.arabic] || item.nameSomali.toLowerCase()}.mp3`;
+  function speakLetter(item: AlphabetItem) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+
+    const sayText = (text: string, lang: string, rate = 0.75, pitch = 1.1) => {
+      return new Promise<void>((resolve) => {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = lang;
+        utter.rate = rate;
+        utter.pitch = pitch;
+        utter.onend = () => resolve();
+        utter.onerror = () => resolve();
+        window.speechSynthesis.speak(utter);
+      });
+    };
+
+    setAudioPlaying(true);
+    // Say Arabic letter name first, then the Somali name
+    sayText(item.nameArabic, "ar-SA", 0.7, 1.0)
+      .then(() => new Promise<void>(r => setTimeout(r, 400)))
+      .then(() => sayText(item.nameSomali, "en-US", 0.8, 1.1))
+      .finally(() => setAudioPlaying(false));
   }
 
   function autoPlayAudio() {
     if (!current) return;
-    const audio = new Audio(getAudioUrl(current));
-    audio.onerror = () => fallbackSpeak(current.arabic + ".. " + current.nameSomali);
-    audioRef.current = audio;
-    setAudioPlaying(true);
-    audio.play()
-      .catch(() => fallbackSpeak(current.arabic + ".. " + current.nameSomali))
-      .finally(() => setTimeout(() => setAudioPlaying(false), 2000));
+    speakLetter(current);
   }
 
   function playAudio() {
     if (!current) return;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    autoPlayAudio();
+    window.speechSynthesis.cancel();
+    speakLetter(current);
   }
 
   function getPoint(e: ReactPointerEvent<HTMLCanvasElement>): Point {
