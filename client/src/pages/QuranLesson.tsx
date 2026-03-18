@@ -397,31 +397,16 @@ export default function QuranLesson() {
           }, 2200);
         }
       } else if (!result.completed) {
-        // Smart Retry: graduated response based on mistake count
+        // Smart Retry: replay audio after each mistake (text is always visible)
         const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
         setAyahMistakes(prev => ({ ...prev, [currentAyah.number]: mistakeNum }));
 
-        if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-
-        if (mistakeNum === 1) {
-          // 1st mistake: replay audio only, no text reveal
-          setTimeout(() => {
-            const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
-            if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
-          }, 800);
-        } else if (mistakeNum === 2) {
-          // 2nd mistake: show text for 8 seconds
-          setRevealText(true);
-          revealTimerRef.current = setTimeout(() => setRevealText(false), 8000);
-        } else {
-          // 3rd+ mistake: show text + replay audio + keep 12 seconds
-          setRevealText(true);
-          setTimeout(() => {
-            const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
-            if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
-          }, 400);
-          revealTimerRef.current = setTimeout(() => setRevealText(false), 12000);
-        }
+        // Always replay audio so child can listen and compare
+        const delay = mistakeNum >= 3 ? 400 : 800;
+        setTimeout(() => {
+          const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
+          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
+        }, delay);
       }
     } catch (error: any) {
       setCheckResult({
@@ -431,7 +416,7 @@ export default function QuranLesson() {
       });
     }
     setIsChecking(false);
-  }, [currentAyah, surahNumber, totalAyahs, ayahProgress]);
+  }, [currentAyah, surahNumber, totalAyahs, ayahProgress, ayahMistakes, getAudioUrl, selectedReciter]);
 
   const goToAyah = (index: number) => {
     if (index >= 0 && index < totalAyahs && isAyahAccessible(index)) {
@@ -665,22 +650,22 @@ export default function QuranLesson() {
                 )}
               </div>
 
-              {/* Quran text: always hidden during lesson — revealed only after wrong answer */}
+              {/* Quran text: always visible */}
               <div className="text-right mb-5" dir="rtl">
                 {isCurrentCompleted ? (
-                  <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]" data-testid="text-ayah-arabic">
-                    {currentAyah.text}
-                  </p>
-                ) : revealText ? (
-                  <div className="rounded-2xl border-2 border-orange-400/50 bg-orange-500/10 p-4" data-testid="text-ayah-revealed">
-                    <p className="text-orange-300 text-xs font-bold mb-2 text-center">📖 Aayadda waa la muujiyay — aad ugu xifdi, 6 ilbiriqsi gudahood waa la qarin doonaa</p>
-                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">{currentAyah.text}</p>
+                  <div className="rounded-2xl border-2 border-green-400/40 bg-green-500/10 p-4" data-testid="text-ayah-arabic">
+                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
+                      {currentAyah.text}
+                    </p>
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/3 p-6 text-center" data-testid="text-ayah-hidden">
-                    <p className="text-5xl mb-3">🎵</p>
-                    <p className="text-white/60 font-bold text-base">Dhageyso — qoraalka waa qarsoon yahay</p>
-                    <p className="text-white/30 text-xs mt-1">Xifdi ka aqri, qoraalka ha u baahna</p>
+                  <div className={`rounded-2xl p-4 transition-all duration-500 ${isPlaying ? "border-2 border-[#4ECDC4]/60 bg-[#4ECDC4]/10 shadow-lg shadow-[#4ECDC4]/10" : "border border-white/15 bg-white/5"}`} data-testid="text-ayah-arabic">
+                    {isPlaying && (
+                      <p className="text-[#4ECDC4] text-xs font-bold mb-2 text-center tracking-wide">🔊 Dhageyso aayada</p>
+                    )}
+                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
+                      {currentAyah.text}
+                    </p>
                   </div>
                 )}
               </div>
@@ -830,11 +815,9 @@ export default function QuranLesson() {
                 <div className="text-4xl mb-2">⚠️</div>
                 <h3 className="text-orange-300 font-bold text-xl mb-1">Waad Khaladay</h3>
                 <p className="text-white/70 text-sm mb-3" data-testid="text-feedback">{checkResult.message}</p>
-                {revealText && (
-                  <p className="text-orange-200 text-xs bg-orange-500/10 rounded-xl px-3 py-2 mb-3">
-                    📖 Qoraalka waa muuqanayaa — ku xifdi si fiican, 6 ilbiriqsi gudahood waa la qarin doonaa
+                <p className="text-orange-200 text-xs bg-orange-500/10 rounded-xl px-3 py-2 mb-3">
+                    📖 Aayada aqri oo dhageyso, ka dibna mar kale isku day
                   </p>
-                )}
                 <div className="flex gap-3">
                   <button onClick={playAyah}
                     className="flex-1 py-3 rounded-2xl bg-[#4ECDC4]/20 text-[#4ECDC4] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#4ECDC4]/30"
