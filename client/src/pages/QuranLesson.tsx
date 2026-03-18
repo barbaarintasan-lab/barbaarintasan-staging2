@@ -449,7 +449,19 @@ export default function QuranLesson() {
               const audio = new Audio(url);
               audioRef.current = audio;
               audio.onplay = () => { setIsPlaying(true); setIsLoadingAudio(false); };
-              audio.onended = () => { setIsPlaying(false); setHasListened(true); preloadNextAyah(); };
+              audio.onended = () => {
+                setIsPlaying(false);
+                setHasListened(true);
+                // preload the ayah after the one we just advanced to
+                if (surah && nextIdx + 1 < surah.ayahs.length) {
+                  const preloadAyahNum = surah.ayahs[nextIdx + 1].number;
+                  const preloadUrl = getAudioUrl(surahNumber, preloadAyahNum, selectedReciter);
+                  const pa = new Audio();
+                  pa.preload = "auto";
+                  pa.src = preloadUrl;
+                  preloadRef.current = pa;
+                }
+              };
               audio.onerror = () => { setIsPlaying(false); setIsLoadingAudio(false); };
               setTimeout(() => audio.play().catch(() => {}), 400);
             }

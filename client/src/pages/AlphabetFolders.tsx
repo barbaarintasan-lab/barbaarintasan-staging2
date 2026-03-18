@@ -226,7 +226,6 @@ export default function AlphabetFolders() {
                     {phase.letters.map((letter) => {
                       const color = LETTER_COLORS[letter.id - 1];
                       const done = completedSet.has(letter.id);
-                      const stars = done ? 3 : 0;
                       return (
                         <button
                           key={letter.id}
