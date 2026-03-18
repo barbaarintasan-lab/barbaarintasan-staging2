@@ -11432,29 +11432,107 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
+  // ── Alphabet TTS: generate + cache audio for letter names ──────────────────
+  app.get("/api/alphabet/tts", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const letter = String(req.query.letter || "").trim();
+      if (!letter) return res.status(400).json({ error: "letter required" });
+
+      const cacheKey = Buffer.from(letter).toString("base64url").slice(0, 32).replace(/[^a-zA-Z0-9]/g, "_");
+      const cacheDir = path.join(process.cwd(), "tts-audio", "alphabet");
+      if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+      const cachePath = path.join(cacheDir, `${cacheKey}.mp3`);
+
+      if (fs.existsSync(cachePath)) {
+        res.setHeader("Content-Type", "audio/mpeg");
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        return res.sendFile(cachePath);
+      }
+
+      const openai = getOpenAIClient();
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "alloy",
+        input: letter,
+        speed: 0.75,
+      });
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(cachePath, buffer);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(buffer);
+    } catch (error: any) {
+      console.error("[ALPHABET TTS] error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  // ── Alphabet recitation check: Whisper + GPT-4o-mini ────────────────────────
   app.post("/api/quran/alphabet/recitation/check", requireChildAuth, recordingUpload.single("audio"), async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
       const letterId = Number.parseInt(String(req.body.letterId || "0"), 10);
+      const expectedArabic = String(req.body.arabic || "").trim();
+      const expectedName   = String(req.body.nameArabic || "").trim();
+
       if (!Number.isInteger(letterId) || letterId <= 0) {
         return res.status(400).json({ error: "letterId waa qasab" });
       }
+      if (!req.file) return res.status(400).json({ error: "Audio file required" });
 
-      const [child] = await db.select({ age: children.age }).from(children).where(eq(children.id, childId));
-      const age = child?.age ?? 8;
-      const audioBytes = req.file?.size || 0;
+      const [childRow] = await db.select({ age: children.age }).from(children).where(eq(children.id, childId));
+      const age = childRow?.age ?? 8;
 
-      // Lightweight fallback scoring: longer/clearer attempts get a better confidence score.
-      const baseScore = Math.min(100, Math.round((audioBytes / 24000) * 100));
-      const passThreshold = age <= 5 ? 28 : age <= 8 ? 40 : 50;
-      const correct = baseScore >= passThreshold;
+      const openai = getOpenAIClient();
+      let correct = false;
+      let feedback = "Mar kale isku day!";
+      let score = 0;
 
-      return res.json({
-        correct,
-        score: baseScore,
-        threshold: passThreshold,
-        message: correct ? "Aad u fiican!" : "Mar kale isku day!",
-      });
+      try {
+        const { toFile } = await import("openai");
+        const audioFile = await toFile(
+          Buffer.from(req.file.buffer),
+          "recording.webm",
+          { type: req.file.mimetype || "audio/webm" }
+        );
+
+        const transcription = await openai.audio.transcriptions.create({
+          model: "whisper-1",
+          file: audioFile,
+          language: "ar",
+          prompt: `Arabic letter: ${expectedArabic} ${expectedName}`,
+        });
+
+        const transcribed = transcription.text.trim();
+
+        const prompt = `You are an Arabic teacher checking if a child (age ${age}) correctly said the Arabic letter "${expectedArabic}" (name: "${expectedName}").
+Child said: "${transcribed}"
+
+Be VERY lenient — if the child said any sound close to this letter name, accept it. Children may say just the base sound.
+Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback": "short encouragement in Somali (max 8 words)" }`;
+
+        const gpt = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          max_tokens: 80,
+        });
+
+        const parsed = JSON.parse(gpt.choices[0].message.content || "{}");
+        correct = parsed.correct === true;
+        score   = Math.round(Number(parsed.score) || (correct ? 80 : 30));
+        feedback = parsed.feedback || (correct ? "Aad u fiican! ⭐" : "Mar kale isku day!");
+      } catch (aiErr: any) {
+        // Fallback: pass if audio is long enough
+        const audioBytes = req.file.size || 0;
+        const passThreshold = age <= 5 ? 20000 : age <= 8 ? 28000 : 36000;
+        correct = audioBytes >= passThreshold;
+        score   = correct ? 75 : 35;
+        feedback = correct ? "Aad u fiican! ⭐" : "Mar kale isku day!";
+      }
+
+      return res.json({ correct, score, feedback });
     } catch (error: any) {
       console.error("[ALPHABET] Recitation check error:", error);
       return res.status(500).json({ error: "Khalad ayaa dhacay" });

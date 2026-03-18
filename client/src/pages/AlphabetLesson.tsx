@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useParams } from "wouter";
 import { useChildAuth } from "@/contexts/ChildAuthContext";
-import { ArrowLeft, Volume2 } from "lucide-react";
+import { ArrowLeft, Volume2, Mic, MicOff, CheckCircle, XCircle } from "lucide-react";
 
 type AlphabetItem = {
   id: number;
@@ -18,10 +18,12 @@ type AlphabetItem = {
 
 type Point = { x: number; y: number };
 type LessonTab = "listen" | "forms" | "higaad" | "trace";
+type SessionPhase = "learning" | "review" | "finaltest";
 
 const TRACE_PASS_SCORE = 55;
 const DISTANCE_THRESHOLD = 22;
 const CANVAS_SIZE = 280;
+const SESSION_MIN = 3;
 
 const LETTER_COLORS: string[] = [
   "#FF6B6B","#4ECDC4","#45B7D1","#96CEB4","#FECA57",
@@ -134,16 +136,6 @@ function computeTraceScore(user: Point[], reference: Point[], threshold: number)
   return Math.max(0, Math.min(100, Math.round(coverage * 0.65 + precision * 0.35)));
 }
 
-function speakArabic(text: string, then?: () => void) {
-  if (!("speechSynthesis" in window)) { then?.(); return; }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "ar-SA"; u.rate = 0.7; u.pitch = 1.0;
-  u.onend = () => then?.();
-  u.onerror = () => then?.();
-  window.speechSynthesis.speak(u);
-}
-
 const FALLBACK_CURRICULUM: AlphabetItem[] = [
   "ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"
 ].map((arabic, i) => {
@@ -171,20 +163,40 @@ export default function AlphabetLesson() {
   const [curriculum, setCurriculum] = useState<AlphabetItem[]>([]);
   const [loadingCurriculum, setLoadingCurriculum] = useState(true);
   const [activeTab, setActiveTab] = useState<LessonTab>("listen");
-  const [audioPlaying, setAudioPlaying] = useState(false);
 
+  // ── Session state (Quran-style) ──────────────────────────────────
+  const [sessionLearned, setSessionLearned] = useState<number[]>([]); // indices in curriculum
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("learning");
+  const [finalTestIdx, setFinalTestIdx] = useState(0);
+  const [finalTestResults, setFinalTestResults] = useState<boolean[]>([]);
+  const [sessionComplete, setSessionComplete] = useState(false);
+
+  // ── Current letter interaction ───────────────────────────────────
+  const [audioPlaying, setAudioPlaying]   = useState(false);
+  const [hasListened,  setHasListened]    = useState(false);
+  const [isRecording,  setIsRecording]    = useState(false);
+  const [isChecking,   setIsChecking]     = useState(false);
+  const [checkResult,  setCheckResult]    = useState<{ correct: boolean; feedback: string } | null>(null);
+  const [autoAdvancing, setAutoAdvancing] = useState(false);
+
+  // ── Tracing ──────────────────────────────────────────────────────
   const [traceScore, setTraceScore]       = useState<number | null>(null);
   const [traceFeedback, setTraceFeedback] = useState<"" | "pass" | "fail">("");
   const [traceAttempts, setTraceAttempts] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [traceDone, setTraceDone]         = useState(false);
 
+  // ── Higaad/forms helpers ─────────────────────────────────────────
   const [harakatPlaying, setHarakatPlaying] = useState<string | null>(null);
   const [formPlaying, setFormPlaying]       = useState<string | null>(null);
 
-  const canvasRef  = useRef<HTMLCanvasElement | null>(null);
-  const drawingRef = useRef(false);
-  const userPointsRef = useRef<Point[]>([]);
+  // ── Refs ─────────────────────────────────────────────────────────
+  const canvasRef         = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef        = useRef(false);
+  const userPointsRef     = useRef<Point[]>([]);
+  const audioRef          = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
+  const audioChunksRef    = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (!isLoading && !child) setLocation("/child-login");
@@ -224,6 +236,126 @@ export default function AlphabetLesson() {
     return sampleSvgPath(tracingPath, 300, CANVAS_SIZE, CANVAS_SIZE);
   }, [tracingPath]);
 
+  // Reset per-letter states when current letter changes
+  useEffect(() => {
+    setHasListened(false);
+    setCheckResult(null);
+    setAutoAdvancing(false);
+    setIsRecording(false);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+  }, [current?.id]);
+
+  // Reset trace states on letter change
+  useEffect(() => {
+    setActiveTab("listen");
+    setTraceScore(null); setTraceFeedback(""); setTraceAttempts(0);
+    setShowCelebration(false); setTraceDone(false);
+    // Auto-play audio when letter changes
+    if (current) setTimeout(() => playLetterAudio(current.nameArabic), 600);
+  }, [current?.id]);
+
+  useEffect(() => {
+    if (activeTab === "trace") setTimeout(() => drawCanvas(), 100);
+  }, [activeTab]);
+
+  // ── Audio: use server TTS instead of SpeechSynthesis ────────────
+  const playLetterAudio = useCallback(async (text: string) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    setAudioPlaying(true);
+    try {
+      const url = `/api/alphabet/tts?letter=${encodeURIComponent(text)}`;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setAudioPlaying(false); setHasListened(true); };
+      audio.onerror = () => { setAudioPlaying(false); setHasListened(true); };
+      await audio.play();
+    } catch {
+      setAudioPlaying(false);
+      setHasListened(true);
+    }
+  }, []);
+
+  function playHarakat(vowelized: string) {
+    playLetterAudio(vowelized);
+  }
+
+  function playForm(form: string, label: string) {
+    setFormPlaying(label);
+    playLetterAudio(form.replace(/ـ/g, "")).then(() => setFormPlaying(null));
+  }
+
+  // ── Recording ────────────────────────────────────────────────────
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mimeType = (window as any).MediaRecorder?.isTypeSupported?.("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus" : "audio/webm";
+      const mr = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
+      mr.start();
+      setIsRecording(true);
+    } catch {
+      alert("Fadlan mic-ka oggollow! Settings > Permissions > Microphone");
+    }
+  }
+
+  async function stopAndCheck(letter: AlphabetItem) {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    setIsRecording(false);
+    mediaRecorderRef.current.stop();
+    await new Promise(r => setTimeout(r, 400));
+
+    const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    setIsChecking(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      formData.append("letterId", String(letter.id));
+      formData.append("arabic", letter.arabic);
+      formData.append("nameArabic", letter.nameArabic);
+
+      const res = await fetch("/api/quran/alphabet/recitation/check", {
+        method: "POST", credentials: "include", body: formData,
+      });
+      const data = await res.json();
+      setCheckResult({ correct: data.correct, feedback: data.feedback || (data.correct ? "Aad u fiican! ⭐" : "Mar kale isku day!") });
+
+      if (data.correct) {
+        // Mark completed in DB
+        try {
+          await fetch("/api/quran/alphabet/complete", {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ letterId: letter.id, phase: letter.phase, completed: true, recitationScore: data.score || 80, tracingScore: 70 }),
+          });
+        } catch { /* non-blocking */ }
+
+        // Add to session
+        setSessionLearned(prev => prev.includes(index) ? prev : [...prev, index]);
+
+        // Auto-advance after 1.5s
+        setAutoAdvancing(true);
+        setTimeout(() => {
+          setAutoAdvancing(false);
+          setCheckResult(null);
+          const nextIdx = index + 1;
+          if (nextIdx < curriculum.length) {
+            setLocation(`/alphabet-lesson/${curriculum[nextIdx].id}`);
+          }
+        }, 1800);
+      }
+    } catch {
+      setCheckResult({ correct: false, feedback: "Khalad ayaa dhacay. Mar kale isku day." });
+    } finally {
+      setIsChecking(false);
+    }
+  }
+
+  // ── Tracing ──────────────────────────────────────────────────────
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -258,33 +390,6 @@ export default function AlphabetLesson() {
     }
     userPointsRef.current = [];
   }, [tracingPath, referencePoints, letterColor]);
-
-  useEffect(() => {
-    setActiveTab("listen");
-    setTraceScore(null); setTraceFeedback(""); setTraceAttempts(0);
-    setShowCelebration(false); setTraceDone(false);
-    if (current) setTimeout(() => { setAudioPlaying(true); speakArabic(current.nameArabic, () => setAudioPlaying(false)); }, 500);
-  }, [current?.id]);
-
-  useEffect(() => {
-    if (activeTab === "trace") setTimeout(() => drawCanvas(), 100);
-  }, [activeTab, drawCanvas]);
-
-  function playLetterAudio() {
-    if (!current) return;
-    setAudioPlaying(true);
-    speakArabic(current.nameArabic, () => setAudioPlaying(false));
-  }
-
-  function playHarakat(vowelized: string, mark: string) {
-    setHarakatPlaying(mark);
-    speakArabic(vowelized, () => setHarakatPlaying(null));
-  }
-
-  function playForm(form: string, label: string) {
-    setFormPlaying(label);
-    speakArabic(form.replace(/ـ/g, ""), () => setFormPlaying(null));
-  }
 
   function getPoint(e: ReactPointerEvent<HTMLCanvasElement>): Point {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -325,27 +430,72 @@ export default function AlphabetLesson() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ letterId: current.id, phase: current.phase, tracingScore: score }),
       });
-      if (pass) {
-        await fetch("/api/quran/alphabet/complete", {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ letterId: current.id, phase: current.phase, completed: true, tracingScore: score, recitationScore: 70 }),
-        });
-        setShowCelebration(true);
-        setTraceDone(true);
-      }
+      if (pass) { setShowCelebration(true); setTraceDone(true); }
     } catch { /* non-blocking */ }
   }
 
   function goNext() {
-    if (index < curriculum.length - 1) {
-      setLocation(`/alphabet-lesson/${curriculum[index + 1].id}`);
-    } else {
-      setLocation("/alphabet-folders");
-    }
+    if (index < curriculum.length - 1) setLocation(`/alphabet-lesson/${curriculum[index + 1].id}`);
+    else setLocation("/alphabet-folders");
   }
-  function goBack() {
-    setLocation("/alphabet-folders");
+
+  // ── Final test: per-letter recording ─────────────────────────────
+  const finalTestLetter = sessionLearned[finalTestIdx] !== undefined
+    ? curriculum[sessionLearned[finalTestIdx]] : null;
+
+  async function startFinalTest() {
+    setSessionPhase("finaltest");
+    setFinalTestIdx(0);
+    setFinalTestResults([]);
+  }
+
+  async function stopFinalTestCheck() {
+    if (!finalTestLetter || !isRecording) return;
+    setIsRecording(false);
+    mediaRecorderRef.current?.stop();
+    await new Promise(r => setTimeout(r, 400));
+
+    const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    setIsChecking(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      formData.append("letterId", String(finalTestLetter.id));
+      formData.append("arabic", finalTestLetter.arabic);
+      formData.append("nameArabic", finalTestLetter.nameArabic);
+
+      const res = await fetch("/api/quran/alphabet/recitation/check", {
+        method: "POST", credentials: "include", body: formData,
+      });
+      const data = await res.json();
+      const passed = data.correct;
+      const newResults = [...finalTestResults, passed];
+      setFinalTestResults(newResults);
+      setCheckResult({ correct: passed, feedback: data.feedback || (passed ? "Aad u fiican! ⭐" : "Mar kale isku day!") });
+
+      setTimeout(() => {
+        setCheckResult(null);
+        const nextIdx = finalTestIdx + 1;
+        if (nextIdx >= sessionLearned.length) {
+          const allPassed = newResults.every(Boolean);
+          if (allPassed) {
+            setSessionComplete(true);
+          } else {
+            // retry failed ones — just restart final test
+            setFinalTestIdx(0);
+            setFinalTestResults([]);
+          }
+        } else {
+          setFinalTestIdx(nextIdx);
+        }
+      }, 1600);
+    } catch {
+      setCheckResult({ correct: false, feedback: "Khalad. Mar kale." });
+      setTimeout(() => { setCheckResult(null); }, 1200);
+    } finally {
+      setIsChecking(false);
+    }
   }
 
   if (isLoading || loadingCurriculum) {
@@ -358,7 +508,7 @@ export default function AlphabetLesson() {
       </div>
     );
   }
-  if (!current) {
+  if (!current && sessionPhase !== "finaltest" && !sessionComplete) {
     return (
       <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-7xl">🎉</div>
@@ -379,8 +529,166 @@ export default function AlphabetLesson() {
     { id: "trace",  label: "Qor",      emoji: "✏️" },
   ];
 
+  // ═══════════════════════════════════════════════════════════════
+  // SESSION COMPLETE SCREEN
+  // ═══════════════════════════════════════════════════════════════
+  if (sessionComplete) {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        {Array.from({ length: 16 }).map((_, i) => (
+          <div key={i} className="absolute text-4xl animate-bounce pointer-events-none"
+            style={{ top:`${Math.random()*70+5}%`, left:`${Math.random()*80+10}%`, animationDelay:`${i*0.15}s`, animationDuration:"1s" }}>
+            {["⭐","🌟","✨","🎉","🎊","🌙"][i % 6]}
+          </div>
+        ))}
+        <div className="relative z-10 text-center max-w-sm">
+          <div className="text-8xl mb-4">🏆</div>
+          <h1 className="text-3xl font-black text-white mb-2">MaashaAllah!</h1>
+          <p className="text-white/70 mb-2">Casharkan waa dhammaatay!</p>
+          <div className="bg-white/10 rounded-2xl p-4 mb-6">
+            <p className="text-[#FFD93D] font-black text-lg mb-2">Waxaad baratay:</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {sessionLearned.map(i => (
+                <span key={i} className="text-3xl font-black" style={{ fontFamily: "Amiri, serif", color: LETTER_COLORS[(curriculum[i]?.id ?? 1) - 1] }}>
+                  {curriculum[i]?.arabic}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                setSessionLearned([]); setSessionPhase("learning");
+                setSessionComplete(false); setFinalTestIdx(0); setFinalTestResults([]);
+              }}
+              className="w-full py-4 rounded-2xl font-black text-lg text-[#1a1a2e] active:scale-95 transition-transform"
+              style={{ background: "linear-gradient(135deg, #FFD93D, #FFA502)" }}
+              data-testid="btn-continue-session">
+              📖 Sii wad Barashada
+            </button>
+            <button onClick={() => setLocation("/alphabet-folders")}
+              className="w-full py-3 rounded-2xl font-bold text-white/60 bg-white/10 border border-white/20 active:scale-95"
+              data-testid="btn-back-folders">
+              🏠 Ku noqo Xarfaha
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FINAL TEST SCREEN
+  // ═══════════════════════════════════════════════════════════════
+  if (sessionPhase === "finaltest" && finalTestLetter) {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-6">
+            <p className="text-white/40 text-sm font-bold mb-1">Imtixaan Xariifka</p>
+            <div className="flex justify-center gap-2 mb-4">
+              {sessionLearned.map((_, i) => (
+                <div key={i} className={`w-3 h-3 rounded-full ${
+                  i < finalTestResults.length
+                    ? (finalTestResults[i] ? "bg-green-400" : "bg-red-400")
+                    : i === finalTestIdx ? "bg-[#FFD93D]" : "bg-white/20"
+                }`} />
+              ))}
+            </div>
+            <h2 className="text-white font-black text-xl">
+              Xaraf {finalTestIdx + 1} / {sessionLearned.length}
+            </h2>
+          </div>
+
+          {/* Hidden letter card */}
+          <div className="rounded-3xl p-8 mb-6 text-center border border-white/10 bg-white/5">
+            <p className="text-white/40 text-sm mb-4">Xarafka waa la qariyey — maxaad maqashay?</p>
+            {/* Show Somali name only, no Arabic */}
+            <p className="text-4xl font-black text-white/80 mb-2">{finalTestLetter.nameSomali}</p>
+            <p className="text-white/30 text-sm">Ku dhawaaq xarafka Carabiga</p>
+          </div>
+
+          {/* Check result */}
+          {checkResult && (
+            <div className={`rounded-2xl p-4 mb-4 text-center ${checkResult.correct ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
+              {checkResult.correct ? <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-1" /> : <XCircle className="w-8 h-8 text-red-400 mx-auto mb-1" />}
+              <p className={`font-bold text-sm ${checkResult.correct ? "text-green-300" : "text-red-300"}`}>{checkResult.feedback}</p>
+            </div>
+          )}
+
+          {/* Recording button */}
+          {!checkResult && !isChecking && (
+            <button
+              onClick={() => isRecording ? stopFinalTestCheck() : startRecording()}
+              disabled={isChecking}
+              className={`w-full py-5 rounded-2xl font-black text-xl active:scale-95 transition-all ${
+                isRecording
+                  ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40"
+                  : "text-[#1a1a2e]"
+              }`}
+              style={!isRecording ? { background: "linear-gradient(135deg, #FFD93D, #FFA502)" } : {}}
+              data-testid="btn-final-record">
+              {isRecording ? <><MicOff className="inline w-6 h-6 mr-2" />Jooji Duubida</> : <><Mic className="inline w-6 h-6 mr-2" />Bilow Duubida</>}
+            </button>
+          )}
+
+          {isChecking && (
+            <div className="text-center py-5">
+              <div className="w-10 h-10 border-4 border-[#FFD93D]/20 border-t-[#FFD93D] rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-white/40 text-sm">AI waa hubinayaa...</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // REVIEW SCREEN
+  // ═══════════════════════════════════════════════════════════════
+  if (sessionPhase === "review") {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <h2 className="text-white font-black text-2xl text-center mb-2">Dib u Eeg ✨</h2>
+          <p className="text-white/50 text-sm text-center mb-6">Xarfaha aad baratay — akhriso saddex jeer</p>
+
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            {sessionLearned.map(i => {
+              const letter = curriculum[i];
+              const color = LETTER_COLORS[(letter?.id ?? 1) - 1];
+              return (
+                <button key={i}
+                  onClick={() => playLetterAudio(letter.nameArabic)}
+                  className="rounded-2xl p-4 flex flex-col items-center gap-1 border border-white/10 active:scale-95 transition-transform"
+                  style={{ background: color + "18" }}>
+                  <span className="text-4xl font-black leading-none" style={{ fontFamily: "Amiri, serif", color }}>
+                    {letter?.arabic}
+                  </span>
+                  <span className="text-white/50 text-xs font-bold">{letter?.nameSomali}</span>
+                  <Volume2 className="w-3 h-3 opacity-40" style={{ color }} />
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={startFinalTest}
+            className="w-full py-4 rounded-2xl font-black text-xl text-[#1a1a2e] active:scale-95 transition-transform"
+            style={{ background: "linear-gradient(135deg, #FFD93D, #FFA502)" }}
+            data-testid="btn-start-final-test">
+            🧪 Bilow Imtixaanka
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MAIN LESSON SCREEN
+  // ═══════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-[#1a1a2e] relative overflow-hidden pb-28">
+    <div className="min-h-screen bg-[#1a1a2e] relative overflow-hidden pb-32">
       {Array.from({ length: 18 }).map((_, i) => (
         <div key={i} className="absolute rounded-full bg-white pointer-events-none"
           style={{
@@ -401,9 +709,23 @@ export default function AlphabetLesson() {
         </div>
       )}
 
+      {/* Floating session button (min 3 letters) */}
+      {sessionLearned.length >= SESSION_MIN && sessionPhase === "learning" && !autoAdvancing && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 animate-bounce">
+          <button
+            onClick={() => setSessionPhase("review")}
+            className="px-6 py-3 rounded-2xl font-black text-[#1a1a2e] shadow-2xl active:scale-95 transition-transform flex items-center gap-2"
+            style={{ background: "linear-gradient(135deg, #FFD93D, #FFA502)", boxShadow: "0 8px 32px rgba(255,217,61,0.5)" }}
+            data-testid="btn-session-ready">
+            ✅ Diyaar — Imtixaanka Bilow ({sessionLearned.length} xaraf)
+          </button>
+        </div>
+      )}
+
       <div className="relative z-10 max-w-md mx-auto px-4 pt-5">
+        {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <button onClick={goBack}
+          <button onClick={() => setLocation("/alphabet-folders")}
             className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white"
             data-testid="btn-back">
             <ArrowLeft className="w-5 h-5" />
@@ -412,13 +734,14 @@ export default function AlphabetLesson() {
             <h1 className="text-white font-black text-base">Baro Alifka</h1>
             <p className="text-white/40 text-xs">{index + 1} / {curriculum.length}</p>
           </div>
-          <button onClick={() => setLocation("/alphabet-games")}
-            className="px-3 py-2 rounded-2xl bg-purple-500/30 border border-purple-400/40 text-purple-300 font-bold text-xs"
-            data-testid="btn-games">
-            🎮 Ciyaaro
-          </button>
+          <div className="flex items-center gap-1 bg-white/10 rounded-xl px-2 py-1">
+            <span className="text-[#FFD93D] font-black text-sm">{sessionLearned.length}</span>
+            <span className="text-white/40 text-xs">/ {SESSION_MIN}</span>
+            <span className="text-xs">⭐</span>
+          </div>
         </div>
 
+        {/* Progress bar */}
         <div className="mb-1 h-2 rounded-full bg-white/10 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%`, background: `linear-gradient(90deg, ${letterColor}, ${letterColor}99)` }} />
@@ -431,14 +754,14 @@ export default function AlphabetLesson() {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <span className="font-black leading-none opacity-[0.04] text-[240px]"
               style={{ fontFamily: "Amiri, serif", color: letterColor }}>
-              {current.arabic}
+              {current?.arabic}
             </span>
           </div>
-          <button onClick={playLetterAudio}
+          <button onClick={() => current && playLetterAudio(current.nameArabic)}
             className={`relative z-10 font-black leading-none mb-2 block mx-auto transition-transform active:scale-95 ${audioPlaying ? "animate-pulse" : ""}`}
             style={{ fontFamily: "Amiri, serif", color: letterColor, textShadow: `0 0 50px ${letterColor}90`, fontSize: "clamp(120px, 35vw, 180px)" }}
             data-testid="btn-play-letter">
-            {current.arabic}
+            {current?.arabic}
           </button>
           <div className="relative z-10 flex items-center justify-center gap-2 mb-1">
             {audioPlaying && (
@@ -450,10 +773,10 @@ export default function AlphabetLesson() {
               </div>
             )}
             <p className="text-3xl font-black text-white/90" style={{ fontFamily: "Amiri, serif" }}>
-              {current.nameArabic}
+              {current?.nameArabic}
             </p>
           </div>
-          <p className="relative z-10 text-white/50 font-bold text-sm">{current.nameSomali}</p>
+          <p className="relative z-10 text-white/50 font-bold text-sm">{current?.nameSomali}</p>
         </div>
 
         {/* Tab bar */}
@@ -461,9 +784,7 @@ export default function AlphabetLesson() {
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`py-2.5 rounded-2xl font-bold text-xs flex flex-col items-center gap-1 transition-all ${
-                activeTab === tab.id
-                  ? "text-[#1a1a2e] shadow-lg"
-                  : "bg-white/6 text-white/40 border border-white/10"
+                activeTab === tab.id ? "text-[#1a1a2e] shadow-lg" : "bg-white/6 text-white/40 border border-white/10"
               }`}
               style={activeTab === tab.id ? { backgroundColor: letterColor, boxShadow: `0 4px 20px ${letterColor}60` } : {}}
               data-testid={`tab-${tab.id}`}>
@@ -476,13 +797,77 @@ export default function AlphabetLesson() {
         {/* ── LISTEN TAB ── */}
         {activeTab === "listen" && (
           <div className="space-y-3">
-            <button onClick={playLetterAudio}
+            {/* Re-listen button */}
+            <button onClick={() => current && playLetterAudio(current.nameArabic)}
               className="w-full rounded-2xl py-4 text-lg font-black flex items-center justify-center gap-3 active:scale-98 transition-transform border border-white/10"
               style={{ backgroundColor: letterColor + "20", color: "white" }}
+              disabled={audioPlaying}
               data-testid="btn-listen-again">
-              <Volume2 className="w-6 h-6" /> Dhageyso Mar Kale
+              <Volume2 className="w-6 h-6" />
+              {audioPlaying ? "Codka waa la dhagaystaa..." : "🔊 Dhageyso Mar Kale"}
             </button>
 
+            {/* Recording section */}
+            {hasListened && (
+              <div className="rounded-2xl border border-white/10 p-4 space-y-3"
+                style={{ backgroundColor: letterColor + "08" }}>
+                <p className="text-center text-white/60 text-sm font-bold">
+                  Hadda adiga ku dhawaaq xarafka 🎤
+                </p>
+
+                {/* Check result feedback */}
+                {checkResult && (
+                  <div className={`rounded-xl p-3 text-center ${checkResult.correct ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
+                    {checkResult.correct
+                      ? <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-1" />
+                      : <XCircle className="w-8 h-8 text-red-400 mx-auto mb-1" />}
+                    <p className={`font-bold text-sm ${checkResult.correct ? "text-green-300" : "text-red-300"}`}>
+                      {checkResult.feedback}
+                    </p>
+                  </div>
+                )}
+
+                {isChecking && (
+                  <div className="text-center py-3">
+                    <div className="w-8 h-8 border-4 border-[#FFD93D]/20 border-t-[#FFD93D] rounded-full animate-spin mx-auto mb-1" />
+                    <p className="text-white/40 text-xs">AI waa hubinayaa...</p>
+                  </div>
+                )}
+
+                {autoAdvancing && (
+                  <div className="text-center py-2">
+                    <p className="text-green-300 font-bold text-sm animate-pulse">⏭ Xarafka xiga...</p>
+                  </div>
+                )}
+
+                {!checkResult && !isChecking && !autoAdvancing && (
+                  <button
+                    onClick={() => current && (isRecording ? stopAndCheck(current) : startRecording())}
+                    className={`w-full py-4 rounded-2xl font-black text-lg active:scale-95 transition-all ${
+                      isRecording
+                        ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40"
+                        : "text-[#1a1a2e]"
+                    }`}
+                    style={!isRecording ? { background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` } : {}}
+                    data-testid="btn-record">
+                    {isRecording
+                      ? <><MicOff className="inline w-5 h-5 mr-2" />Jooji Duubida</>
+                      : <><Mic className="inline w-5 h-5 mr-2" />Bilow Duubida</>}
+                  </button>
+                )}
+
+                {checkResult && !checkResult.correct && !autoAdvancing && (
+                  <button
+                    onClick={() => { setCheckResult(null); }}
+                    className="w-full py-3 rounded-2xl font-bold text-white/70 bg-white/10 border border-white/20 active:scale-95 text-sm"
+                    data-testid="btn-retry">
+                    🔄 Dib u isku day
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Quran word card */}
             {qWord && (
               <div className="rounded-2xl px-5 py-4 border border-white/10"
                 style={{ backgroundColor: letterColor + "12" }}>
@@ -491,266 +876,123 @@ export default function AlphabetLesson() {
                   style={{ fontFamily: "Amiri, serif", color: letterColor, fontSize: "clamp(36px, 10vw, 52px)", direction: "rtl" }}>
                   {qWord.word} {qWord.emoji}
                 </p>
-                <p className="text-center text-white/50 text-sm font-bold">{qWord.meaning}</p>
+                <p className="text-center text-white/40 text-sm">{qWord.meaning}</p>
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {index > 0 && (
-                <button onClick={() => setLocation(`/alphabet-lesson/${curriculum[index - 1].id}`)}
-                  className="rounded-2xl py-3 font-bold text-white/50 border border-white/10 bg-white/5 text-sm"
-                  data-testid="btn-prev">
-                  ← {curriculum[index - 1].arabic}
-                </button>
-              )}
-              <button onClick={() => setActiveTab("forms")}
-                className={`rounded-2xl py-3 font-black text-sm text-[#1a1a2e] ${index === 0 ? "col-span-2" : ""}`}
-                style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` }}
-                data-testid="btn-continue">
-                Sii wad →
-              </button>
-            </div>
           </div>
         )}
 
-        {/* ── CONNECTED FORMS TAB ── */}
+        {/* ── FORMS (XIDID) TAB ── */}
         {activeTab === "forms" && forms && (
-          <div className="space-y-4">
-            <div className="text-center mb-2">
-              <p className="text-white/60 text-sm font-bold">
-                Sida <span style={{ color: letterColor }}>{current.arabic}</span> erayada ku eg tahay
-              </p>
-              {forms.nonConnecting && (
-                <p className="text-amber-400/80 text-xs mt-1">
-                  ⚠️ Xarfahan kaliya dhinac bidix ma xidna
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Kaliya",  form: forms.isolated, pos: "Meel kasta", somali: "Alone" },
-                { label: "Hore",   form: forms.initial,  pos: "Ereyga hore", somali: "Bilowga" },
-                { label: "Dhexe",  form: forms.medial,   pos: "Dhexda ereyga", somali: "Dhex" },
-                { label: "Dib",    form: forms.final,    pos: "Dhabarka ereyga", somali: "Dhammaadka" },
-              ].map(f => (
-                <button key={f.label}
-                  onClick={() => playForm(f.form, f.label)}
-                  className="rounded-2xl p-4 border flex flex-col items-center gap-2 active:scale-97 transition-all"
-                  style={{
-                    borderColor: formPlaying === f.label ? letterColor : "rgba(255,255,255,0.12)",
-                    backgroundColor: formPlaying === f.label ? letterColor + "20" : "rgba(255,255,255,0.04)",
-                  }}
-                  data-testid={`btn-form-${f.label}`}>
-                  <span className="font-black leading-none"
-                    style={{ fontFamily: "Amiri, serif", color: letterColor, fontSize: "clamp(42px, 12vw, 60px)" }}>
-                    {f.form}
-                  </span>
-                  <div className="text-center">
-                    <p className="text-white/80 font-black text-sm">{f.somali}</p>
-                    <p className="text-white/30 text-xs">{f.pos}</p>
-                  </div>
-                  {formPlaying === f.label && (
-                    <div className="flex gap-1 items-end h-3 mt-1">
-                      {[1,2,3].map(i => (
-                        <div key={i} className="w-1 rounded-full animate-bounce"
-                          style={{ height:`${i*3+3}px`, backgroundColor: letterColor, animationDelay:`${i*0.12}s` }} />
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="rounded-2xl p-4 border border-white/10 bg-white/4">
-              <p className="text-white/50 text-xs text-center mb-3 font-bold">Eray Quraanka ah oo leh {current.arabic}</p>
-              <div className="grid grid-cols-3 gap-2 text-center" dir="rtl">
-                {[
-                  { word: current.arabic + "ـ",        where: "Hore"  },
-                  { word: "ـ" + current.arabic + "ـ",  where: "Dhex"  },
-                  { word: "ـ" + current.arabic,         where: "Dib"   },
-                ].map(ex => (
-                  <div key={ex.where} className="rounded-xl p-2 bg-white/5 border border-white/10">
-                    <p className="font-black text-2xl mb-1" style={{ fontFamily: "Amiri, serif", color: letterColor }}>
-                      {ex.word}
-                    </p>
-                    <p className="text-white/30 text-xs" dir="ltr">{ex.where}</p>
-                  </div>
-                ))}
+          <div className="space-y-3">
+            <p className="text-white/50 text-xs text-center font-bold mb-1">Sida xarfuhu u yimaadaan meelaha kala duwan</p>
+            {forms.nonConnecting && (
+              <div className="rounded-xl px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-center">
+                <p className="text-amber-300 text-xs font-bold">⚠️ Xarfan kuma xidna xarfaha ka hor</p>
               </div>
-            </div>
-
-            <button onClick={() => setActiveTab("higaad")}
-              className="w-full rounded-2xl py-4 font-black text-[#1a1a2e]"
-              style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` }}
-              data-testid="btn-to-higaad">
-              📖 Higaadda →
-            </button>
-          </div>
-        )}
-
-        {/* ── HIGAAD TAB ── */}
-        {activeTab === "higaad" && (
-          <div className="space-y-4">
-            <div className="text-center mb-1">
-              <p className="text-white/60 text-sm font-bold">
-                Gujiso xarfaha si aad u maqasho — baro sida loo akhristo
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {HARAKAT_LIST.map(h => {
-                const vowelized = h.example(current.arabic);
-                const isPlaying = harakatPlaying === h.mark;
-                return (
-                  <button key={h.mark}
-                    onClick={() => playHarakat(vowelized, h.mark)}
-                    className="rounded-2xl py-4 px-3 border flex flex-col items-center gap-1.5 active:scale-96 transition-all"
-                    style={{
-                      borderColor: isPlaying ? h.color : "rgba(255,255,255,0.10)",
-                      backgroundColor: isPlaying ? h.color + "20" : "rgba(255,255,255,0.04)",
-                    }}
-                    data-testid={`btn-harakat-${h.name}`}>
-                    <span className="font-black leading-none"
-                      style={{ fontFamily: "Amiri, serif", color: h.color, fontSize: "clamp(44px, 13vw, 64px)" }}>
-                      {vowelized}
-                    </span>
-                    <div className="text-center">
-                      <p className="text-white/80 font-bold text-sm">{h.name}</p>
-                      <p className="text-white/40 text-xs">{h.desc}</p>
-                    </div>
-                    {isPlaying && (
-                      <div className="flex gap-1 items-end h-3">
-                        {[1,2,3].map(i => (
-                          <div key={i} className="w-1 rounded-full animate-bounce"
-                            style={{ height:`${i*3+2}px`, backgroundColor: h.color, animationDelay:`${i*0.12}s` }} />
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="rounded-2xl p-4 border border-[#FFD93D]/20 bg-[#FFD93D]/5">
-              <p className="text-[#FFD93D] font-black text-sm mb-2">💡 Talooyinka Akhrinta</p>
-              <ul className="text-white/50 text-xs space-y-1">
-                <li>• Fatha (ـَ) = Codka "a" — sida: بَ = "ba"</li>
-                <li>• Kasra (ـِ) = Codka "i" — sida: بِ = "bi"</li>
-                <li>• Damma (ـُ) = Codka "u" — sida: بُ = "bu"</li>
-                <li>• Sukuun (ـْ) = Joogsasho — codna ma jiro</li>
-              </ul>
-            </div>
-
-            <button onClick={() => setActiveTab("trace")}
-              className="w-full rounded-2xl py-4 font-black text-[#1a1a2e]"
-              style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` }}
-              data-testid="btn-to-trace">
-              ✏️ Hadda Qor →
-            </button>
-          </div>
-        )}
-
-        {/* ── TRACE TAB ── */}
-        {activeTab === "trace" && (
-          <div>
-            {traceDone ? (
-              <div className="text-center space-y-4">
-                <div className="rounded-3xl p-8 border border-white/10" style={{ backgroundColor: letterColor + "15" }}>
-                  <div className="text-7xl mb-4">🌟</div>
-                  <h2 className="text-3xl font-black text-white mb-2">Aad u fiican!</h2>
-                  <p className="text-white/60 font-bold">
-                    <span style={{ color: letterColor }} className="text-2xl">{current.arabic}</span> — {current.nameSomali}
-                  </p>
-                  {traceScore && <p className="text-white/40 text-sm mt-2">Natiijo: {traceScore}% ⭐</p>}
+            )}
+            {[
+              { label: "Gooni (Isolated)", form: forms.isolated, note: "Marka xariig dheer kelidii" },
+              { label: "Horeba (Initial)",  form: forms.initial,  note: "Bilawga ereyga" },
+              { label: "Dhexe (Medial)",    form: forms.medial,   note: "Dhexda ereyga" },
+              { label: "Dhamaad (Final)",   form: forms.final,    note: "Dhamaadka ereyga" },
+            ].map(({ label, form, note }) => (
+              <button key={label}
+                onClick={() => playForm(form, label)}
+                className={`w-full flex items-center justify-between rounded-2xl px-5 py-3.5 border transition-all active:scale-98 ${formPlaying === label ? "border-white/30" : "border-white/10"}`}
+                style={{ backgroundColor: formPlaying === label ? letterColor + "25" : letterColor + "0d" }}>
+                <div className="text-left">
+                  <p className="text-white/70 text-xs font-bold">{label}</p>
+                  <p className="text-white/40 text-[10px]">{note}</p>
                 </div>
-                <button onClick={goNext}
-                  className="w-full rounded-3xl py-5 text-xl font-black"
-                  style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)`, color: "#0f172a" }}
+                <div className="flex items-center gap-3">
+                  <span className="font-black text-4xl leading-none" style={{ fontFamily: "Amiri, serif", color: letterColor, direction: "rtl" }}>{form}</span>
+                  <Volume2 className="w-4 h-4 opacity-40" style={{ color: letterColor }} />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── HIGAAD (HARAKAT) TAB ── */}
+        {activeTab === "higaad" && current && (
+          <div className="space-y-2.5">
+            <p className="text-white/50 text-xs text-center font-bold mb-1">Astaamaha codadka — taabo si aad u dhagaystid</p>
+            {HARAKAT_LIST.map(h => {
+              const vowelized = h.example(current.arabic);
+              return (
+                <button key={h.mark}
+                  onClick={() => { setHarakatPlaying(h.mark); playLetterAudio(vowelized).then(() => setHarakatPlaying(null)); }}
+                  className={`w-full flex items-center gap-4 rounded-2xl px-4 py-3 border transition-all active:scale-98 ${harakatPlaying === h.mark ? "border-white/30" : "border-white/10"}`}
+                  style={{ backgroundColor: harakatPlaying === h.mark ? h.color + "22" : h.color + "0d" }}>
+                  <span className="text-3xl font-black w-12 text-center flex-shrink-0" style={{ fontFamily: "Amiri, serif", color: h.color }}>{vowelized}</span>
+                  <div className="flex-1 text-left">
+                    <p className="text-white/80 font-bold text-sm">{h.name}</p>
+                    <p className="text-white/40 text-xs">{h.desc}</p>
+                  </div>
+                  <Volume2 className="w-4 h-4 opacity-40" style={{ color: h.color }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── TRACE (QOR) TAB ── */}
+        {activeTab === "trace" && (
+          <div className="flex flex-col items-center gap-4">
+            {traceDone ? (
+              <div className="text-center py-6">
+                <p className="text-5xl mb-3">🎉</p>
+                <p className="text-green-400 font-black text-xl">MaashaAllah! Waa sax!</p>
+                <p className="text-white/50 text-sm mt-2">Qoraalku waa fiicnaaday</p>
+                <button onClick={goNext} className="mt-5 px-8 py-3 rounded-2xl font-black text-[#1a1a2e] text-lg active:scale-95"
+                  style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` }}
                   data-testid="btn-next-letter">
-                  {index < curriculum.length - 1 ? "Xarafka xiga →" : "🎉 Dhammaad!"}
+                  Xarafka xiga ➜
                 </button>
               </div>
             ) : (
-              <div>
-                <div className="rounded-3xl p-4 mb-4 border border-white/10 bg-white/5">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-white/70 font-bold text-sm">✏️ Raac xariiqda caddaan ah</p>
-                    {traceAttempts > 0 && traceScore !== null && (
-                      <span className="text-sm font-black" style={{ color: traceFeedback === "pass" ? "#4ADE80" : "#FF6B6B" }}>
-                        {traceScore}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex justify-center">
-                    <div className="rounded-2xl overflow-hidden border-2"
-                      style={{ borderColor: traceFeedback === "pass" ? "#4ADE80" : traceFeedback === "fail" ? "#FF6B6B" : letterColor + "50" }}>
-                      <canvas ref={canvasRef} className="touch-none block"
-                        style={{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px`, cursor: "crosshair" }}
-                        onPointerDown={pointerDown} onPointerMove={pointerMove}
-                        onPointerUp={pointerUp} onPointerCancel={pointerUp}
-                        data-testid="trace-canvas" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center gap-2 mt-1 text-xs text-white/30">
-                    <span className="w-3 h-1 rounded-full bg-green-400" /> Fiican
-                    <span className="w-3 h-1 rounded-full bg-red-400 ml-2" /> Meel kale
-                  </div>
+              <>
+                <p className="text-white/50 text-xs font-bold">Raac xarriiqda — faraha saartid daboolka</p>
+                <div className="relative rounded-2xl overflow-hidden border-2 border-white/10"
+                  style={{ boxShadow: `0 0 30px ${letterColor}30` }}>
+                  <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE}
+                    style={{ display:"block", width:`${CANVAS_SIZE}px`, height:`${CANVAS_SIZE}px`, touchAction:"none" }}
+                    onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp}
+                    data-testid="canvas-trace" />
                 </div>
-
-                {traceFeedback === "fail" && (
-                  <div className="mb-3 rounded-2xl px-4 py-3 bg-red-500/10 border border-red-500/30 text-center">
-                    <p className="text-red-300 font-bold">❌ Mar kale isku day! Raac xariiqda caddaan ah.</p>
+                {traceScore !== null && (
+                  <div className={`w-full rounded-2xl p-3 text-center ${traceFeedback === "pass" ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
+                    <p className={`font-black text-lg ${traceFeedback === "pass" ? "text-green-400" : "text-red-400"}`}>
+                      {traceFeedback === "pass" ? "✅ Aad u fiican!" : "❌ Mar kale isku day"}
+                    </p>
+                    <p className="text-white/50 text-sm">Dhibcahaaga: {traceScore}%</p>
                   </div>
                 )}
-
-                <div className="flex gap-3">
-                  <button onClick={() => drawCanvas()}
-                    className="flex-1 rounded-2xl py-4 font-bold text-white/60 border border-white/15 bg-white/5"
-                    data-testid="btn-clear">🧹 Nadiifi</button>
+                <div className="flex gap-3 w-full">
+                  <button onClick={drawCanvas}
+                    className="flex-1 py-3 rounded-2xl font-bold bg-white/10 border border-white/20 text-white/70 text-sm active:scale-95"
+                    data-testid="btn-clear-trace">
+                    🗑 Nadiifi
+                  </button>
                   <button onClick={submitTracing}
-                    className="flex-grow rounded-2xl py-4 font-black text-slate-900"
-                    style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)`, minWidth: "60%" }}
-                    data-testid="btn-check-trace">✅ Hubi</button>
+                    className="flex-1 py-3 rounded-2xl font-black text-[#1a1a2e] text-sm active:scale-95"
+                    style={{ background: `linear-gradient(135deg, ${letterColor}, ${letterColor}cc)` }}
+                    data-testid="btn-submit-trace">
+                    ✓ Hubi
+                  </button>
                 </div>
-
-                {traceAttempts >= 3 && traceFeedback !== "pass" && (
-                  <button onClick={() => { setTraceDone(true); setShowCelebration(false); }}
-                    className="w-full mt-3 rounded-2xl py-3 font-bold text-white/40 border border-white/10 text-sm"
-                    data-testid="btn-skip">Xarafka xiga →</button>
+                {traceAttempts > 0 && traceFeedback === "fail" && (
+                  <button onClick={goNext}
+                    className="text-white/30 text-sm font-bold underline"
+                    data-testid="btn-skip-trace">
+                    Ka bood ➜
+                  </button>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}
-      </div>
-
-      {/* Prev / Next floating nav at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 max-w-md mx-auto px-4 pb-4 pt-2 bg-[#1a1a2e]/90 backdrop-blur-sm border-t border-white/10">
-        <div className="flex gap-3">
-          <button
-            onClick={() => index > 0 && setLocation(`/alphabet-lesson/${curriculum[index - 1].id}`)}
-            disabled={index === 0}
-            className="flex-1 rounded-2xl py-3 font-bold text-sm border border-white/10 text-white/50 disabled:opacity-25"
-            data-testid="btn-nav-prev">
-            ← {index > 0 ? curriculum[index - 1].arabic : ""}
-          </button>
-          <button
-            onClick={playLetterAudio}
-            className="w-14 rounded-2xl py-3 font-bold text-lg flex items-center justify-center border border-white/10"
-            style={{ color: letterColor, backgroundColor: letterColor + "15" }}
-            data-testid="btn-nav-play">
-            🔊
-          </button>
-          <button
-            onClick={() => index < curriculum.length - 1
-              ? setLocation(`/alphabet-lesson/${curriculum[index + 1].id}`)
-              : setLocation("/alphabet-folders")}
-            className="flex-1 rounded-2xl py-3 font-bold text-sm border border-white/10 text-white/50"
-            data-testid="btn-nav-next">
-            {index < curriculum.length - 1 ? curriculum[index + 1].arabic : "✓"} →
-          </button>
-        </div>
       </div>
     </div>
   );
