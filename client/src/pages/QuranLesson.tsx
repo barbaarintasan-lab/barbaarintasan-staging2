@@ -83,9 +83,14 @@ export default function QuranLesson() {
   const [listenCount, setListenCount] = useState(0);
   const [revealText, setRevealText] = useState(false);
   const [autoAdvancing, setAutoAdvancing] = useState(false);
+  const [ayahMistakes, setAyahMistakes] = useState<Record<number, number>>({});
+  const [fullSurahReview, setFullSurahReview] = useState(false);
+  const [reviewPlaying, setReviewPlaying] = useState(false);
+  const [reviewAyahIndex, setReviewAyahIndex] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const preloadRef = useRef<HTMLAudioElement | null>(null);
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -381,8 +386,7 @@ export default function QuranLesson() {
         const isLast = newCompletedCount >= totalAyahs;
         if (isLast) {
           setSurahComplete(true);
-          setShowCelebration(true);
-          setTimeout(() => setShowCelebration(false), 6000);
+          setFullSurahReview(true); // show full text + sequential audio before games
         } else {
           // auto-advance to next ayah after 2 seconds
           setAutoAdvancing(true);
@@ -393,12 +397,31 @@ export default function QuranLesson() {
           }, 2200);
         }
       } else if (!result.completed) {
-        // wrong answer: reveal text for 6 seconds then hide
-        setRevealText(true);
+        // Smart Retry: graduated response based on mistake count
+        const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
+        setAyahMistakes(prev => ({ ...prev, [currentAyah.number]: mistakeNum }));
+
         if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-        revealTimerRef.current = setTimeout(() => {
-          setRevealText(false);
-        }, 6000);
+
+        if (mistakeNum === 1) {
+          // 1st mistake: replay audio only, no text reveal
+          setTimeout(() => {
+            const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
+            if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
+          }, 800);
+        } else if (mistakeNum === 2) {
+          // 2nd mistake: show text for 8 seconds
+          setRevealText(true);
+          revealTimerRef.current = setTimeout(() => setRevealText(false), 8000);
+        } else {
+          // 3rd+ mistake: show text + replay audio + keep 12 seconds
+          setRevealText(true);
+          setTimeout(() => {
+            const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
+            if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
+          }, 400);
+          revealTimerRef.current = setTimeout(() => setRevealText(false), 12000);
+        }
       }
     } catch (error: any) {
       setCheckResult({
@@ -425,9 +448,40 @@ export default function QuranLesson() {
     }
   };
 
+  const playFullSurahSequential = useCallback(() => {
+    if (!surah) return;
+    setReviewPlaying(true);
+    setReviewAyahIndex(0);
+    let idx = 0;
+    const playNext = () => {
+      if (idx >= surah.ayahs.length) {
+        setReviewPlaying(false);
+        return;
+      }
+      setReviewAyahIndex(idx);
+      const url = getAudioUrl(surahNumber, surah.ayahs[idx].number, selectedReciter);
+      const a = new Audio(url);
+      reviewAudioRef.current = a;
+      a.onended = () => { idx++; setTimeout(playNext, 600); };
+      a.onerror = () => { idx++; setTimeout(playNext, 300); };
+      a.play().catch(() => { idx++; setTimeout(playNext, 300); });
+    };
+    playNext();
+  }, [surah, surahNumber, selectedReciter, getAudioUrl]);
+
+  const finishFullReview = () => {
+    if (reviewAudioRef.current) { reviewAudioRef.current.pause(); reviewAudioRef.current = null; }
+    setReviewPlaying(false);
+    setFullSurahReview(false);
+    setShowCelebration(true);
+    setTimeout(() => setShowCelebration(false), 6000);
+  };
+
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
-  const MIN_LISTENS = 3;
+  // Adaptive: if child struggled (≥2 mistakes) require 5 listens, else 3
+  const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
+  const MIN_LISTENS = currentAyahMistakes >= 2 ? 5 : 3;
   const canRecord = listenCount >= MIN_LISTENS && !isCurrentCompleted && !autoAdvancing;
 
   if (authLoading || surahLoading) {
@@ -800,7 +854,64 @@ export default function QuranLesson() {
           </div>
         )}
 
-        {surahComplete && !showCelebration && (
+        {/* ═══ FULL SURAH REVIEW SCREEN ═══ */}
+        {fullSurahReview && (
+          <div className="px-4 mb-6">
+            <div className="bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f3460] rounded-3xl p-6 border-2 border-[#FFD93D]/40 text-center">
+              <div className="text-5xl mb-3">📖</div>
+              <h3 className="text-[#FFD93D] font-bold text-xl mb-1">Aad baad u mahadsantahay!</h3>
+              <p className="text-white/70 text-sm mb-4">
+                Suurada oo dhan waa bartay — hadda dhageyso oo dib u akhriso!
+              </p>
+
+              {/* Full surah text display */}
+              <div className="bg-black/30 rounded-2xl p-4 mb-4 text-right max-h-64 overflow-y-auto border border-[#FFD93D]/20">
+                {surah?.ayahs.map((ayah, i) => (
+                  <p key={ayah.number}
+                    className={`font-arabic text-xl leading-loose mb-2 transition-all duration-300 ${
+                      reviewPlaying && reviewAyahIndex === i
+                        ? "text-[#FFD93D] text-2xl"
+                        : "text-white/80"
+                    }`}
+                    dir="rtl"
+                  >
+                    {ayah.text} {ayah.number === 1 && surahNumber !== 9 ? "" : `﴿${ayah.number}﴾`}
+                  </p>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {!reviewPlaying ? (
+                  <button
+                    onClick={playFullSurahSequential}
+                    className="w-full py-4 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                    data-testid="button-play-full-surah"
+                  >
+                    🔊 Dhageyso Suurada oo dhan
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-center gap-3 py-4">
+                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="text-white/60 text-sm">
+                      Aayah {(reviewAyahIndex + 1)}/{surah?.ayahs.length}...
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={finishFullReview}
+                  className="w-full py-3 bg-white/10 text-white/70 border border-white/20 font-bold text-base rounded-2xl active:scale-95 transition-all"
+                  data-testid="button-finish-review"
+                >
+                  {reviewPlaying ? "Jooji oo dhamee →" : "Dhamee Dhagsiga →"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {surahComplete && !showCelebration && !fullSurahReview && (
           <div className="px-4 mb-6">
             <div className="bg-gradient-to-r from-[#FFD93D]/20 to-[#FFA502]/20 rounded-3xl p-6 border-2 border-[#FFD93D]/30 text-center">
               <Trophy className="w-16 h-16 text-[#FFD93D] mx-auto mb-3" />
