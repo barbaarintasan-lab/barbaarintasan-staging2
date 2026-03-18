@@ -44,6 +44,14 @@ interface CheckResult {
   message: string;
 }
 
+interface LessonSubmitResult {
+  success: boolean;
+  isPassed: boolean;
+  isSoftPass: boolean;
+  attemptNumber: number;
+  message: string;
+}
+
 interface ReciterOption {
   id: string;
   name: string;
@@ -132,6 +140,9 @@ export default function QuranLesson() {
   const finalTestChunksRef = useRef<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !child) setLocation("/child-login");
@@ -190,7 +201,17 @@ export default function QuranLesson() {
     setRevealText(false);
     setAutoAdvancing(false);
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    submitInFlightRef.current = false;
   }, [currentAyahIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    };
+  }, []);
 
   const currentAyah = surah?.ayahs?.[currentAyahIndex];
   const totalAyahs = surah?.numberOfAyahs || 0;
@@ -316,6 +337,8 @@ export default function QuranLesson() {
   }, []);
 
   const startRecording = useCallback(async () => {
+    if (isChecking || isRecording || autoAdvancing) return;
+
     // Stop Sheikh audio if playing so mic can record cleanly
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     if (preloadRef.current) { preloadRef.current.pause(); }
@@ -377,10 +400,11 @@ export default function QuranLesson() {
         alert("Fadlan oggolow microphone-ka kadibna mar kale riix Isku day!");
       }
     }
-  }, [isLikelyIPhoneSafari, pickRecorderMimeType]);
+  }, [autoAdvancing, isChecking, isLikelyIPhoneSafari, isRecording, pickRecorderMimeType]);
 
   const stopRecording = useCallback(async () => {
-    if (!mediaRecorderRef.current || !currentAyah) return;
+    if (!mediaRecorderRef.current || !currentAyah || submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setIsRecording(false);
     setIsChecking(true);
 
@@ -411,21 +435,68 @@ export default function QuranLesson() {
       }
       const result: CheckResult = await response.json();
 
+      let submitResult: LessonSubmitResult | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const submitResponse = await fetch("/api/quran/lesson/submit", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              surahNumber,
+              ayahNumber: currentAyah.number,
+              isCorrect: result.completed,
+            }),
+          });
+
+          if (!submitResponse.ok) {
+            const submitError = await submitResponse.json().catch(() => null);
+            throw new Error(submitError?.error || "Submit failed");
+          }
+
+          submitResult = await submitResponse.json();
+          break;
+        } catch (submitError) {
+          if (attempt === 1) {
+            console.error("Quran lesson submit failed:", submitError);
+          }
+        }
+      }
+
       const wasAlreadyCompleted = ayahProgress[currentAyah.number]?.completed || false;
+      const wasPassed = submitResult?.isPassed ?? result.completed;
+      const isSoftPass = submitResult?.isSoftPass ?? false;
+      const nextAttemptCount = submitResult?.attemptNumber ?? ((ayahProgress[currentAyah.number]?.attempts || 0) + 1);
+      const nextResult: CheckResult = wasPassed
+        ? {
+            outcome: "correct",
+            completed: true,
+            message: isSoftPass ? "✨ Waad saxday, sii wad!" : result.message,
+          }
+        : result;
       const updatedProgress = {
         ...ayahProgress,
         [currentAyah.number]: {
           ayahNumber: currentAyah.number,
-          attempts: (ayahProgress[currentAyah.number]?.attempts || 0) + 1,
-          bestScore: result.completed ? 100 : (ayahProgress[currentAyah.number]?.bestScore || 0),
-          lastScore: result.completed ? 100 : 40,
-          completed: result.completed || wasAlreadyCompleted,
+          attempts: nextAttemptCount,
+          bestScore: wasPassed ? 100 : (ayahProgress[currentAyah.number]?.bestScore || 0),
+          lastScore: wasPassed ? 100 : 40,
+          completed: wasPassed || wasAlreadyCompleted,
         }
       };
       setAyahProgress(updatedProgress);
-      setCheckResult(result);
+      setCheckResult(nextResult);
 
-      if (result.completed && !wasAlreadyCompleted) {
+      if (isSoftPass) {
+        if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+        feedbackTimeoutRef.current = setTimeout(() => {
+          setCheckResult(null);
+        }, 1500);
+      }
+
+      if (wasPassed && !wasAlreadyCompleted) {
         // Track this ayah index in the session
         setSessionLearned(prev => prev.includes(currentAyahIndex) ? prev : [...prev, currentAyahIndex]);
 
@@ -438,7 +509,7 @@ export default function QuranLesson() {
           // auto-advance to next ayah after 2 seconds, then auto-play sheikh audio
           setAutoAdvancing(true);
           const nextIdx = Math.min(currentAyahIndex + 1, totalAyahs - 1);
-          setTimeout(() => {
+          autoAdvanceTimeoutRef.current = setTimeout(() => {
             setAutoAdvancing(false);
             setCurrentAyahIndex(nextIdx);
             setCheckResult(null);
@@ -466,9 +537,9 @@ export default function QuranLesson() {
               audio.onerror = () => { setIsPlaying(false); setIsLoadingAudio(false); };
               setTimeout(() => audio.play().catch(() => {}), 400);
             }
-          }, 2200);
+          }, isSoftPass ? 1500 : 2200);
         }
-      } else if (!result.completed) {
+      } else if (!wasPassed) {
         // Smart Retry: replay audio after each mistake (text is always visible)
         const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
         setAyahMistakes(prev => ({ ...prev, [currentAyah.number]: mistakeNum }));
@@ -488,7 +559,8 @@ export default function QuranLesson() {
       });
     }
     setIsChecking(false);
-  }, [currentAyah, currentAyahIndex, surahNumber, totalAyahs, ayahProgress, ayahMistakes, getAudioUrl, selectedReciter]);
+    submitInFlightRef.current = false;
+  }, [currentAyah, currentAyahIndex, surahNumber, totalAyahs, ayahProgress, ayahMistakes, getAudioUrl, selectedReciter, surah]);
 
   const goToAyah = (index: number) => {
     if (index >= 0 && index < totalAyahs && isAyahAccessible(index)) {
@@ -1216,6 +1288,7 @@ export default function QuranLesson() {
                     <RotateCcw className="w-4 h-4" /> Dhageyso
                   </button>
                   <button onClick={startRecording}
+                    disabled={isChecking || autoAdvancing}
                     className="flex-1 py-3 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#FFD93D]/30"
                     data-testid="button-try-again"
                   >
