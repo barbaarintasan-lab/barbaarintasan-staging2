@@ -245,6 +245,21 @@ export default function AlphabetLesson() {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
   }, [current?.id]);
 
+  // ── Audio: MUST be declared before any useEffect that uses it in deps ──
+  const playLetterAudio = useCallback((text: string): Promise<void> => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    setAudioPlaying(true);
+    return new Promise((resolve) => {
+      const url = `/api/alphabet/tts?letter=${encodeURIComponent(text)}`;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setAudioPlaying(false); setHasListened(true); resolve(); };
+      // On error: stop spinner but do NOT set hasListened — user must tap manually
+      audio.onerror = () => { setAudioPlaying(false); resolve(); };
+      audio.play().catch(() => { setAudioPlaying(false); resolve(); });
+    });
+  }, []);
+
   // Reset trace states on letter change + auto-play sequence
   useEffect(() => {
     setActiveTab("listen");
@@ -259,10 +274,8 @@ export default function AlphabetLesson() {
     const run = async () => {
       await new Promise(r => setTimeout(r, 700));
       if (cancelled) return;
-      // 1. Play the letter name (e.g. "أَلِف")
       await playLetterAudio(current.nameArabic);
       if (cancelled) return;
-      // 2. Short pause, then play the Quran example word (e.g. "اللَّه")
       const word = QURAN_WORDS[current.arabic];
       if (word) {
         await new Promise(r => setTimeout(r, 500));
@@ -277,21 +290,6 @@ export default function AlphabetLesson() {
   useEffect(() => {
     if (activeTab === "trace") setTimeout(() => drawCanvas(), 100);
   }, [activeTab]);
-
-  // ── Audio: use server TTS, returns Promise that resolves when done ──
-  const playLetterAudio = useCallback((text: string): Promise<void> => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    setAudioPlaying(true);
-    return new Promise((resolve) => {
-      const url = `/api/alphabet/tts?letter=${encodeURIComponent(text)}`;
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { setAudioPlaying(false); setHasListened(true); resolve(); };
-      // On error: stop spinner but do NOT set hasListened — user must tap manually
-      audio.onerror = () => { setAudioPlaying(false); resolve(); };
-      audio.play().catch(() => { setAudioPlaying(false); resolve(); });
-    });
-  }, []);
 
   function playHarakat(vowelized: string) {
     playLetterAudio(vowelized);
