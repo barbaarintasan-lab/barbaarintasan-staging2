@@ -110,6 +110,7 @@ export default function QuranLesson() {
   const [fullSurahReview, setFullSurahReview] = useState(false);
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [reviewAyahIndex, setReviewAyahIndex] = useState(0);
+  const [reviewState, setReviewState] = useState<"listening" | "ready" | "recording" | "checking" | "failed">("listening");
 
   // Tabs
   const [activeTab, setActiveTab] = useState<DashboardTab>("quran");
@@ -507,11 +508,13 @@ export default function QuranLesson() {
   const playFullSurahSequential = useCallback(() => {
     if (!surah) return;
     setReviewPlaying(true);
+    setReviewState("listening");
     setReviewAyahIndex(0);
     let idx = 0;
     const playNext = () => {
       if (idx >= surah.ayahs.length) {
         setReviewPlaying(false);
+        setReviewState("ready");
         return;
       }
       setReviewAyahIndex(idx);
@@ -524,6 +527,58 @@ export default function QuranLesson() {
     };
     playNext();
   }, [surah, surahNumber, selectedReciter, getAudioUrl]);
+
+  const startSurahRecordingTest = async () => {
+    if (!surah) return;
+    setReviewState("recording");
+    finalTestChunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"].find(m => MediaRecorder.isTypeSupported(m)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) finalTestChunksRef.current.push(e.data); };
+      recorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
+      recorder.start();
+      finalTestMediaRecorderRef.current = recorder;
+    } catch {
+      alert("Fadlan oggolow microphone-ka kadibna isku day mar kale!");
+      setReviewState("ready");
+    }
+  };
+
+  const stopSurahRecordingTest = async () => {
+    if (!finalTestMediaRecorderRef.current || !surah) return;
+    setReviewState("checking");
+    const recorder = finalTestMediaRecorderRef.current;
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => { recorder.stream.getTracks().forEach(t => t.stop()); resolve(); };
+      recorder.stop();
+    });
+    const mimeType = finalTestChunksRef.current[0]?.type || "audio/webm";
+    const blob = new Blob(finalTestChunksRef.current, { type: mimeType });
+    const formData = new FormData();
+    formData.append("audio", blob, "surah-test.webm");
+    formData.append("surahNumber", surahNumber.toString());
+    formData.append("ayahNumbers", JSON.stringify(surah.ayahs.map(a => a.number)));
+    try {
+      const response = await fetch("/api/quran/check-session", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const result = await response.json();
+      if (result.passed && result.score >= 75) {
+        setSurahComplete(true);
+        setFullSurahReview(false);
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 6000);
+      } else {
+        setReviewState("failed");
+      }
+    } catch {
+      setReviewState("failed");
+    }
+  };
 
   const finishFullReview = () => {
     if (reviewAudioRef.current) { reviewAudioRef.current.pause(); reviewAudioRef.current = null; }
@@ -1199,7 +1254,7 @@ export default function QuranLesson() {
               </div>
 
               <div className="flex flex-col gap-3">
-                {!reviewPlaying ? (
+                {reviewState === "listening" && !reviewPlaying && (
                   <button
                     onClick={playFullSurahSequential}
                     className="w-full py-4 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -1207,7 +1262,9 @@ export default function QuranLesson() {
                   >
                     🔊 Dhageyso Suurada oo dhan
                   </button>
-                ) : (
+                )}
+                
+                {reviewState === "listening" && reviewPlaying && (
                   <div className="flex items-center justify-center gap-3 py-4">
                     <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                     <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -1217,13 +1274,59 @@ export default function QuranLesson() {
                     </span>
                   </div>
                 )}
-                <button
-                  onClick={finishFullReview}
-                  className="w-full py-3 bg-white/10 text-white/70 border border-white/20 font-bold text-base rounded-2xl active:scale-95 transition-all"
-                  data-testid="button-finish-review"
-                >
-                  {reviewPlaying ? "Jooji oo dhamee →" : "Dhamee Dhagsiga →"}
-                </button>
+
+                {reviewState === "ready" && (
+                  <button
+                    onClick={startSurahRecordingTest}
+                    className="w-full py-4 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                    data-testid="button-ready-to-recite"
+                  >
+                    🎤 Diyaar ma tahay?
+                  </button>
+                )}
+
+                {reviewState === "recording" && (
+                  <button
+                    onClick={stopSurahRecordingTest}
+                    className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 animate-pulse"
+                    data-testid="button-stop-recording"
+                  >
+                    ⏹️ Jooji oo soo dir
+                  </button>
+                )}
+
+                {reviewState === "checking" && (
+                  <div className="flex items-center justify-center gap-3 py-4">
+                    <Loader2 className="w-6 h-6 text-[#FFD93D] animate-spin" />
+                    <span className="text-white/60 text-sm">AI ayaa hubinaya...</span>
+                  </div>
+                )}
+
+                {reviewState === "failed" && (
+                  <>
+                    <div className="bg-red-500/20 border border-red-400/40 rounded-2xl p-4 text-center mb-2">
+                      <p className="text-red-300 font-bold text-base mb-2">❌ Akhri mar kale</p>
+                      <p className="text-red-200/70 text-sm">Waxaad u baahan tahay 75% si aad casharka u dhameyso</p>
+                    </div>
+                    <button
+                      onClick={() => setReviewState("listening")}
+                      className="w-full py-3 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-base rounded-2xl active:scale-95 transition-all"
+                      data-testid="button-retry-listen"
+                    >
+                      🔄 Dib u dhageyso
+                    </button>
+                  </>
+                )}
+
+                {reviewState !== "checking" && (
+                  <button
+                    onClick={finishFullReview}
+                    className="w-full py-3 bg-white/10 text-white/70 border border-white/20 font-bold text-base rounded-2xl active:scale-95 transition-all"
+                    data-testid="button-finish-review"
+                  >
+                    Ka bax casharka
+                  </button>
+                )}
               </div>
             </div>
           </div>
