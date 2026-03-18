@@ -11337,9 +11337,16 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       } catch {
         return res.status(400).json({ error: "Suurada lama helin" });
       }
+
+      // Fetch child age to apply age-appropriate leniency
+      const childRecord = await storage.getChild(childId);
+      const childAge = childRecord?.age ?? 7;
+      // Passing threshold based on age: young children need less accuracy
+      const passingScore = childAge <= 5 ? 25 : childAge <= 8 ? 60 : 75;
+
       const openai = getOpenAIClient();
       const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
-      let result: { outcome: string };
+      let result: { score: number };
       try {
         const transcription = await openai.audio.transcriptions.create({
           model: "whisper-1",
@@ -11347,19 +11354,38 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           language: "ar",
         });
         const transcribedText = transcription.text.trim();
+
+        // Build age-aware system prompt
+        let ageContext: string;
+        if (childAge <= 4) {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo yar oo weli baranaya. Aad u fududee — hadduu akhriyo xitaa qaybta ugu yar ee aayada, ku sii dhawr daraajo.`;
+        } else if (childAge <= 6) {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo da' yar. Fududee, hadduu akhriyo kala badnaanshiyaha kelmadaha.`;
+        } else if (childAge <= 9) {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo dhexdhexaad ah. Eeg in akhrintaydu tahay mid macquul ah.`;
+        } else {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo weyn. Heer sare u raadi saxnaanta.`;
+        }
+
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
               content: `Waxaad tahay macalin Quraan ah oo carruurta wax bara. Ilmo ayaa akhrinaya aayad Quraan ah.
+${ageContext}
 Is barbar dhig qoraalka saxda ah iyo kan ilmuhu akhriyay.
 Waa inaad ku jawaabto JSON-kan oo kaliya (qoraal kale ha ku darin):
 {
-  "outcome": "correct" ama "needs_retry"
+  "score": <tiro 0-100>
 }
-Haddii ilmuhu si fiican u akhriyay oo aayada sax u dhammeeyay, "correct" sii.
-Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" sii - ilmuhu wuxuu ku baranayaa isku dayga!`
+- 100: aayada oo dhammi sax u akhriyay
+- 75: kala badnaanshiyaha (75%+) sax u akhriyay
+- 50: kuwa badnaa (50%+) sax u akhriyay
+- 25: qayb yar (25% oo kale) u akhriyay
+- 0: wax aan la aqoon ama been gabi ahaanba
+
+Ilmuhu wuxuu ku baranayaa isku dayga!`
             },
             {
               role: "user",
@@ -11371,15 +11397,17 @@ Haddii qayb muhiim ah uga khaldan tahay ama aad shaki ka qabtid, "needs_retry" s
         try {
           const responseText = completion.choices[0].message.content || "{}";
           const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          result = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+          result = { score: typeof parsed.score === "number" ? parsed.score : 0 };
         } catch {
-          result = { outcome: "needs_retry" };
+          result = { score: 0 };
         }
       } catch (aiError: any) {
         console.warn("[QURAN] AI check fallback - whisper/gpt unavailable:", aiError.code || aiError.message);
-        result = { outcome: "correct" };
+        result = { score: passingScore }; // fallback = just enough to pass
       }
-      const isCorrect = result.outcome === "correct";
+      const isCorrect = result.score >= passingScore;
+      console.log(`[QURAN] Child age=${childAge}, score=${result.score}, passingScore=${passingScore}, isCorrect=${isCorrect}`);
       const completed = isCorrect;
       const score = isCorrect ? 100 : 40;
       const existing = await db.select().from(quranLessonProgress).where(
