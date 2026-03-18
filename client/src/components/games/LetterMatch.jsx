@@ -3,13 +3,13 @@ import { calculateScore, getPerformanceLevel } from "../../utils/gameScoring";
 import { isGameUnlocked } from "../../utils/unlock";
 
 const LETTER_POOL = [
-  { letter: "ا", audio: "/api/audio/alphabet/alif.mp3" },
-  { letter: "ب", audio: "/api/audio/alphabet/ba.mp3" },
-  { letter: "ت", audio: "/api/audio/alphabet/ta.mp3" },
-  { letter: "ث", audio: "/api/audio/alphabet/tha.mp3" },
-  { letter: "ج", audio: "/api/audio/alphabet/jeem.mp3" },
-  { letter: "ح", audio: "/api/audio/alphabet/ha.mp3" },
-  { letter: "خ", audio: "/api/audio/alphabet/kha.mp3" },
+  { letter: "ا" },
+  { letter: "ب" },
+  { letter: "ت" },
+  { letter: "ث" },
+  { letter: "ج" },
+  { letter: "ح" },
+  { letter: "خ" },
 ];
 
 const QUESTION_COUNT_BY_LEVEL = {
@@ -91,11 +91,12 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
     };
   }, []);
 
-  function playAudio(audioUrl) {
-    if (!audioUrl) return;
+  function playAudio(letter) {
+    if (!letter) return;
+    const ttsUrl = `/api/alphabet/tts?letter=${encodeURIComponent(letter)}`;
     const audio = audioRef.current || new Audio();
     audioRef.current = audio;
-    audio.src = audioUrl;
+    audio.src = ttsUrl;
     audio.preload = "auto";
     audio.load();
     audio.play().catch(() => {
@@ -105,13 +106,13 @@ export default function LetterMatch({ lesson = { completed: false, score: 0 }, l
 
   function playQuestionAudio() {
     if (!currentRound) return;
-    playAudio(currentRound.correctLetter.audio);
+    playAudio(currentRound.correctLetter.letter);
   }
 
   function handleSelect(letterObj) {
     if (!currentRound || showFeedback) return;
 
-    playAudio(letterObj.audio);
+    playAudio(letterObj.letter);
 
     setSelected(letterObj.letter);
     const correct = letterObj.letter === currentRound.correctLetter.letter;
