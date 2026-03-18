@@ -81,9 +81,11 @@ export default function QuranLesson() {
   const [rewardSummary, setRewardSummary] = useState<RewardSummary | null>(null);
 
   const [listenCount, setListenCount] = useState(0);
-  const [isAyahHidden, setIsAyahHidden] = useState(false);
+  const [revealText, setRevealText] = useState(false);
+  const [autoAdvancing, setAutoAdvancing] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preloadRef = useRef<HTMLAudioElement | null>(null);
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -142,7 +144,9 @@ export default function QuranLesson() {
     setCheckResult(null);
     setListenCount(0);
     setAudioFailed(false);
-    setIsAyahHidden(false);
+    setRevealText(false);
+    setAutoAdvancing(false);
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
   }, [currentAyahIndex]);
 
   const currentAyah = surah?.ayahs?.[currentAyahIndex];
@@ -358,8 +362,6 @@ export default function QuranLesson() {
       }
       const result: CheckResult = await response.json();
 
-      setCheckResult(result);
-      setIsAyahHidden(false);
       const wasAlreadyCompleted = ayahProgress[currentAyah.number]?.completed || false;
       const updatedProgress = {
         ...ayahProgress,
@@ -372,13 +374,31 @@ export default function QuranLesson() {
         }
       };
       setAyahProgress(updatedProgress);
+      setCheckResult(result);
+
       if (result.completed && !wasAlreadyCompleted) {
         const newCompletedCount = Object.values(updatedProgress).filter(p => p.completed).length;
-        if (newCompletedCount >= totalAyahs) {
+        const isLast = newCompletedCount >= totalAyahs;
+        if (isLast) {
           setSurahComplete(true);
           setShowCelebration(true);
-          setTimeout(() => setShowCelebration(false), 5000);
+          setTimeout(() => setShowCelebration(false), 6000);
+        } else {
+          // auto-advance to next ayah after 2 seconds
+          setAutoAdvancing(true);
+          setTimeout(() => {
+            setAutoAdvancing(false);
+            setCurrentAyahIndex(prev => Math.min(prev + 1, totalAyahs - 1));
+            setCheckResult(null);
+          }, 2200);
         }
+      } else if (!result.completed) {
+        // wrong answer: reveal text for 6 seconds then hide
+        setRevealText(true);
+        if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = setTimeout(() => {
+          setRevealText(false);
+        }, 6000);
       }
     } catch (error: any) {
       setCheckResult({
@@ -407,8 +427,8 @@ export default function QuranLesson() {
 
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
-  const canStartHiddenRecite = hasListened && !isCurrentCompleted;
-  const canRecordHidden = isCurrentCompleted || (hasListened && isAyahHidden);
+  const MIN_LISTENS = 3;
+  const canRecord = listenCount >= MIN_LISTENS && !isCurrentCompleted && !autoAdvancing;
 
   if (authLoading || surahLoading) {
     return (
@@ -591,44 +611,38 @@ export default function QuranLesson() {
                 )}
               </div>
 
-              <div className="text-right mb-6" dir="rtl">
-                {isAyahHidden && !isCurrentCompleted ? (
-                  <div className="rounded-2xl border border-dashed border-[#FFD93D]/40 bg-[#FFD93D]/5 p-4 text-center" data-testid="text-ayah-hidden">
-                    <p className="text-[#FFD93D] text-sm font-semibold">Aayadda waa qarsoon tahay</p>
-                    <p className="text-white/50 text-xs mt-1">AI ayaa ku dhageysanaysa adigoo xifdi ka akhrinaya</p>
-                  </div>
-                ) : (
+              {/* Quran text: always hidden during lesson — revealed only after wrong answer */}
+              <div className="text-right mb-5" dir="rtl">
+                {isCurrentCompleted ? (
                   <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]" data-testid="text-ayah-arabic">
                     {currentAyah.text}
                   </p>
+                ) : revealText ? (
+                  <div className="rounded-2xl border-2 border-orange-400/50 bg-orange-500/10 p-4" data-testid="text-ayah-revealed">
+                    <p className="text-orange-300 text-xs font-bold mb-2 text-center">📖 Aayadda waa la muujiyay — aad ugu xifdi, 6 ilbiriqsi gudahood waa la qarin doonaa</p>
+                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">{currentAyah.text}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/3 p-6 text-center" data-testid="text-ayah-hidden">
+                    <p className="text-5xl mb-3">🎵</p>
+                    <p className="text-white/60 font-bold text-base">Dhageyso — qoraalka waa qarsoon yahay</p>
+                    <p className="text-white/30 text-xs mt-1">Xifdi ka aqri, qoraalka ha u baahna</p>
+                  </div>
                 )}
               </div>
 
               {!isCurrentCompleted && (
-                <div className="flex items-center gap-3 mb-5 px-2">
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${hasListened ? "bg-green-500/20 text-green-300" : "bg-[#4ECDC4]/20 text-[#4ECDC4] animate-pulse"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${hasListened ? "bg-green-500/30" : "bg-[#4ECDC4]/30"}`}>1</span>
-                    Dhagayso
+                <div className="flex items-center gap-2 mb-4 px-1">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount >= MIN_LISTENS ? "bg-green-500/20 text-green-300" : "bg-[#4ECDC4]/20 text-[#4ECDC4]"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount >= MIN_LISTENS ? "bg-green-500/30" : "bg-[#4ECDC4]/30"}`}>1</span>
+                    Dhageyso {listenCount > 0 && <span className="font-black">{listenCount}/{MIN_LISTENS}</span>}
                   </div>
                   <div className="flex-1 h-px bg-white/10" />
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${canRecordHidden ? "bg-[#FFD93D]/20 text-[#FFD93D]" : "bg-white/5 text-white/20"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${canRecordHidden ? "bg-[#FFD93D]/30" : "bg-white/10"}`}>2</span>
-                    Akhri
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${canRecord ? "bg-[#FFD93D]/20 text-[#FFD93D]" : "bg-white/5 text-white/20"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${canRecord ? "bg-[#FFD93D]/30" : "bg-white/10"}`}>2</span>
+                    Xifdi
                   </div>
                 </div>
-              )}
-
-              {canStartHiddenRecite && !isAyahHidden && (
-                <button
-                  onClick={() => {
-                    setIsAyahHidden(true);
-                    setCheckResult(null);
-                  }}
-                  className="w-full mb-4 py-3 rounded-2xl bg-[#FFD93D]/15 text-[#FFD93D] border border-[#FFD93D]/35 font-bold text-sm hover:bg-[#FFD93D]/25 transition-all active:scale-95"
-                  data-testid="button-hide-ayah-ready"
-                >
-                  Diyaar haddaad tahay riix - Aayadda qari
-                </button>
               )}
 
               <div className="flex items-center justify-center gap-5">
@@ -645,38 +659,21 @@ export default function QuranLesson() {
                 </button>
 
                 <button onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isChecking || isPlaying || !canRecordHidden}
+                  disabled={isChecking || isPlaying || !canRecord || autoAdvancing}
                   className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                     isRecording ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50 scale-110" :
-                    isChecking ? "bg-white/10 text-white/30" :
-                    !canRecordHidden ? "bg-white/10 text-white/20 border-2 border-white/5 cursor-not-allowed" :
+                    isChecking || autoAdvancing ? "bg-white/10 text-white/30" :
+                    !canRecord ? "bg-white/10 text-white/20 border-2 border-white/5 cursor-not-allowed" :
                     "bg-gradient-to-br from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] shadow-lg shadow-[#FFD93D]/30 hover:shadow-[#FFD93D]/50"
                   }`}
                   data-testid="button-record"
                 >
-                  {isChecking ? (
-                    <div className="flex flex-col items-center">
-                      <Loader2 className="w-8 h-8 animate-spin" />
-                    </div>
-                  ) :
-                    isRecording ? <MicOff className="w-8 h-8" /> :
-                    !canRecordHidden ? <Lock className="w-6 h-6" /> :
-                    <Mic className="w-8 h-8" />}
+                  {isChecking ? <Loader2 className="w-8 h-8 animate-spin" /> :
+                   autoAdvancing ? <ChevronRight className="w-8 h-8 animate-pulse" /> :
+                   isRecording ? <MicOff className="w-8 h-8" /> :
+                   !canRecord ? <Lock className="w-6 h-6" /> :
+                   <Mic className="w-8 h-8" />}
                 </button>
-
-                {currentAyahIndex < totalAyahs - 1 && (
-                  <button onClick={nextAyah}
-                    disabled={!isCurrentCompleted}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all active:scale-90 ${
-                      isCurrentCompleted
-                        ? "bg-green-500/20 text-green-300 border-green-500/40 hover:bg-green-500/30"
-                        : "bg-white/5 text-white/20 border-white/5 cursor-not-allowed"
-                    }`}
-                    data-testid="button-next-ayah"
-                  >
-                    {isCurrentCompleted ? <ChevronRight className="w-7 h-7" /> : <Lock className="w-5 h-5" />}
-                  </button>
-                )}
               </div>
 
               {audioFailed && !hasListened && (
@@ -699,20 +696,34 @@ export default function QuranLesson() {
                 </div>
               )}
 
-              {!canRecordHidden && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && (
-                <p className="text-center text-[#4ECDC4]/70 text-sm mt-4">
-                  Marka hore dhagayso Macalinka, ku celcesho oo xifdi Aayda, kadibna riix badhanka kore ee Jaalada ah, qari aayadda oo ka soo bax
+              {!canRecord && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && !isCurrentCompleted && !autoAdvancing && (
+                <p className="text-center text-[#4ECDC4]/70 text-sm mt-4 px-2">
+                  {listenCount === 0
+                    ? "👆 Riix badhanka codka si aad u dhageyso Macalinka"
+                    : `🎧 Ku celi ${MIN_LISTENS - listenCount} jeer si aad u xifdi, ka dibna mic-ka riix`}
                 </p>
               )}
 
-              {hasListened && !isPlaying && !isRecording && !isChecking && (
+              {canRecord && !isRecording && !isChecking && !autoAdvancing && (
+                <p className="text-center text-[#FFD93D]/80 text-sm mt-4 px-2">
+                  ✅ Waad ku filan tahay — Mic-ka riix oo aayada akhri!
+                </p>
+              )}
+
+              {!isPlaying && !isRecording && !isChecking && listenCount > 0 && !autoAdvancing && (
                 <button onClick={playAyah}
-                  className="flex items-center justify-center gap-2 mx-auto mt-4 px-5 py-2 rounded-full bg-[#4ECDC4]/10 text-[#4ECDC4] text-sm font-medium border border-[#4ECDC4]/20 hover:bg-[#4ECDC4]/20 active:scale-95 transition-all"
+                  className="flex items-center justify-center gap-2 mx-auto mt-3 px-5 py-2 rounded-full bg-[#4ECDC4]/10 text-[#4ECDC4] text-sm font-medium border border-[#4ECDC4]/20 hover:bg-[#4ECDC4]/20 active:scale-95 transition-all"
                   data-testid="button-replay"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  Dhagayso mar kale {listenCount > 0 && <span className="text-white/30">({listenCount}x)</span>}
+                  Dhageyso mar kale ({listenCount}x)
                 </button>
+              )}
+
+              {autoAdvancing && (
+                <div className="text-center mt-4">
+                  <p className="text-green-400 font-bold text-base animate-pulse">⭐ Sax! Aayada xigta...</p>
+                </div>
               )}
 
               {isRecording && (
@@ -747,45 +758,41 @@ export default function QuranLesson() {
           </div>
         )}
 
-        {checkResult && (
+        {checkResult && !autoAdvancing && (
           <div className="px-4 mb-6">
             {checkResult.outcome === "correct" ? (
-              <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-3xl p-6 border-2 border-green-500/40 text-center" data-testid="result-correct">
-                <div className="text-6xl mb-3">&#x2705;</div>
-                <h3 className="text-green-300 font-bold text-2xl mb-2">Sax!</h3>
-                <p className="text-white/80 text-lg mb-4" data-testid="text-feedback">{checkResult.message}</p>
-                <p className="text-white/70 text-sm mb-4">Hambalyo! Aayadda xigta u gudub.</p>
-                <div className="flex justify-center gap-2 mb-5">
+              <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-3xl p-5 border-2 border-green-500/40 text-center" data-testid="result-correct">
+                <div className="text-5xl mb-2">✅</div>
+                <h3 className="text-green-300 font-bold text-2xl mb-1">Sax!</h3>
+                <p className="text-white/70 text-sm mb-3" data-testid="text-feedback">{checkResult.message}</p>
+                <div className="flex justify-center gap-2">
                   {[1, 2, 3].map(i => (
-                    <Star key={i} className="w-8 h-8 text-[#FFD93D] fill-[#FFD93D] animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
+                    <Star key={i} className="w-7 h-7 text-[#FFD93D] fill-[#FFD93D] animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
                   ))}
                 </div>
-                {currentAyahIndex < totalAyahs - 1 && (
-                  <button onClick={nextAyah}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] text-lg font-bold hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
-                    data-testid="button-continue"
-                  >
-                    Aayada xigta <ChevronRight className="w-5 h-5" />
-                  </button>
-                )}
               </div>
             ) : (
-              <div className="bg-gradient-to-br from-orange-500/15 to-amber-500/10 rounded-3xl p-6 border-2 border-orange-400/30 text-center" data-testid="result-retry">
-                <div className="text-6xl mb-3">&#x26A0;&#xFE0F;</div>
-                <h3 className="text-orange-300 font-bold text-2xl mb-2">Waad Khaladay</h3>
-                <p className="text-white/80 text-lg mb-5" data-testid="text-feedback">{checkResult.message}</p>
+              <div className="bg-gradient-to-br from-orange-500/15 to-amber-500/10 rounded-3xl p-5 border-2 border-orange-400/30 text-center" data-testid="result-retry">
+                <div className="text-4xl mb-2">⚠️</div>
+                <h3 className="text-orange-300 font-bold text-xl mb-1">Waad Khaladay</h3>
+                <p className="text-white/70 text-sm mb-3" data-testid="text-feedback">{checkResult.message}</p>
+                {revealText && (
+                  <p className="text-orange-200 text-xs bg-orange-500/10 rounded-xl px-3 py-2 mb-3">
+                    📖 Qoraalka waa muuqanayaa — ku xifdi si fiican, 6 ilbiriqsi gudahood waa la qarin doonaa
+                  </p>
+                )}
                 <div className="flex gap-3">
                   <button onClick={playAyah}
-                    className="flex-1 py-4 rounded-2xl bg-[#4ECDC4]/20 text-[#4ECDC4] text-base font-bold hover:bg-[#4ECDC4]/30 flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#4ECDC4]/30"
+                    className="flex-1 py-3 rounded-2xl bg-[#4ECDC4]/20 text-[#4ECDC4] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#4ECDC4]/30"
                     data-testid="button-replay"
                   >
-                    <RotateCcw className="w-5 h-5" /> Dhageyso
+                    <RotateCcw className="w-4 h-4" /> Dhageyso
                   </button>
                   <button onClick={startRecording}
-                    className="flex-1 py-4 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] text-base font-bold hover:bg-[#FFD93D]/30 flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#FFD93D]/30"
+                    className="flex-1 py-3 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#FFD93D]/30"
                     data-testid="button-try-again"
                   >
-                    <Mic className="w-5 h-5" /> Isku day!
+                    <Mic className="w-4 h-4" /> Isku day!
                   </button>
                 </div>
               </div>
