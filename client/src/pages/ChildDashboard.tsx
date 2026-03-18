@@ -164,7 +164,7 @@ export default function ChildDashboard() {
           {/* ══════════ ALIF CARD ══════════ */}
           {(isYoungChild ? true : true) && (
             <button
-              onClick={() => setLocation("/alphabet-lesson")}
+              onClick={() => setLocation("/alphabet-folders")}
               className={`w-full text-left rounded-3xl overflow-hidden relative card-open card-shimmer border-2 border-white/20 shadow-2xl`}
               style={{ "--glow": "#a78bfa" } as React.CSSProperties}
               data-testid="card-alphabet"

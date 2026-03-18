@@ -71,6 +71,7 @@ const ChildDashboard = lazy(() => import("@/pages/ChildDashboard"));
 const QuranFolders = lazy(() => import("@/pages/QuranFolders"));
 const JuzFolder = lazy(() => import("@/pages/JuzFolder"));
 const QuranLesson = lazy(() => import("@/pages/QuranLesson"));
+const AlphabetFolders = lazy(() => import("@/pages/AlphabetFolders"));
 const AlphabetLesson = lazy(() => import("@/pages/AlphabetLesson"));
 const AlphabetGames = lazy(() => import("@/pages/AlphabetGames"));
 const QuranWordPuzzle = lazy(() => import("@/pages/QuranWordPuzzle"));
@@ -207,6 +208,7 @@ function Router() {
     "/quran-folders",
     "/quran-juz",
     "/quran-lesson",
+    "/alphabet-folders",
     "/alphabet-lesson",
     "/alphabet-games",
     "/quran-game/",
@@ -286,6 +288,8 @@ function Router() {
             <Route path="/quran-folders" component={QuranFolders} />
             <Route path="/quran-juz/:juzNum" component={JuzFolder} />
             <Route path="/quran-lesson/:surahNumber" component={QuranLesson} />
+            <Route path="/alphabet-folders" component={AlphabetFolders} />
+            <Route path="/alphabet-lesson/:letterId" component={AlphabetLesson} />
             <Route path="/alphabet-lesson" component={AlphabetLesson} />
             <Route path="/alphabet-games" component={AlphabetGames} />
             <Route path="/quran-game/word-puzzle/:surahNumber" component={QuranWordPuzzle} />
