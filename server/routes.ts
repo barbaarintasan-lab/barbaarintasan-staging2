@@ -12312,21 +12312,55 @@ Ku jawaab JSON kaliya:
   app.get("/api/quran/games/available", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;
-      const progress = await db.select().from(childProgress).where(eq(childProgress.childId, childId));
-      const playableSurahs = progress.filter((p) => p.completed);
-      const unlockedGames = playableSurahs.map((surah) => ({
-        surahNumber: surah.surahNumber,
-        surahName: surah.surahName || `Surah ${surah.surahNumber}`,
-        starsEarned: surah.starsEarned || 0,
-        games: ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"],
-      }));
+
+      const completedSurahs = await db.select().from(childProgress).where(
+        and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
+      );
+
+      const ayahRows = await db.select().from(quranLessonProgress).where(
+        and(eq(quranLessonProgress.childId, childId), eq(quranLessonProgress.completed, true))
+      );
+
+      const ayahCountBySurah = new Map<number, number>();
+      for (const row of ayahRows) {
+        const count = ayahCountBySurah.get(row.surahNumber) || 0;
+        ayahCountBySurah.set(row.surahNumber, count + 1);
+      }
+
+      const completedSurahNums = new Set(completedSurahs.map((s) => s.surahNumber));
+      const unlockedSet = new Map<number, { surahNumber: number; surahName: string; starsEarned: number }>();
+
+      for (const s of completedSurahs) {
+        unlockedSet.set(s.surahNumber, {
+          surahNumber: s.surahNumber,
+          surahName: s.surahName || `Surah ${s.surahNumber}`,
+          starsEarned: s.starsEarned || 0,
+        });
+      }
+
+      for (const [surahNumber, count] of ayahCountBySurah.entries()) {
+        if (count >= 2 && !completedSurahNums.has(surahNumber)) {
+          unlockedSet.set(surahNumber, {
+            surahNumber,
+            surahName: `Surah ${surahNumber}`,
+            starsEarned: 0,
+          });
+        }
+      }
+
+      const unlockedGames = Array.from(unlockedSet.values())
+        .sort((a, b) => a.surahNumber - b.surahNumber)
+        .map((entry) => ({
+          ...entry,
+          games: ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"],
+        }));
 
       res.json({
         tokensAvailable: unlockedGames.length,
         gamesRemainingToday: 999,
         maxGamesPerDay: 999,
         unlockedGames,
-        totalCompleted: playableSurahs.length,
+        totalCompleted: completedSurahs.length,
       });
     } catch (error: any) {
       console.error("[QURAN GAMES] Available games error:", error);

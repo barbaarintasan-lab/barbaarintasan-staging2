@@ -4,8 +4,31 @@ import { useLocation, useParams } from "wouter";
 import { useQuranText } from "@/hooks/useQuranText";
 import {
   ArrowLeft, Mic, MicOff, CheckCircle2, Star, RotateCcw,
-  ChevronRight, Volume2, Loader2, Lock, Trophy, ChevronDown
+  ChevronRight, Volume2, Loader2, Lock, Trophy, ChevronDown,
+  Gamepad2, Award, Flame, TrendingUp, BookOpen
 } from "lucide-react";
+
+type DashboardTab = "quran" | "games" | "rewards";
+
+interface UnlockedGame {
+  surahNumber: number;
+  surahName: string;
+  starsEarned: number;
+  games: string[];
+}
+
+const GAME_INFO: Record<string, { label: string; emoji: string }> = {
+  word_puzzle: { label: "Kelmadaha", emoji: "🧩" },
+  memory_match: { label: "Xasuusta", emoji: "🃏" },
+  surah_quiz: { label: "Imtixaan", emoji: "⚡" },
+  somali_flashcards: { label: "Kaarka", emoji: "📚" },
+};
+const GAME_ROUTES: Record<string, string> = {
+  word_puzzle: "/quran-word-puzzle",
+  memory_match: "/quran-memory-match",
+  surah_quiz: "/quran-surah-quiz",
+  somali_flashcards: "/quran-flashcards",
+};
 
 interface AyahProgress {
   ayahNumber: number;
@@ -88,6 +111,10 @@ export default function QuranLesson() {
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [reviewAyahIndex, setReviewAyahIndex] = useState(0);
 
+  // Tabs
+  const [activeTab, setActiveTab] = useState<DashboardTab>("quran");
+  const [unlockedGames, setUnlockedGames] = useState<UnlockedGame[]>([]);
+
   // Session-based learning: track ayahs learned this visit
   const [sessionLearned, setSessionLearned] = useState<number[]>([]); // ayah INDICES completed this session
   const [sessionPhase, setSessionPhase] = useState<"learning" | "review" | "finaltest">("learning");
@@ -119,6 +146,16 @@ export default function QuranLesson() {
       })
       .catch(() => {});
   }, [surahNumber, child]);
+
+  useEffect(() => {
+    if (!child) return;
+    fetch("/api/quran/games/available", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.unlockedGames) setUnlockedGames(data.unlockedGames);
+      })
+      .catch(() => {});
+  }, [child, ayahProgress]);
 
   useEffect(() => {
     if (!child) return;
@@ -831,7 +868,7 @@ export default function QuranLesson() {
           </div>
         </div>
 
-        <div className="px-4 mb-5">
+        <div className="px-4 mb-3">
           <div className="h-3 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-[#FFD93D] to-[#FFA502] rounded-full transition-all duration-500"
               style={{ width: `${totalAyahs > 0 ? (completedCount / totalAyahs) * 100 : 0}%` }}
@@ -839,6 +876,33 @@ export default function QuranLesson() {
           </div>
         </div>
 
+        {/* Tab bar */}
+        <div className="px-4 mb-5">
+          <div className="flex bg-white/5 border border-white/10 rounded-2xl p-1 gap-1">
+            {([
+              { id: "quran" as DashboardTab, label: "Quraan", icon: <BookOpen className="w-4 h-4" /> },
+              { id: "games" as DashboardTab, label: "Ciyaaro", icon: <Gamepad2 className="w-4 h-4" /> },
+              { id: "rewards" as DashboardTab, label: "Hadiyad", icon: <Award className="w-4 h-4" /> },
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  activeTab === tab.id
+                    ? "bg-[#FFD93D] text-[#1a1a2e]"
+                    : "text-white/50 hover:text-white/80"
+                }`}
+                data-testid={`tab-${tab.id}`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === "quran" && (
+        <>
         <div className="px-4 mb-5">
           <div className="flex gap-2 flex-wrap">
             {surah.ayahs.map((ayah, idx) => {
@@ -1223,8 +1287,126 @@ export default function QuranLesson() {
           </div>
         )}
 
+        </>
+        )} {/* end activeTab === "quran" */}
+
+        {/* Games tab */}
+        {activeTab === "games" && (
+          <div className="px-4 pb-6">
+            <div className="mb-4">
+              <h3 className="text-white font-bold text-lg flex items-center gap-2 mb-1">
+                <Gamepad2 className="w-5 h-5 text-[#A855F7]" />
+                Ciyaaraha Farxad leh
+              </h3>
+              <p className="text-white/40 text-xs">
+                Ciyaaruhu waxay kuu furan yihiin markaa 2+ aayah barato.
+              </p>
+            </div>
+
+            {unlockedGames.length === 0 ? (
+              <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
+                <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                <h4 className="text-white/60 font-semibold mb-2">Weli 2 aayah ma baranin</h4>
+                <p className="text-white/30 text-sm">
+                  Marka 2 aayah oo dhan la dhammeeyo, dhammaan ciyaaraha si toos ah bay u muuqanayaan.
+                </p>
+                <button
+                  onClick={() => setActiveTab("quran")}
+                  className="mt-4 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-6 py-2 rounded-xl font-bold text-sm active:scale-95 transition-transform"
+                  data-testid="button-go-quran-from-games"
+                >
+                  Casharrada Eeg 📖
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {unlockedGames.map((ug) => (
+                  <div key={ug.surahNumber} className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      <h4 className="text-white font-semibold text-sm flex-1">{ug.surahName}</h4>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3].map((i) => (
+                          <Star key={i} className={`w-3 h-3 ${i <= ug.starsEarned ? "text-[#FFD93D] fill-[#FFD93D]" : "text-white/10"}`} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {ug.games.map((gameKey) => {
+                        const info = GAME_INFO[gameKey];
+                        if (!info) return null;
+                        return (
+                          <button
+                            key={gameKey}
+                            onClick={() => setLocation(`${GAME_ROUTES[gameKey]}/${ug.surahNumber}`)}
+                            className="rounded-xl border border-white/10 bg-white/10 p-3 text-center transition-all hover:bg-white/15 active:scale-95"
+                            data-testid={`game-${gameKey}-${ug.surahNumber}`}
+                          >
+                            <span className="text-2xl block mb-1">{info.emoji}</span>
+                            <span className="text-white/70 text-[10px] font-medium block">{info.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Rewards tab */}
+        {activeTab === "rewards" && (
+          <div className="px-4 pb-6">
+            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+              <Award className="w-5 h-5 text-[#FFD93D]" />
+              Hadiyado
+            </h3>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
+                <p className="text-[#FFD93D] text-2xl font-bold">{rewardSummary?.aayahStars ?? 0}</p>
+                <p className="text-white/40 text-xs mt-1">⭐ Aayah Stars</p>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
+                <p className="text-emerald-300 text-2xl font-bold">{rewardSummary?.surahTrophies ?? 0}</p>
+                <p className="text-white/40 text-xs mt-1">🏆 Surah Trophies</p>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
+                <p className="text-amber-300 text-2xl font-bold">{rewardSummary?.gameCoins ?? 0}</p>
+                <p className="text-white/40 text-xs mt-1">🪙 Game Coins</p>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
+                <p className="text-cyan-300 text-2xl font-bold">{rewardSummary?.gameTokens ?? 0}</p>
+                <p className="text-white/40 text-xs mt-1">🎫 Tokens</p>
+              </div>
+            </div>
+
+            {rewardSummary?.badges && rewardSummary.badges.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-white/60 text-sm font-semibold mb-3">Badges-kaaga</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {rewardSummary.badges.map((badge: { key: string; icon: string; name: string }) => (
+                    <div key={badge.key} className="bg-white/5 rounded-2xl p-3 text-center border border-white/10">
+                      <span className="text-3xl block mb-1">{badge.icon}</span>
+                      <p className="text-white/70 text-[10px] font-medium">{badge.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(!rewardSummary?.badges || rewardSummary.badges.length === 0) && (
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/10 text-center">
+                <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                <p className="text-white/40 text-sm">Sii wad barashada si aad u hesho hadiyad!</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Floating "Diyaar ma ahay" button — shows when 2+ ayahs learned this session */}
-        {sessionLearned.length >= 2 && !surahComplete && !fullSurahReview && (
+        {sessionLearned.length >= 2 && !surahComplete && !fullSurahReview && activeTab === "quran" && (
           <div className="fixed bottom-6 left-4 right-4 z-40">
             <button
               onClick={() => { setReviewReadCount(0); setSessionPhase("review"); }}
