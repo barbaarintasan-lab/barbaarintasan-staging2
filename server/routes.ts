@@ -11809,8 +11809,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       // Fetch child age to apply age-appropriate leniency
       const childRecord = await storage.getChild(childId);
       const childAge = childRecord?.age ?? 7;
-      // Passing threshold based on age: young children need less accuracy
-      const passingScore = childAge <= 5 ? 25 : childAge <= 8 ? 60 : 75;
+      // Passing threshold based on age:
+      // young children (<=8) pass with 25% to avoid blocking early learners.
+      const passingScore = childAge <= 8 ? 25 : childAge <= 11 ? 50 : 75;
 
       const openai = getOpenAIClient();
       const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
@@ -11857,7 +11858,7 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
             },
             {
               role: "user",
-              content: `Qoraalka saxda ah (Aayada): ${correctText}\n\nKan ilmuhu akhriyay: ${transcribedText}`
+              content: `Da'da ilmaha: ${childAge}\nQoraalka saxda ah (Aayada): ${correctText}\n\nKan ilmuhu akhriyay: ${transcribedText}`
             }
           ],
           temperature: 0.3,
