@@ -297,6 +297,17 @@ export default function AlphabetLesson() {
     playLetterAudio(vowelized);
   }
 
+  // Play a Blob immediately so the child hears their own recording
+  function playBlob(blob: Blob): Promise<void> {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.play().catch(() => { URL.revokeObjectURL(url); resolve(); });
+    });
+  }
+
   function playForm(form: string, label: string) {
     setFormPlaying(label);
     playLetterAudio(form.replace(/ـ/g, "")).then(() => setFormPlaying(null));
@@ -327,6 +338,8 @@ export default function AlphabetLesson() {
     await new Promise(r => setTimeout(r, 400));
 
     const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    // Play child's own voice immediately — don't await, run in parallel with AI check
+    playBlob(blob);
     setIsChecking(true);
 
     try {
@@ -474,6 +487,8 @@ export default function AlphabetLesson() {
     await new Promise(r => setTimeout(r, 400));
 
     const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    // Child hears their own voice immediately while AI checks in parallel
+    playBlob(blob);
     setIsChecking(true);
 
     try {

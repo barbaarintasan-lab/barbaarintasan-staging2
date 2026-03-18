@@ -11432,14 +11432,15 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
-  // ── Alphabet TTS: generate + cache audio for letter names ──────────────────
+  // ── Alphabet TTS: Arabic letters via Azure ar-SA-HamedNeural ──────────────
   app.get("/api/alphabet/tts", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const letter = String(req.query.letter || "").trim();
       if (!letter) return res.status(400).json({ error: "letter required" });
 
+      // "ar" suffix in cache dir busts old OpenAI cache
       const cacheKey = Buffer.from(letter).toString("base64url").slice(0, 32).replace(/[^a-zA-Z0-9]/g, "_");
-      const cacheDir = path.join(process.cwd(), "tts-audio", "alphabet");
+      const cacheDir = path.join(process.cwd(), "tts-audio", "alphabet-ar");
       if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
       const cachePath = path.join(cacheDir, `${cacheKey}.mp3`);
 
@@ -11449,15 +11450,40 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         return res.sendFile(cachePath);
       }
 
-      const openai = getOpenAIClient();
-      const response = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: "alloy",
-        input: letter,
-        speed: 0.75,
-      });
+      const AZURE_SPEECH_KEY    = process.env.AZURE_SPEECH_KEY;
+      const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION;
 
-      const buffer = Buffer.from(await response.arrayBuffer());
+      let buffer: Buffer | null = null;
+
+      // ── Primary: Azure TTS ar-SA-HamedNeural (native clear Arabic) ──
+      if (AZURE_SPEECH_KEY && AZURE_SPEECH_REGION) {
+        const ssml = `<speak version='1.0' xml:lang='ar-SA'><voice xml:lang='ar-SA' xml:gender='Male' name='ar-SA-HamedNeural'><prosody rate="-15%">${letter}</prosody></voice></speak>`;
+        const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+        const azureRes = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+          },
+          body: ssml,
+        });
+        if (azureRes.ok) {
+          buffer = Buffer.from(await azureRes.arrayBuffer());
+        } else {
+          console.warn("[ALPHABET TTS] Azure failed:", azureRes.status, await azureRes.text());
+        }
+      }
+
+      // ── Fallback: OpenAI TTS ──
+      if (!buffer) {
+        const openai = getOpenAIClient();
+        const oaiRes = await openai.audio.speech.create({
+          model: "tts-1", voice: "onyx", input: letter, speed: 0.8,
+        });
+        buffer = Buffer.from(await oaiRes.arrayBuffer());
+      }
+
       fs.writeFileSync(cachePath, buffer);
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
