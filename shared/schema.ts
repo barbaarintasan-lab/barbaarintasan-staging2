@@ -2198,11 +2198,13 @@ export const children = pgTable("children", {
   parentId: varchar("parent_id").notNull().references(() => parents.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   age: integer("age").notNull(),
-  username: text("username").notNull().unique(),
+  username: text("username").notNull(),
   password: text("password").notNull(),
   avatarColor: text("avatar_color").notNull().default("#FFD93D"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("children_parent_username_unique_idx").on(table.parentId, table.username),
+]);
 
 export const insertChildSchema = createInsertSchema(children).omit({
   id: true,

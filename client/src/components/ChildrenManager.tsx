@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, User, BookOpen, ChevronRight, Star, Clock, Flame, BarChart3 } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, User, BookOpen, ChevronRight, Star, Clock, Flame, BarChart3, RotateCcw } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface ChildProfile {
@@ -37,11 +37,14 @@ export function ChildrenManager() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [resettingChildId, setResettingChildId] = useState<string | null>(null);
+  const [latestReset, setLatestReset] = useState<{ childId: string; childName: string; password: string } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     age: "",
     username: "",
     password: "",
+    passwordConfirm: "",
     avatarColor: AVATAR_COLORS[0],
   });
 
@@ -115,38 +118,66 @@ export function ChildrenManager() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/children/${id}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      return data;
+    },
+    onMutate: (id) => setResettingChildId(id),
+    onSuccess: (data) => {
+      setLatestReset({ childId: data.child.id, childName: data.child.name, password: data.password });
+      toast.success(`Password cusub: ${data.password}`);
+    },
+    onError: (err: any) => toast.error(err.message),
+    onSettled: () => setResettingChildId(null),
+  });
+
   const resetForm = () => {
-    setFormData({ name: "", age: "", username: "", password: "", avatarColor: AVATAR_COLORS[0] });
+    setFormData({ name: "", age: "", username: "", password: "", passwordConfirm: "", avatarColor: AVATAR_COLORS[0] });
     setShowPassword(false);
   };
 
   const handleSubmit = () => {
-    if (!formData.name || !formData.age || !formData.username) {
-      toast.error("Buuxi magaca, da'da, iyo username");
+    if (!formData.name) {
+      toast.error("Geli magaca ilmaha");
       return;
     }
 
-    const ageValue = parseInt(formData.age, 10);
-    if (!Number.isInteger(ageValue) || ageValue < 3 || ageValue > 15) {
-      toast.error("Da'da waa inay noqotaa 3 ilaa 15");
+    const ageValue = formData.age ? parseInt(formData.age, 10) : 0;
+    if (!Number.isInteger(ageValue) || ageValue < 0 || ageValue > 15) {
+      toast.error("Da'da waa inay noqotaa 0 ilaa 15");
+      return;
+    }
+
+    if ((formData.password || formData.passwordConfirm) && formData.password !== formData.passwordConfirm) {
+      toast.error("Labada password isma laha");
       return;
     }
 
     if (editingId) {
       const updateData: any = {
         name: formData.name,
-        age: String(ageValue),
-        avatarColor: formData.avatarColor,
-        username: formData.username,
       };
+      if (formData.age) updateData.age = String(ageValue);
       if (formData.password) updateData.password = formData.password;
+      if (formData.passwordConfirm) updateData.passwordConfirm = formData.passwordConfirm;
       updateMutation.mutate({ id: editingId, data: updateData });
     } else {
       if (!formData.password) {
         toast.error("Password waa lagama maarmaan");
         return;
       }
-      createMutation.mutate({ ...formData, age: String(ageValue) });
+      createMutation.mutate({
+        name: formData.name,
+        age: String(ageValue),
+        password: formData.password,
+        passwordConfirm: formData.passwordConfirm,
+      } as any);
     }
   };
 
@@ -157,6 +188,7 @@ export function ChildrenManager() {
       age: String(child.age),
       username: child.username,
       password: "",
+      passwordConfirm: "",
       avatarColor: child.avatarColor,
     });
     setShowAddForm(true);
@@ -188,42 +220,15 @@ export function ChildrenManager() {
             {editingId ? "Wax ka beddel" : "Ilmo cusub ku dar"}
           </h4>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-600 mb-1 block">Magaca</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
-                placeholder="Axmed"
-                className="w-full px-3 py-2 rounded-lg border text-sm"
-                data-testid="input-child-name"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 mb-1 block">Da'da (sano)</label>
-              <input
-                type="number"
-                value={formData.age}
-                onChange={(e) => setFormData(f => ({ ...f, age: sanitizeAgeInput(e.target.value) }))}
-                placeholder="7"
-                min="3"
-                max="15"
-                className="w-full px-3 py-2 rounded-lg border text-sm"
-                data-testid="input-child-age"
-              />
-            </div>
-          </div>
-
           <div>
-            <label className="text-xs text-gray-600 mb-1 block">Username</label>
+            <label className="text-xs text-gray-600 mb-1 block">Magaca</label>
             <input
               type="text"
-              value={formData.username}
-              onChange={(e) => setFormData(f => ({ ...f, username: e.target.value }))}
-              placeholder="axmed2019"
+              value={formData.name}
+              onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
+              placeholder="Axmed"
               className="w-full px-3 py-2 rounded-lg border text-sm"
-              data-testid="input-child-username-form"
+              data-testid="input-child-name"
             />
           </div>
 
@@ -248,22 +253,19 @@ export function ChildrenManager() {
             </button>
           </div>
 
-          <div>
-            <label className="text-xs text-gray-600 mb-1 block">Midabka</label>
-            <div className="flex gap-2 flex-wrap">
-              {AVATAR_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setFormData(f => ({ ...f, avatarColor: color }))}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    formData.avatarColor === color ? "border-blue-600 scale-110" : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  data-testid={`button-color-${color}`}
-                />
-              ))}
-            </div>
+          <div className="relative">
+            <label className="text-xs text-gray-600 mb-1 block">Password mar kale</label>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={formData.passwordConfirm}
+              onChange={(e) => setFormData(f => ({ ...f, passwordConfirm: e.target.value }))}
+              placeholder={editingId ? "Password cusub mar kale" : "Password mar kale"}
+              className="w-full px-3 py-2 rounded-lg border text-sm pr-10"
+              data-testid="input-child-password-confirm-form"
+            />
           </div>
+
+          <p className="text-xs text-gray-500">Magaca ilmaha ayaa user ahaan loo kaydinayaa. Carruur kale oo waalidiin kale leh way la bixi karaan magac la mid ah.</p>
 
           <div className="flex gap-2 pt-2">
             <button
@@ -300,6 +302,14 @@ export function ChildrenManager() {
       )}
 
       {/* Children list */}
+      {latestReset && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3" data-testid="child-reset-password-result">
+          <p className="text-sm font-semibold text-amber-900">Password cusub ee {latestReset.childName}</p>
+          <p className="text-xl font-bold text-amber-700 tracking-wider mt-1">{latestReset.password}</p>
+          <p className="text-xs text-amber-700/80 mt-1">Keydi. Password-kii hore waa la joojiyay.</p>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-4 text-gray-400 text-sm">Loading...</div>
       ) : childrenData.length === 0 ? (
@@ -324,9 +334,17 @@ export function ChildrenManager() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">{child.name}</p>
-                <p className="text-gray-400 text-xs">@{child.username} · {child.age} sano</p>
+                <p className="text-gray-400 text-xs">{child.age > 0 ? `${child.age} sano` : "Password mar keliya geli, kadib wuu xasuusanayaa"}</p>
               </div>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => resetPasswordMutation.mutate(child.id)}
+                  className="p-2 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50"
+                  data-testid={`button-reset-child-${child.id}`}
+                  disabled={resettingChildId === child.id}
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => startEdit(child)}
                   className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"

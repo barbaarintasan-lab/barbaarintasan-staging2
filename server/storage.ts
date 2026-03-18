@@ -600,8 +600,10 @@ export interface IStorage {
   getChildrenByParentId(parentId: string): Promise<Child[]>;
   getChild(id: string): Promise<Child | undefined>;
   getChildByUsername(username: string): Promise<Child | undefined>;
+  getChildrenByUsername(username: string): Promise<Child[]>;
+  getChildByParentAndUsername(parentId: string, username: string): Promise<Child | undefined>;
   createChild(child: InsertChild): Promise<Child>;
-  updateChild(id: string, data: Partial<{ name: string; age: number; password: string; avatarColor: string }>): Promise<Child | undefined>;
+  updateChild(id: string, data: Partial<{ name: string; age: number; username: string; password: string; avatarColor: string }>): Promise<Child | undefined>;
   deleteChild(id: string): Promise<void>;
 }
 
@@ -6072,12 +6074,23 @@ export class DatabaseStorage implements IStorage {
     return child || undefined;
   }
 
+  async getChildrenByUsername(username: string): Promise<Child[]> {
+    return await db.select().from(children).where(eq(children.username, username)).orderBy(asc(children.createdAt));
+  }
+
+  async getChildByParentAndUsername(parentId: string, username: string): Promise<Child | undefined> {
+    const [child] = await db.select().from(children).where(
+      and(eq(children.parentId, parentId), eq(children.username, username))
+    );
+    return child || undefined;
+  }
+
   async createChild(child: InsertChild): Promise<Child> {
     const [created] = await db.insert(children).values(child).returning();
     return created;
   }
 
-  async updateChild(id: string, data: Partial<{ name: string; age: number; password: string; avatarColor: string }>): Promise<Child | undefined> {
+  async updateChild(id: string, data: Partial<{ name: string; age: number; username: string; password: string; avatarColor: string }>): Promise<Child | undefined> {
     const [updated] = await db.update(children).set(data).where(eq(children.id, id)).returning();
     return updated || undefined;
   }

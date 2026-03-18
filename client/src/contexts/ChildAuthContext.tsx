@@ -13,7 +13,7 @@ interface ChildProfile {
 interface ChildAuthContextType {
   child: ChildProfile | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, childId?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshChild: () => Promise<void>;
 }
@@ -44,12 +44,12 @@ export function ChildAuthProvider({ children: childrenProp }: { children: ReactN
     checkAuth();
   }, [checkAuth]);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string, childId?: string) => {
     const res = await fetch("/api/auth/child/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, childId }),
     });
     if (!res.ok) {
       const data = await res.json();

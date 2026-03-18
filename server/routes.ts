@@ -182,6 +182,26 @@ const postImageUpload = multer({
   }
 });
 
+const CHILD_SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
+
+function normalizeChildUsername(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "") || "child";
+}
+
+function normalizeChildLoginIdentifier(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+function generateChildPassword(): string {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
 function resolveQuranJsonPath(fileName: string): string {
   const distPath = path.join(process.cwd(), "dist", "public", "quran", fileName);
   if (fs.existsSync(distPath)) {
@@ -10777,31 +10797,45 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Parent: create child profile
   app.post("/api/children", requireParentAuth, async (req: Request, res: Response) => {
     try {
-      const { name, age, username, password, avatarColor } = req.body;
-      if (!name || !age || !username || !password) {
-        return res.status(400).json({ error: "Buuxi dhammaan meelaha" });
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Waalidka lama helin" });
       }
 
-      const parsedAge = Number.parseInt(String(age), 10);
-      if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
-        return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+      const { name, age, username, password, passwordConfirm, avatarColor } = req.body;
+      if (!name || !password) {
+        return res.status(400).json({ error: "Geli magaca ilmaha iyo password-ka" });
       }
 
-      if (username.length < 3) {
-        return res.status(400).json({ error: "Username waa inuu ka badan yahay 3 xaraf" });
+      if (passwordConfirm !== undefined && password !== passwordConfirm) {
+        return res.status(400).json({ error: "Labada password isma laha" });
       }
-      const existing = await storage.getChildByUsername(username.toLowerCase().trim());
+
+      const parsedAge = age === undefined || age === null || String(age).trim() === ""
+        ? 0
+        : Number.parseInt(String(age), 10);
+      if (!Number.isInteger(parsedAge) || parsedAge < 0 || parsedAge > 15) {
+        return res.status(400).json({ error: "Da'da waa inay noqotaa 0 ilaa 15" });
+      }
+
+      const normalizedUsername = normalizeChildUsername(username || name);
+      if (normalizedUsername.length < 2) {
+        return res.status(400).json({ error: "Magaca ilmaha si sax ah u qor" });
+      }
+
+      const existing = await storage.getChildByParentAndUsername(parentId, normalizedUsername);
       if (existing) {
-        return res.status(400).json({ error: "Username-kan waa la isticmaalayaa. Mid kale dooro." });
+        return res.status(400).json({ error: "Magacaan hore ayuu uga diiwaangashan yahay carruurtaada" });
       }
+
       const hashedPassword = await bcrypt.hash(password, 10);
       const child = await storage.createChild({
-        parentId: req.session.parentId,
+        parentId,
         name: name.trim(),
         age: parsedAge,
-        username: username.toLowerCase().trim(),
+        username: normalizedUsername,
         password: hashedPassword,
-        avatarColor: avatarColor || "#FFD93D",
+        avatarColor: avatarColor || ["#FFD93D", "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8"][Math.floor(Math.random() * 8)],
       });
       const { password: _, ...safeChild } = child;
       res.json(safeChild);
@@ -10814,7 +10848,12 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Parent: list children
   app.get("/api/children", requireParentAuth, async (req: Request, res: Response) => {
     try {
-      const childrenList = await storage.getChildrenByParentId(req.session.parentId);
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Waalidka lama helin" });
+      }
+
+      const childrenList = await storage.getChildrenByParentId(parentId);
       const safeChildren = childrenList.map(({ password, ...rest }) => rest);
       res.json(safeChildren);
     } catch (error: any) {
@@ -10826,29 +10865,39 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Parent: update child
   app.put("/api/children/:id", requireParentAuth, async (req: Request, res: Response) => {
     try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Waalidka lama helin" });
+      }
+
       const child = await storage.getChild(req.params.id);
-      if (!child || child.parentId !== req.session.parentId) {
+      if (!child || child.parentId !== parentId) {
         return res.status(404).json({ error: "Ilmaha lama helin" });
       }
       const updateData: any = {};
-      if (req.body.name) updateData.name = req.body.name.trim();
+      const nextName = req.body.name ? req.body.name.trim() : child.name;
+      if (req.body.name) updateData.name = nextName;
       if (req.body.age !== undefined && req.body.age !== null && String(req.body.age).trim() !== "") {
         const parsedAge = Number.parseInt(String(req.body.age), 10);
-        if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 15) {
-          return res.status(400).json({ error: "Da'da waa inay noqotaa 3 ilaa 15" });
+        if (!Number.isInteger(parsedAge) || parsedAge < 0 || parsedAge > 15) {
+          return res.status(400).json({ error: "Da'da waa inay noqotaa 0 ilaa 15" });
         }
         updateData.age = parsedAge;
       }
       if (req.body.avatarColor) updateData.avatarColor = req.body.avatarColor;
+      if (req.body.passwordConfirm !== undefined && req.body.password !== req.body.passwordConfirm) {
+        return res.status(400).json({ error: "Labada password isma laha" });
+      }
       if (req.body.password) {
         updateData.password = await bcrypt.hash(req.body.password, 10);
       }
-      if (req.body.username) {
-        const newUsername = req.body.username.toLowerCase().trim();
+      const requestedUsername = req.body.username !== undefined ? req.body.username : (req.body.name ? nextName : child.username);
+      if (requestedUsername) {
+        const newUsername = normalizeChildUsername(requestedUsername);
         if (newUsername !== child.username) {
-          const existing = await storage.getChildByUsername(newUsername);
+          const existing = await storage.getChildByParentAndUsername(parentId, newUsername);
           if (existing && existing.id !== child.id) {
-            return res.status(400).json({ error: "Username-kan waa la isticmaalayaa" });
+            return res.status(400).json({ error: "Magacaan hore ayuu uga diiwaangashan yahay carruurtaada" });
           }
           updateData.username = newUsername;
         }
@@ -10881,21 +10930,84 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
+  // Parent: reset child password and invalidate prior sessions
+  app.post("/api/children/:id/reset-password", requireParentAuth, async (req: Request, res: Response) => {
+    try {
+      const child = await storage.getChild(req.params.id);
+      if (!child || child.parentId !== req.session.parentId) {
+        return res.status(404).json({ error: "Ilmaha lama helin" });
+      }
+
+      const nextPassword = generateChildPassword();
+      const hashedPassword = await bcrypt.hash(nextPassword, 10);
+      await storage.updateChild(child.id, { password: hashedPassword });
+      await db.update(childSessions)
+        .set({ isActive: false })
+        .where(and(eq(childSessions.childId, child.id), eq(childSessions.isActive, true)));
+
+      res.json({
+        success: true,
+        child: {
+          id: child.id,
+          name: child.name,
+          username: child.username,
+        },
+        password: nextPassword,
+      });
+    } catch (error: any) {
+      console.error("[CHILDREN] Reset password error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
   // Child login
   app.post("/api/auth/child/login", async (req: Request, res: Response) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ error: "Buuxi username iyo password" });
+      const { username, password, childId } = req.body;
+      if ((!username && !childId) || !password) {
+        return res.status(400).json({ error: "Buuxi magaca ama username-ka iyo password-ka" });
       }
-      const child = await storage.getChildByUsername(username.toLowerCase().trim());
-      if (!child) {
+
+      const candidates = new Map<string, any>();
+      if (childId) {
+        const exactChild = await storage.getChild(String(childId));
+        if (exactChild) {
+          candidates.set(exactChild.id, exactChild);
+        }
+      }
+
+      if (username) {
+        const normalizedIdentifier = normalizeChildLoginIdentifier(username);
+        const usernameMatches = await storage.getChildrenByUsername(normalizedIdentifier);
+        usernameMatches.forEach((match) => candidates.set(match.id, match));
+
+        const nameMatches = await db.select().from(children).where(
+          sql`lower(${children.name}) = ${normalizedIdentifier}`
+        );
+        nameMatches.forEach((match) => candidates.set(match.id, match));
+      }
+
+      if (candidates.size === 0) {
         return res.status(401).json({ error: "Username ama password waa khalad" });
       }
-      const validPassword = await bcrypt.compare(password, child.password);
-      if (!validPassword) {
+
+      const validChildren: any[] = [];
+      for (const candidate of Array.from(candidates.values())) {
+        const validPassword = await bcrypt.compare(password, candidate.password);
+        if (validPassword) {
+          validChildren.push(candidate);
+        }
+      }
+
+      if (validChildren.length === 0) {
         return res.status(401).json({ error: "Username ama password waa khalad" });
       }
+
+      if (validChildren.length > 1 && !childId) {
+        return res.status(409).json({ error: "Akoonkan waxaa wadaaga carruur kale. Fadlan waalidkaaga ha kaa galo qalabkan." });
+      }
+
+      const child = validChildren[0];
       const parent = await storage.getParent(child.parentId);
       if (!parent) {
         return res.status(403).json({ error: "Akoonka waalidka lama helin" });
@@ -10908,8 +11020,9 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         childId: child.id,
         parentId: child.parentId,
         sessionToken: childSessionToken,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + CHILD_SESSION_MAX_AGE_MS),
       });
+      req.session.cookie.maxAge = CHILD_SESSION_MAX_AGE_MS;
       req.session.childId = child.id;
       req.session.childSessionToken = childSessionToken;
       const { password: _, ...safeChild } = child;
@@ -10947,6 +11060,10 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       if (!child) {
         return res.status(401).json({ error: "Akoonka lama helin" });
       }
+      req.session.cookie.maxAge = CHILD_SESSION_MAX_AGE_MS;
+      await db.update(childSessions)
+        .set({ expiresAt: new Date(Date.now() + CHILD_SESSION_MAX_AGE_MS) })
+        .where(eq(childSessions.id, activeSession.id));
       const { password: _, ...safeChild } = child;
       res.json({ child: safeChild });
     } catch (error: any) {

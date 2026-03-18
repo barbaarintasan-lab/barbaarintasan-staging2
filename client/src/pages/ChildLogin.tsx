@@ -24,7 +24,7 @@ export default function ChildLogin() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useChildAuth();
+  const { login, child, isLoading: childAuthLoading } = useChildAuth();
   const [, setLocation] = useLocation();
 
   const [parentLoggedIn, setParentLoggedIn] = useState(false);
@@ -33,10 +33,17 @@ export default function ChildLogin() {
   const [selectedChild, setSelectedChild] = useState<ChildProfile | null>(null);
   const [childPassword, setChildPassword] = useState("");
   const [showChildPassword, setShowChildPassword] = useState(false);
+  const [resettingChildId, setResettingChildId] = useState<string | null>(null);
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newChild, setNewChild] = useState({ name: "", age: "", username: "", password: "", avatarColor: AVATAR_COLORS[0] });
+  const [newChild, setNewChild] = useState({ name: "", password: "", confirmPassword: "" });
   const [creatingChild, setCreatingChild] = useState(false);
+
+  useEffect(() => {
+    if (!childAuthLoading && child) {
+      setLocation("/child-dashboard");
+    }
+  }, [child, childAuthLoading, setLocation]);
 
   useEffect(() => {
     fetch("/api/auth/parent/me", { credentials: "include" })
@@ -88,7 +95,7 @@ export default function ChildLogin() {
     }
     setIsLoading(true);
     try {
-      await login(selectedChild.username, childPassword.trim());
+      await login(selectedChild.name, childPassword.trim(), selectedChild.id);
       setLocation("/child-dashboard");
     } catch (err: any) {
       toast.error(err.message || "Password-ka waa khalad");
@@ -97,16 +104,35 @@ export default function ChildLogin() {
     }
   };
 
+  const handleResetChildPassword = async () => {
+    if (!selectedChild) return;
+    setResettingChildId(selectedChild.id);
+    try {
+      const res = await fetch(`/api/children/${selectedChild.id}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Khalad ayaa dhacay");
+      setChildPassword(data.password);
+      setShowChildPassword(true);
+      toast.success(`Password cusub: ${data.password}`);
+    } catch (err: any) {
+      toast.error(err.message || "Khalad ayaa dhacay");
+    } finally {
+      setResettingChildId(null);
+    }
+  };
+
   const handleCreateChild = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChild.name.trim() || !newChild.age || !newChild.username.trim() || !newChild.password.trim()) {
-      toast.error("Buuxi dhammaan meelaha");
+    if (!newChild.name.trim() || !newChild.password.trim() || !newChild.confirmPassword.trim()) {
+      toast.error("Geli magaca iyo labada password");
       return;
     }
 
-    const ageValue = parseInt(newChild.age, 10);
-    if (!Number.isInteger(ageValue) || ageValue < 3 || ageValue > 15) {
-      toast.error("Da'da waa inay noqotaa 3 ilaa 10 Sano");
+    if (newChild.password !== newChild.confirmPassword) {
+      toast.error("Labada password isma laha");
       return;
     }
 
@@ -116,7 +142,12 @@ export default function ChildLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...newChild, age: String(ageValue) }),
+        body: JSON.stringify({
+          name: newChild.name,
+          password: newChild.password,
+          passwordConfirm: newChild.confirmPassword,
+          avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -125,7 +156,7 @@ export default function ChildLogin() {
       const created = await res.json();
       setParentChildren(prev => [...prev, created]);
       setShowAddForm(false);
-      setNewChild({ name: "", age: "", username: "", password: "", avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)] });
+      setNewChild({ name: "", password: "", confirmPassword: "" });
       toast.success(`${created.name} Ilmaha akoonkiisi waa la sameeyay!`);
     } catch (err: any) {
       toast.error(err.message);
@@ -201,7 +232,7 @@ export default function ChildLogin() {
                     {selectedChild.name.charAt(0).toUpperCase()}
                   </div>
                   <h3 className="text-white font-bold text-xl">{selectedChild.name}</h3>
-                  <p className="text-white/40 text-sm">{selectedChild.age} sano</p>
+                  {selectedChild.age > 0 && <p className="text-white/40 text-sm">{selectedChild.age} sano</p>}
                 </div>
                 <form onSubmit={handleChildLogin} className="space-y-4">
                   <div className="relative">
@@ -238,6 +269,16 @@ export default function ChildLogin() {
                       </>
                     )}
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleResetChildPassword}
+                    disabled={resettingChildId === selectedChild.id}
+                    className="w-full py-3 rounded-xl bg-white/10 text-white/80 font-semibold text-sm hover:bg-white/15 transition-all disabled:opacity-50"
+                    data-testid="button-reset-child-password"
+                  >
+                    {resettingChildId === selectedChild.id ? "Password cusub waa soo baxayaa..." : "Password cusub soo saar"}
+                  </button>
+                  <p className="text-white/35 text-xs text-center">Haddii qalabku ka lumo, waalidka ayaa password cusub ka samayn kara halkan.</p>
                 </form>
               </div>
             ) : (
@@ -263,7 +304,7 @@ export default function ChildLogin() {
                         </div>
                         <div className="flex-1 text-left">
                           <h3 className="text-white font-bold text-lg">{child.name}</h3>
-                          <p className="text-white/40 text-sm">{child.age} sano</p>
+                          {child.age > 0 && <p className="text-white/40 text-sm">{child.age} sano</p>}
                         </div>
                         <BookOpen className="w-5 h-5 text-[#FFD93D]" />
                       </button>
@@ -291,24 +332,6 @@ export default function ChildLogin() {
                         data-testid="input-new-child-name"
                       />
                       <input
-                        type="number"
-                        value={newChild.age}
-                        onChange={(e) => setNewChild(p => ({ ...p, age: sanitizeAgeInput(e.target.value) }))}
-                        placeholder="Da'da (3-15)"
-                        min="3"
-                        max="15"
-                        className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
-                        data-testid="input-new-child-age"
-                      />
-                      <input
-                        type="text"
-                        value={newChild.username}
-                        onChange={(e) => setNewChild(p => ({ ...p, username: e.target.value }))}
-                        placeholder="Username"
-                        className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
-                        data-testid="input-new-child-username"
-                      />
-                      <input
                         type="password"
                         value={newChild.password}
                         onChange={(e) => setNewChild(p => ({ ...p, password: e.target.value }))}
@@ -316,18 +339,15 @@ export default function ChildLogin() {
                         className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
                         data-testid="input-new-child-password"
                       />
-                      <div className="flex flex-wrap gap-2">
-                        {AVATAR_COLORS.map(color => (
-                          <button
-                            type="button"
-                            key={color}
-                            onClick={() => setNewChild(p => ({ ...p, avatarColor: color }))}
-                            className={`w-8 h-8 rounded-full border-2 transition-all ${newChild.avatarColor === color ? "border-white scale-110" : "border-transparent"}`}
-                            style={{ backgroundColor: color }}
-                            data-testid={`color-${color}`}
-                          />
-                        ))}
-                      </div>
+                      <input
+                        type="password"
+                        value={newChild.confirmPassword}
+                        onChange={(e) => setNewChild(p => ({ ...p, confirmPassword: e.target.value }))}
+                        placeholder="Password mar kale"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
+                        data-testid="input-new-child-password-confirm"
+                      />
+                      <p className="text-white/35 text-xs">Magaca ilmaha ayaa user ahaan loo kaydinayaa, qalabkuna mar kasta wuu xasuusanayaa marka hal mar la galo.</p>
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -368,12 +388,12 @@ export default function ChildLogin() {
             </p>
             <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
               <div>
-                <label className="text-white/70 text-sm mb-1 block">Username</label>
+                <label className="text-white/70 text-sm mb-1 block">Magaca ama username</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="username-kaaga"
+                  placeholder="magaca ama username-kaaga"
                   className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] focus:ring-1 focus:ring-[#FFD93D] text-lg"
                   autoComplete="username"
                   data-testid="input-child-username"
