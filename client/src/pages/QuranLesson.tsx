@@ -525,8 +525,7 @@ export default function QuranLesson() {
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
   const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
-  const MIN_LISTENS = 1;
-  const canRecord = listenCount >= MIN_LISTENS && !isCurrentCompleted && !autoAdvancing;
+  const canRecord = !isCurrentCompleted && !autoAdvancing;
 
   if (authLoading || surahLoading) {
     return (
@@ -894,14 +893,16 @@ export default function QuranLesson() {
 
               {!isCurrentCompleted && (
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount >= MIN_LISTENS ? "bg-green-500/20 text-green-300" : "bg-[#4ECDC4]/20 text-[#4ECDC4]"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount >= MIN_LISTENS ? "bg-green-500/30" : "bg-[#4ECDC4]/30"}`}>1</span>
-                    Dhageyso {listenCount > 0 && <span className="font-black">{listenCount}/{MIN_LISTENS}</span>}
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount > 0 ? "bg-green-500/20 text-green-300" : "bg-[#4ECDC4]/20 text-[#4ECDC4]"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount > 0 ? "bg-green-500/30" : "bg-[#4ECDC4]/30"}`}>
+                      {listenCount > 0 ? "✓" : "1"}
+                    </span>
+                    Dhageyso {listenCount > 0 && <span className="font-black">({listenCount}x)</span>}
                   </div>
                   <div className="flex-1 h-px bg-white/10" />
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${canRecord ? "bg-[#FFD93D]/20 text-[#FFD93D]" : "bg-white/5 text-white/20"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${canRecord ? "bg-[#FFD93D]/30" : "bg-white/10"}`}>2</span>
-                    Xifdi
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-[#FFD93D]/20 text-[#FFD93D]">
+                    <span className="w-5 h-5 rounded-full bg-[#FFD93D]/30 flex items-center justify-center text-[10px] font-bold">2</span>
+                    Akhri
                   </div>
                 </div>
               )}
@@ -957,15 +958,9 @@ export default function QuranLesson() {
                 </div>
               )}
 
-              {!canRecord && !audioFailed && !isPlaying && !isLoadingAudio && !isRecording && !isChecking && !isCurrentCompleted && !autoAdvancing && (
-                <p className="text-center text-[#4ECDC4]/70 text-sm mt-4 px-2">
-                  👆 Riix badhanka codka si aad u dhageyso Macalinka
-                </p>
-              )}
-
               {canRecord && !isRecording && !isChecking && !autoAdvancing && (
                 <p className="text-center text-[#FFD93D]/80 text-sm mt-4 px-2">
-                  ✅ Waad ku filan tahay — Mic-ka riix oo aayada akhri!
+                  🎙 Mic-ka riix oo aayada akhri!
                 </p>
               )}
 
