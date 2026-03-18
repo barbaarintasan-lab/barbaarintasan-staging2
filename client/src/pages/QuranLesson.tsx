@@ -113,7 +113,6 @@ export default function QuranLesson() {
 
   // Tabs
   const [activeTab, setActiveTab] = useState<DashboardTab>("quran");
-  const [unlockedGames, setUnlockedGames] = useState<UnlockedGame[]>([]);
 
   // Session-based learning: track ayahs learned this visit
   const [sessionLearned, setSessionLearned] = useState<number[]>([]); // ayah INDICES completed this session
@@ -147,15 +146,6 @@ export default function QuranLesson() {
       .catch(() => {});
   }, [surahNumber, child]);
 
-  useEffect(() => {
-    if (!child) return;
-    fetch("/api/quran/games/available", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.unlockedGames) setUnlockedGames(data.unlockedGames);
-      })
-      .catch(() => {});
-  }, [child, ayahProgress]);
 
   useEffect(() => {
     if (!child) return;
@@ -1290,7 +1280,7 @@ export default function QuranLesson() {
         </>
         )} {/* end activeTab === "quran" */}
 
-        {/* Games tab */}
+        {/* Games tab — session-based unlock: requires 2+ ayahs learned THIS session */}
         {activeTab === "games" && (
           <div className="px-4 pb-6">
             <div className="mb-4">
@@ -1299,16 +1289,20 @@ export default function QuranLesson() {
                 Ciyaaraha Farxad leh
               </h3>
               <p className="text-white/40 text-xs">
-                Ciyaaruhu waxay kuu furan yihiin markaa 2+ aayah barato.
+                Casharkaas ku dhex baranba 2 aayah, ciyaaruhu way furnaadaan.
               </p>
             </div>
 
-            {unlockedGames.length === 0 ? (
+            {sessionLearned.length < 2 ? (
               <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
                 <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                <h4 className="text-white/60 font-semibold mb-2">Weli 2 aayah ma baranin</h4>
+                <h4 className="text-white/60 font-semibold mb-2">
+                  {sessionLearned.length === 0
+                    ? "Weli aayah ma baranin"
+                    : `${sessionLearned.length}/2 aayah — mid oo kale baranba waa furnaadaan!`}
+                </h4>
                 <p className="text-white/30 text-sm">
-                  Marka 2 aayah oo dhan la dhammeeyo, dhammaan ciyaaraha si toos ah bay u muuqanayaan.
+                  Casharkaas ku baranba 2 aayah, ciyaaraha si toos ah bay u furmaan.
                 </p>
                 <button
                   onClick={() => setActiveTab("quran")}
@@ -1320,36 +1314,31 @@ export default function QuranLesson() {
               </div>
             ) : (
               <div className="space-y-4">
-                {unlockedGames.map((ug) => (
-                  <div key={ug.surahNumber} className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      <h4 className="text-white font-semibold text-sm flex-1">{ug.surahName}</h4>
-                      <div className="flex gap-0.5">
-                        {[1, 2, 3].map((i) => (
-                          <Star key={i} className={`w-3 h-3 ${i <= ug.starsEarned ? "text-[#FFD93D] fill-[#FFD93D]" : "text-white/10"}`} />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {ug.games.map((gameKey) => {
-                        const info = GAME_INFO[gameKey];
-                        if (!info) return null;
-                        return (
-                          <button
-                            key={gameKey}
-                            onClick={() => setLocation(`${GAME_ROUTES[gameKey]}/${ug.surahNumber}`)}
-                            className="rounded-xl border border-white/10 bg-white/10 p-3 text-center transition-all hover:bg-white/15 active:scale-95"
-                            data-testid={`game-${gameKey}-${ug.surahNumber}`}
-                          >
-                            <span className="text-2xl block mb-1">{info.emoji}</span>
-                            <span className="text-white/70 text-[10px] font-medium block">{info.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-3 flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                  <p className="text-green-300 text-sm font-semibold">
+                    {sessionLearned.length} aayah baratay — ciyaaruhu waa furan yihiin!
+                  </p>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    <h4 className="text-white font-semibold text-sm flex-1">{surah.name}</h4>
                   </div>
-                ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(GAME_INFO).map(([gameKey, info]) => (
+                      <button
+                        key={gameKey}
+                        onClick={() => setLocation(`${GAME_ROUTES[gameKey]}/${surahNumber}`)}
+                        className="rounded-xl border border-white/10 bg-white/10 p-3 text-center transition-all hover:bg-white/15 active:scale-95"
+                        data-testid={`game-${gameKey}-${surahNumber}`}
+                      >
+                        <span className="text-2xl block mb-1">{info.emoji}</span>
+                        <span className="text-white/70 text-[10px] font-medium block">{info.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
