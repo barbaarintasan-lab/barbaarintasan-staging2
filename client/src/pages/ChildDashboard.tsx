@@ -119,7 +119,7 @@ export default function ChildDashboard() {
     }
   };
 
-  const orderedJuz = [...JUZ_DATA].sort((a, b) => a.num - b.num);
+  const orderedJuz = [...JUZ_DATA].sort((a, b) => b.num - a.num);
 
   return (
     <div className="min-h-screen bg-[#0d1117] relative">
