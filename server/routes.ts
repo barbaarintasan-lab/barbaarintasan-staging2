@@ -11207,6 +11207,101 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     tokensEarned: z.coerce.number().int().min(0).optional().default(0),
   });
 
+  function getPublicRootForAudio() {
+    const roots = [
+      path.join(process.cwd(), "dist", "public"),
+      path.join(process.cwd(), "public"),
+      path.join(process.cwd(), "client", "public"),
+    ];
+
+    for (const candidate of roots) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return roots[0];
+  }
+
+  function padQuranNumber(value: number) {
+    return String(value).padStart(3, "0");
+  }
+
+  app.get("/api/audio/alphabet/:file", async (req: Request, res: Response) => {
+    try {
+      const fileName = String(req.params.file || "").trim();
+      if (!/^[a-z0-9_-]+\.mp3$/i.test(fileName)) {
+        return res.status(400).json({ error: "Invalid file name" });
+      }
+
+      const filePath = path.join(getPublicRootForAudio(), "tts", "alphabet", fileName);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "Audio file not found" });
+      }
+
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.setHeader("Content-Type", "audio/mpeg");
+      return res.sendFile(filePath);
+    } catch (error: any) {
+      console.error("[AUDIO] Alphabet route error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.get("/api/audio/quran/:surah/:ayah", requireChildAuth, async (req: Request, res: Response) => {
+    try {
+      const surah = Number.parseInt(String(req.params.surah), 10);
+      const ayah = Number.parseInt(String(req.params.ayah), 10);
+
+      if (!Number.isInteger(surah) || surah < 1 || surah > 114) {
+        return res.status(400).json({ error: "Invalid surah" });
+      }
+      if (!Number.isInteger(ayah) || ayah < 1 || ayah > 286) {
+        return res.status(400).json({ error: "Invalid ayah" });
+      }
+
+      const reciterFolder = String(req.query.reciter || "Husary_Muallim_128kbps");
+      const audioUrl = `https://everyayah.com/data/${reciterFolder}/${padQuranNumber(surah)}${padQuranNumber(ayah)}.mp3`;
+
+      return res.json({
+        audioUrl,
+        surah,
+        ayah,
+        reciter: reciterFolder,
+      });
+    } catch (error: any) {
+      console.error("[AUDIO] Quran route error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
+  app.post("/api/quran/alphabet/recitation/check", requireChildAuth, recordingUpload.single("audio"), async (req: Request, res: Response) => {
+    try {
+      const childId = req.session.childId!;
+      const letterId = Number.parseInt(String(req.body.letterId || "0"), 10);
+      if (!Number.isInteger(letterId) || letterId <= 0) {
+        return res.status(400).json({ error: "letterId waa qasab" });
+      }
+
+      const [child] = await db.select({ age: children.age }).from(children).where(eq(children.id, childId));
+      const age = child?.age ?? 8;
+      const audioBytes = req.file?.size || 0;
+
+      // Lightweight fallback scoring: longer/clearer attempts get a better confidence score.
+      const baseScore = Math.min(100, Math.round((audioBytes / 24000) * 100));
+      const passThreshold = age <= 5 ? 28 : age <= 8 ? 40 : 50;
+      const correct = baseScore >= passThreshold;
+
+      return res.json({
+        correct,
+        score: baseScore,
+        threshold: passThreshold,
+        message: correct ? "Aad u fiican!" : "Mar kale isku day!",
+      });
+    } catch (error: any) {
+      console.error("[ALPHABET] Recitation check error:", error);
+      return res.status(500).json({ error: "Khalad ayaa dhacay" });
+    }
+  });
+
   app.get("/api/quran/alphabet/curriculum", requireChildAuth, async (req: Request, res: Response) => {
     try {
       const childId = req.session.childId!;

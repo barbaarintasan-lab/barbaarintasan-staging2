@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { calculateScore, getPerformanceLevel } from "../../utils/gameScoring";
 import { isGameUnlocked } from "../../utils/unlock";
 
@@ -36,7 +36,7 @@ function buildRounds(level) {
   });
 }
 
-export default function WordBuilder({ lesson = { completed: false, score: 0 }, level = "easy" }) {
+export default function WordBuilder({ lesson = { completed: false, score: 0 }, level = "easy", onFinish }) {
   const unlocked = isGameUnlocked(lesson);
   const [rounds, setRounds] = useState(() => buildRounds(level));
   const [roundIndex, setRoundIndex] = useState(0);
@@ -49,9 +49,17 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
   const totalQuestions = rounds.length;
   const maxPoints = totalQuestions * 10;
   const isFinished = roundIndex >= totalQuestions;
+  const reportedRef = useRef(false);
 
   const finalScore = useMemo(() => calculateScore(points, maxPoints), [points, maxPoints]);
   const performance = useMemo(() => getPerformanceLevel(finalScore), [finalScore]);
+
+  useEffect(() => {
+    if (isFinished && !reportedRef.current) {
+      reportedRef.current = true;
+      if (typeof onFinish === "function") onFinish(finalScore);
+    }
+  }, [isFinished, finalScore, onFinish]);
 
   function handleDragDrop(fromIndex, toIndex) {
     if (!currentRound) return;
@@ -106,6 +114,7 @@ export default function WordBuilder({ lesson = { completed: false, score: 0 }, l
   }
 
   function restart() {
+    reportedRef.current = false;
     setRounds(buildRounds(level));
     setRoundIndex(0);
     setUserOrder([]);

@@ -70,6 +70,8 @@ const MeetWatch = lazy(() => import("@/pages/MeetWatch"));
 const ChildLogin = lazy(() => import("@/pages/ChildLogin"));
 const ChildDashboard = lazy(() => import("@/pages/ChildDashboard"));
 const QuranLesson = lazy(() => import("@/pages/QuranLesson"));
+const AlphabetLesson = lazy(() => import("@/pages/AlphabetLesson"));
+const AlphabetGames = lazy(() => import("@/pages/AlphabetGames"));
 const QuranWordPuzzle = lazy(() => import("@/pages/QuranWordPuzzle"));
 const QuranMemoryMatch = lazy(() => import("@/pages/QuranMemoryMatch"));
 const QuranSurahQuiz = lazy(() => import("@/pages/QuranSurahQuiz"));
@@ -206,6 +208,8 @@ function Router() {
     "/child-login",
     "/child-dashboard",
     "/quran-lesson",
+    "/alphabet-lesson",
+    "/alphabet-games",
     "/quran-game/",
   ];
   
@@ -281,6 +285,8 @@ function Router() {
             <Route path="/child-login" component={ChildLogin} />
             <Route path="/child-dashboard" component={ChildDashboard} />
             <Route path="/quran-lesson/:surahNumber" component={QuranLesson} />
+            <Route path="/alphabet-lesson" component={AlphabetLesson} />
+            <Route path="/alphabet-games" component={AlphabetGames} />
             <Route path="/quran-game/word-puzzle/:surahNumber" component={QuranWordPuzzle} />
             <Route path="/quran-game/memory-match/:surahNumber" component={QuranMemoryMatch} />
             <Route path="/quran-game/surah-quiz/:surahNumber" component={QuranSurahQuiz} />

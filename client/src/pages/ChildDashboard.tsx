@@ -46,7 +46,7 @@ export default function ChildDashboard() {
         meta: "Age 3-4",
         icon: "🔤",
         status: "open",
-        onClick: () => setLocation("/quran-lesson/1?mode=alphabet"),
+        onClick: () => setLocation("/alphabet-lesson"),
       },
       {
         key: "juz-amma",
