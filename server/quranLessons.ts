@@ -77,7 +77,7 @@ export function getCurriculumWithProgress(
 ): (QuranCurriculumSurah & { unlocked: boolean; completed: boolean })[] {
   return JUZ_AMMA_CURRICULUM.map((surah, index) => {
     const completed = completedSurahs.has(surah.number);
-    const unlocked = index === 0 || completedSurahs.has(JUZ_AMMA_CURRICULUM[index - 1].number);
+    const unlocked = true;
     return { ...surah, unlocked, completed };
   });
 }

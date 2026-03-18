@@ -11235,11 +11235,10 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
       const enriched = surahs.map((s, idx) => {
         const c = ayahCountBySurah[s.number];
         const isCompleted = completedSet.has(s.number);
-        const isUnlocked = idx === 0 || completedSet.has(surahs[idx - 1].number);
         return {
           ...s,
           completed: isCompleted,
-          unlocked: isUnlocked || isCompleted,
+          unlocked: true,
           ayahsCompleted: c?.completed || 0,
           progressPercent: s.ayahCount > 0 && c ? Math.round((c.completed / s.ayahCount) * 100) : 0,
         };
