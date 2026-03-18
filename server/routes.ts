@@ -12020,6 +12020,145 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
   });
 
   // ==========================================
+  // Quraanka Caruurta - Session Check (Multi-Ayah Xifdi Test)
+  // ==========================================
+
+  app.post("/api/quran/check-session", requireChildAuth, quranAudioUpload.single("audio"), async (req: Request, res: Response) => {
+    try {
+      const { surahNumber, ayahNumbers } = req.body;
+      if (!req.file || !surahNumber || !ayahNumbers) {
+        return res.status(400).json({ error: "Audio, surah, iyo ayah numbers waa loo baahan yahay" });
+      }
+      const childId = req.session.childId!;
+      const sNum = parseInt(surahNumber);
+      let ayahNums: number[];
+      try { ayahNums = JSON.parse(ayahNumbers); } catch {
+        return res.status(400).json({ error: "ayahNumbers JSON array ah waa loo baahan yahay" });
+      }
+      if (!Array.isArray(ayahNums) || ayahNums.length < 1) {
+        return res.status(400).json({ error: "Ugu yaraan 1 aayad waa loo baahan yahay" });
+      }
+
+      const paddedNum = sNum.toString().padStart(3, "0");
+      const fs = await import("fs");
+      const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
+      let correctTexts: string[] = [];
+      try {
+        const fileContent = fs.default.readFileSync(quranFilePath, "utf-8");
+        const surahData = JSON.parse(fileContent);
+        for (const aNum of ayahNums) {
+          const ayah = surahData.ayahs?.find((a: any) => a.number === aNum);
+          if (ayah) correctTexts.push(ayah.text);
+        }
+      } catch {
+        return res.status(400).json({ error: "Suurada lama helin" });
+      }
+      if (correctTexts.length === 0) {
+        return res.status(400).json({ error: "Aayaha lama helin" });
+      }
+
+      const childRecord = await storage.getChild(childId);
+      const childAge = childRecord?.age ?? 7;
+
+      const openai = getOpenAIClient();
+      const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
+
+      let transcribedText = "";
+      let passed = false;
+      let score = 0;
+      try {
+        const transcription = await openai.audio.transcriptions.create({
+          model: "whisper-1",
+          file: audioFile,
+          language: "ar",
+        });
+        transcribedText = transcription.text.trim();
+
+        const correctCombined = correctTexts.join(" ");
+
+        let ageContext: string;
+        if (childAge <= 6) {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo yar. Aad u fududee.`;
+        } else if (childAge <= 9) {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo dhexdhexaad ah. Fududee.`;
+        } else {
+          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo weyn.`;
+        }
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `Waxaad tahay macalin Quraan ah oo carruurta wax bara.
+${ageContext}
+Ilmuhu wuxuu xifdinayay ${ayahNums.length} aayad isku xiga. Waa inuu akhriyo dhammaan aayahaas isku xiga oo aan kala fog lahayn.
+Eeg haddii aayahaas oo dhan (ama qaybtooda badnaa) ka soo baxeen dhawaaqiisa.
+HAA MUHIIM: Tajweed iyo qiiraadda HAAR — hadda waxaan hubinaysaa XIFDIGA (kalmadaha) kaliya, ma aha heerka akhris.
+Ku jawaab JSON kaliya:
+{ "score": <0-100> }
+- 80+: kala badnaanshiyaha kelmadaha (80%+) ka soo baxay
+- 60: badnaanshiyaha kelmadaha (60%+) ka soo baxay
+- 40: qayb (40%+) ka soo baxay
+- 0-20: aad u yar ama wax kale`
+            },
+            {
+              role: "user",
+              content: `Aayahaas oo dhan oo isku xiga:\n${correctCombined}\n\nKan ilmuhu akhriyay:\n${transcribedText}`
+            }
+          ],
+          temperature: 0.2,
+        });
+
+        try {
+          const responseText = completion.choices[0].message.content || "{}";
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+          score = typeof parsed.score === "number" ? parsed.score : 0;
+        } catch { score = 0; }
+      } catch (aiError: any) {
+        console.warn("[QURAN SESSION] AI unavailable, fallback pass:", aiError.message);
+        score = 60;
+      }
+
+      const passingScore = childAge <= 8 ? 30 : 50;
+      passed = score >= passingScore;
+
+      let starsEarned = 0;
+      if (passed) {
+        starsEarned = ayahNums.length;
+        try {
+          const [existing] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+          if (existing) {
+            await db.update(childRewardBalances).set({
+              totalStars: existing.totalStars + starsEarned,
+              updatedAt: new Date(),
+            }).where(eq(childRewardBalances.childId, childId));
+          } else {
+            await db.insert(childRewardBalances).values({
+              childId, totalTokens: 0, totalStars: starsEarned, totalCoins: 0, tokensUsed: 0,
+            });
+          }
+          await db.insert(childRewardLedger).values({
+            childId, type: "star", amount: starsEarned, source: "session_xifdi", sourceId: sNum,
+          });
+        } catch (e) {
+          console.warn("[QURAN SESSION] Reward update failed:", e);
+        }
+      }
+
+      const message = passed
+        ? `MaashaAllah! Aad baad u fiicantahay! ${ayahNums.length} aayad ayaad xifdi ku qabsatay! ⭐`.repeat(1)
+        : `Weli kama soo bixin ${score}% — isku day mar kale, waxaad awoodaa!`;
+
+      res.json({ passed, score, starsEarned, message, transcribed: transcribedText });
+    } catch (error: any) {
+      console.error("[QURAN SESSION CHECK] Error:", error);
+      res.status(500).json({ error: "Khalad ayaa dhacay: " + (error.message || "Unknown") });
+    }
+  });
+
+  // ==========================================
   // Quraanka Caruurta - Games & Rewards API
   // ==========================================
 
