@@ -428,7 +428,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
           </div>
           <h2 className="text-2xl font-black text-white">Ku dar ilmahaaga</h2>
           <p className="mt-2 text-sm text-white/90">
-            Kahor inta aadan app-ka sii galin, fadlan u samee ilmahaaga akoon si uu Aabka Quraanka iyo Af-Soomaaliga uga barto.
+            Ka hor inta aadan app-ka sii galin, fadlan u samee ilmahaaga akoon si uu Aabka Quraanka iyo Af-Soomaaliga uga barto.
           </p>
         </div>
 
