@@ -36,7 +36,7 @@ export default function ChildLogin() {
   const [resettingChildId, setResettingChildId] = useState<string | null>(null);
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newChild, setNewChild] = useState({ name: "", password: "", confirmPassword: "" });
+  const [newChild, setNewChild] = useState({ name: "", age: "", password: "", confirmPassword: "" });
   const [creatingChild, setCreatingChild] = useState(false);
 
   useEffect(() => {
@@ -126,8 +126,14 @@ export default function ChildLogin() {
 
   const handleCreateChild = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChild.name.trim() || !newChild.password.trim() || !newChild.confirmPassword.trim()) {
+    if (!newChild.name.trim() || !newChild.age.trim() || !newChild.password.trim() || !newChild.confirmPassword.trim()) {
       toast.error("Geli magaca iyo labada password");
+      return;
+    }
+
+    const parsedAge = Number.parseInt(newChild.age, 10);
+    if (!Number.isInteger(parsedAge) || parsedAge < 1) {
+      toast.error("Geli da' sax ah");
       return;
     }
 
@@ -144,6 +150,7 @@ export default function ChildLogin() {
         credentials: "include",
         body: JSON.stringify({
           name: newChild.name,
+          age: parsedAge,
           password: newChild.password,
           passwordConfirm: newChild.confirmPassword,
           avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
@@ -156,7 +163,7 @@ export default function ChildLogin() {
       const created = await res.json();
       setParentChildren(prev => [...prev, created]);
       setShowAddForm(false);
-      setNewChild({ name: "", password: "", confirmPassword: "" });
+      setNewChild({ name: "", age: "", password: "", confirmPassword: "" });
       toast.success(`${created.name} Ilmaha akoonkiisi waa la sameeyay!`);
     } catch (err: any) {
       toast.error(err.message);
@@ -313,6 +320,15 @@ export default function ChildLogin() {
                         placeholder="Magaca ilmaha"
                         className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
                         data-testid="input-new-child-name"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={newChild.age}
+                        onChange={(e) => setNewChild(p => ({ ...p, age: sanitizeAgeInput(e.target.value) }))}
+                        placeholder="Da'da ilmaha"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D] text-sm"
+                        data-testid="input-new-child-age"
                       />
                       <input
                         type="password"

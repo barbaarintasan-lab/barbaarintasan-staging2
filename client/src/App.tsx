@@ -319,6 +319,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
   const [isCheckingChildren, setIsCheckingChildren] = useState(false);
   const [childrenCount, setChildrenCount] = useState<number | null>(null);
   const [childName, setChildName] = useState("");
+  const [childAge, setChildAge] = useState("");
   const [childPassword, setChildPassword] = useState("");
   const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
   const [isCreatingChild, setIsCreatingChild] = useState(false);
@@ -354,8 +355,13 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
 
   const handleCreateChild = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!childName.trim() || !childPassword.trim() || !childPasswordConfirm.trim()) {
+    if (!childName.trim() || !childAge.trim() || !childPassword.trim() || !childPasswordConfirm.trim()) {
       setCreateError("Buuxi dhammaan xogta ilmaha.");
+      return;
+    }
+    const parsedAge = Number.parseInt(childAge, 10);
+    if (!Number.isInteger(parsedAge) || parsedAge < 1) {
+      setCreateError("Fadlan geli da' sax ah.");
       return;
     }
     if (childPassword !== childPasswordConfirm) {
@@ -373,6 +379,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
         credentials: "include",
         body: JSON.stringify({
           name: childName.trim(),
+          age: parsedAge,
           password: childPassword,
           passwordConfirm: childPasswordConfirm,
           avatarColor: ONBOARDING_AVATAR_COLORS[Math.floor(Math.random() * ONBOARDING_AVATAR_COLORS.length)],
@@ -385,6 +392,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
       }
 
       setChildName("");
+      setChildAge("");
       setChildPassword("");
       setChildPasswordConfirm("");
       setChildrenCount(1);
@@ -430,6 +438,14 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             value={childName}
             onChange={(e) => setChildName(e.target.value)}
             placeholder="Magaca ilmaha"
+            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
+          />
+          <input
+            type="text"
+            inputMode="numeric"
+            value={childAge}
+            onChange={(e) => setChildAge(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="Da'da ilmaha"
             className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
           />
           <input
