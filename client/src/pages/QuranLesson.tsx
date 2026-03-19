@@ -505,33 +505,29 @@ export default function QuranLesson() {
     if (!surah || isLessonReviewPlaying || isLessonReviewRecording || isLessonReviewChecking) return;
 
     setLessonReviewMessage("Dhageyso casharka oo dhan");
-    setFullLessonListenRounds(0);
     setIsLessonReviewPlaying(true);
 
     try {
-      for (let cycle = 1; cycle <= 3; cycle++) {
-        for (const ayah of surah.ayahs) {
-          await new Promise<void>((resolve) => {
-            const url = getAudioUrl(surahNumber, ayah.number, selectedReciter);
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current = null;
-            }
-            const audio = new Audio(url);
-            audioRef.current = audio;
-            audio.onplay = () => setIsPlaying(true);
-            audio.onended = () => {
-              setIsPlaying(false);
-              resolve();
-            };
-            audio.onerror = () => {
-              setIsPlaying(false);
-              resolve();
-            };
-            audio.play().catch(() => resolve());
-          });
-        }
-        setFullLessonListenRounds(cycle);
+      for (const ayah of surah.ayahs) {
+        await new Promise<void>((resolve) => {
+          const url = getAudioUrl(surahNumber, ayah.number, selectedReciter);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+          }
+          const audio = new Audio(url);
+          audioRef.current = audio;
+          audio.onplay = () => setIsPlaying(true);
+          audio.onended = () => {
+            setIsPlaying(false);
+            resolve();
+          };
+          audio.onerror = () => {
+            setIsPlaying(false);
+            resolve();
+          };
+          audio.play().catch(() => resolve());
+        });
       }
     } finally {
       setIsLessonReviewPlaying(false);
@@ -622,22 +618,10 @@ export default function QuranLesson() {
           setSurahComplete(true);
         } else {
           setLessonReviewStep("reinforcement");
-          setLessonPracticeReads(0);
-          setFullLessonListenRounds(0);
           setLessonReviewMessage("Wax yar ayaad khalday, aan dib u celino");
         }
       } else {
-        const targetReads = lessonReviewStep === "reinforcement" ? 2 : 3;
-        const nextReads = Math.min(lessonPracticeReads + 1, targetReads);
-        setLessonPracticeReads(nextReads);
-
-        if (result.status === "good") {
-          setLessonReviewMessage(nextReads >= targetReads ? "Fiican! Hadda diyaar ayaad tahay" : "Fiican! Hal mar kale akhri");
-        } else if (result.status === "needs_improvement") {
-          setLessonReviewMessage("Fiican, qoraalka eeg oo si deggan mar kale u akhri");
-        } else {
-          setLessonReviewMessage("Qoraalka eeg oo mar kale akhri, waad awooddaa");
-        }
+        setLessonReviewMessage("Iskiis u akhri, markaad diyaar noqoto sii wad");
       }
     } catch (error: any) {
       setLessonReviewMessage(error?.message || "Isku day mar kale, waad awooddaa");
@@ -645,14 +629,7 @@ export default function QuranLesson() {
 
     setIsLessonReviewChecking(false);
     submitInFlightRef.current = false;
-  }, [lessonPracticeReads, lessonReviewStep, surah, surahNumber]);
-
-  useEffect(() => {
-    if (lessonFlow !== "lesson_review") return;
-    if (lessonReviewStep !== "full_listen") return;
-    if (isLessonReviewPlaying || fullLessonListenRounds > 0) return;
-    playFullLessonRecitation().catch(() => {});
-  }, [fullLessonListenRounds, isLessonReviewPlaying, lessonFlow, lessonReviewStep, playFullLessonRecitation]);
+  }, [lessonReviewStep, surah, surahNumber]);
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || !currentAyah || submitInFlightRef.current) return;
@@ -1089,7 +1066,6 @@ export default function QuranLesson() {
               {lessonReviewStep === "full_listen" && (
                 <div className="space-y-3">
                   <p className="text-white/80 text-sm">Dhageyso casharka oo dhan</p>
-                  <p className="text-[#4ECDC4] text-xs font-bold">Dhageysi: {fullLessonListenRounds}/3</p>
                   <button
                     onClick={playFullLessonRecitation}
                     disabled={isLessonReviewPlaying}
@@ -1101,10 +1077,9 @@ export default function QuranLesson() {
                   <button
                     onClick={() => {
                       setLessonReviewStep("practice_with_text");
-                      setLessonReviewMessage("Akhriso casharka 2-3 jeer adigoo eegaya");
-                      setLessonPracticeReads(0);
+                      setLessonReviewMessage("Iskiis u akhri adigoo eegaya");
                     }}
-                    disabled={isLessonReviewPlaying || fullLessonListenRounds < 3}
+                    disabled={isLessonReviewPlaying}
                     className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-black disabled:opacity-50"
                     data-testid="button-lesson-review-continue"
                   >
@@ -1115,23 +1090,13 @@ export default function QuranLesson() {
 
               {lessonReviewStep === "practice_with_text" && (
                 <div className="space-y-3">
-                  <p className="text-white/80 text-sm">Akhriso casharka 2-3 jeer adigoo eegaya</p>
-                  <p className="text-[#FFD93D] text-xs font-bold">Akhris: {lessonPracticeReads}/3</p>
-                  <button
-                    onClick={isLessonReviewRecording ? stopLessonReviewRecording : startLessonReviewRecording}
-                    disabled={isLessonReviewChecking || isLessonReviewPlaying}
-                    className="w-full py-3 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] border border-[#FFD93D]/30 font-bold disabled:opacity-50"
-                    data-testid="button-lesson-review-practice-read"
-                  >
-                    {isLessonReviewChecking ? "Waan hubinayaa..." : isLessonReviewRecording ? "⏹️ Jooji" : "🎙️ Akhri"}
-                  </button>
+                  <p className="text-white/80 text-sm">Iskiis u akhri adigoo eegaya</p>
                   <button
                     onClick={() => {
                       setLessonReviewStep("final_test");
                       setLessonReviewMessage("Quraanka qalbiga ka akhri");
                     }}
-                    disabled={lessonPracticeReads < 2}
-                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-black disabled:opacity-50"
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-black"
                     data-testid="button-lesson-review-ready"
                   >
                     ➡️ Diyaar ayaan ahay
@@ -1161,8 +1126,6 @@ export default function QuranLesson() {
               {lessonReviewStep === "reinforcement" && (
                 <div className="space-y-3">
                   <p className="text-orange-200 text-sm font-bold">Wax yar ayaad khalday, aan dib u celino</p>
-                  <p className="text-[#4ECDC4] text-xs font-bold">Dhageysi: {fullLessonListenRounds}/3</p>
-                  <p className="text-[#FFD93D] text-xs font-bold">Akhris: {lessonPracticeReads}/2</p>
                   <button
                     onClick={playFullLessonRecitation}
                     disabled={isLessonReviewPlaying}
@@ -1172,20 +1135,11 @@ export default function QuranLesson() {
                     {isLessonReviewPlaying ? "Dhageysanayaa..." : "▶️ Dhageyso mar kale"}
                   </button>
                   <button
-                    onClick={isLessonReviewRecording ? stopLessonReviewRecording : startLessonReviewRecording}
-                    disabled={isLessonReviewChecking || isLessonReviewPlaying}
-                    className="w-full py-3 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] border border-[#FFD93D]/30 font-bold disabled:opacity-50"
-                    data-testid="button-lesson-review-reinforcement-read"
-                  >
-                    {isLessonReviewChecking ? "Waan hubinayaa..." : isLessonReviewRecording ? "⏹️ Jooji" : "🎙️ Akhri"}
-                  </button>
-                  <button
                     onClick={() => {
                       setLessonReviewStep("final_test");
                       setLessonReviewMessage("Quraanka qalbiga ka akhri");
                     }}
-                    disabled={fullLessonListenRounds < 3 || lessonPracticeReads < 2}
-                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-black disabled:opacity-50"
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-black"
                     data-testid="button-lesson-review-retry-final"
                   >
                     ➡️ Mar kale isku day
