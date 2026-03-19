@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 type DashboardTab = "quran" | "games" | "rewards";
+type AyahLearningStage = "listening" | "repeating" | "memorizing";
 
 interface UnlockedGame {
   surahNumber: number;
@@ -42,6 +43,7 @@ interface CheckResult {
   outcome: "correct" | "needs_retry";
   completed: boolean;
   message: string;
+  score?: number;
 }
 
 interface LessonSubmitResult {
@@ -49,6 +51,8 @@ interface LessonSubmitResult {
   isPassed: boolean;
   isSoftPass: boolean;
   attemptNumber: number;
+  completed: boolean;
+  mode: "repeat" | "memorize";
   message: string;
 }
 
@@ -70,6 +74,8 @@ const RECITERS: ReciterOption[] = [
   { id: "husary_muallim", name: "Al-Husary (Muallim)", nameAr: "الحصري - المعلم" },
   { id: "abdul_basit", name: "Abdul Basit (Mujawwad)", nameAr: "عبد الباسط - مجوّد" },
 ];
+
+const REQUIRED_LISTENS = 2;
 
 const CURRICULUM_ORDER = [
   1, 114, 113, 112,
@@ -105,6 +111,7 @@ export default function QuranLesson() {
   const [sessionTimeLeft, setSessionTimeLeft] = useState(60 * 60);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [hasListened, setHasListened] = useState(false);
+  const [currentStage, setCurrentStage] = useState<AyahLearningStage>("listening");
   const [selectedReciter, setSelectedReciter] = useState<string>(() => {
     try { return localStorage.getItem("quran_reciter") || "husary_muallim"; } catch { return "husary_muallim"; }
   });
@@ -112,17 +119,12 @@ export default function QuranLesson() {
   const [rewardSummary, setRewardSummary] = useState<RewardSummary | null>(null);
 
   const [listenCount, setListenCount] = useState(0);
-  const [revealText, setRevealText] = useState(false);
   const [autoAdvancing, setAutoAdvancing] = useState(false);
   const [ayahMistakes, setAyahMistakes] = useState<Record<number, number>>({});
   const [currentAyahFailures, setCurrentAyahFailures] = useState(0);
   const [slowMode, setSlowMode] = useState(false);
   const [hintAvailable, setHintAvailable] = useState(false);
   const [hintPlaying, setHintPlaying] = useState(false);
-  const [fullSurahReview, setFullSurahReview] = useState(false);
-  const [reviewPlaying, setReviewPlaying] = useState(false);
-  const [reviewAyahIndex, setReviewAyahIndex] = useState(0);
-  const [reviewState, setReviewState] = useState<"listening" | "ready" | "recording" | "checking" | "failed">("listening");
   const [showSessionCelebration, setShowSessionCelebration] = useState(false);
   const [progressLoaded, setProgressLoaded] = useState(false);
 
@@ -131,19 +133,11 @@ export default function QuranLesson() {
 
   // Session-based learning: track ayahs learned this visit
   const [sessionLearned, setSessionLearned] = useState<number[]>([]); // ayah INDICES completed this session
-  const [sessionPhase, setSessionPhase] = useState<"learning" | "review" | "finaltest">("learning");
-  const [reviewReadCount, setReviewReadCount] = useState(0);
-  const [isFinalRecording, setIsFinalRecording] = useState(false);
-  const [isFinalChecking, setIsFinalChecking] = useState(false);
-  const [finalTestResult, setFinalTestResult] = useState<{ passed: boolean; score: number; starsEarned: number; message: string } | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const preloadRef = useRef<HTMLAudioElement | null>(null);
   const audioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const finalTestMediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const finalTestChunksRef = useRef<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,9 +203,9 @@ export default function QuranLesson() {
   useEffect(() => {
     setHasListened(false);
     setCheckResult(null);
+    setCurrentStage("listening");
     setListenCount(0);
     setAudioFailed(false);
-    setRevealText(false);
     setAutoAdvancing(false);
     setCurrentAyahFailures(0);
     setSlowMode(false);
@@ -315,7 +309,13 @@ export default function QuranLesson() {
       audio.onended = () => {
         setIsPlaying(false);
         setHasListened(true);
-        setListenCount(prev => prev + 1);
+        setListenCount((prev) => {
+          const nextCount = prev + 1;
+          if (currentStage === "listening" && nextCount >= REQUIRED_LISTENS) {
+            setCurrentStage("repeating");
+          }
+          return nextCount;
+        });
         preloadNextAyah();
       };
       audio.onerror = () => {
@@ -330,7 +330,7 @@ export default function QuranLesson() {
       setAudioFailed(true);
       if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
     }
-  }, [currentAyah, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah, slowMode]);
+  }, [currentAyah, currentStage, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah, slowMode]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -454,7 +454,13 @@ export default function QuranLesson() {
       audio.onended = () => {
         setIsPlaying(false);
         setHasListened(true);
-        setListenCount((prev) => prev + 1);
+        setListenCount((prev) => {
+          const nextCount = prev + 1;
+          if (currentStage === "listening" && nextCount >= REQUIRED_LISTENS) {
+            setCurrentStage("repeating");
+          }
+          return nextCount;
+        });
         setHintPlaying(false);
         setTimeout(() => {
           startRecording().catch(() => {});
@@ -472,13 +478,14 @@ export default function QuranLesson() {
       setHintPlaying(false);
       setAudioFailed(true);
     }
-  }, [autoAdvancing, currentAyah, getAudioUrl, hintPlaying, isChecking, isRecording, selectedReciter, slowMode, startRecording, surahNumber]);
+  }, [autoAdvancing, currentAyah, currentStage, getAudioUrl, hintPlaying, isChecking, isRecording, selectedReciter, slowMode, startRecording, surahNumber]);
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || !currentAyah || submitInFlightRef.current) return;
     submitInFlightRef.current = true;
     setIsRecording(false);
     setIsChecking(true);
+    const learningMode = currentStage === "memorizing" ? "memorize" : "repeat";
 
     const recorder = mediaRecorderRef.current;
     await new Promise<void>((resolve) => {
@@ -494,6 +501,7 @@ export default function QuranLesson() {
     formData.append("audio", blob, "recording.webm");
     formData.append("surahNumber", surahNumber.toString());
     formData.append("ayahNumber", currentAyah.number.toString());
+    formData.append("mode", learningMode);
 
     try {
       const response = await fetch("/api/quran/check", {
@@ -519,7 +527,9 @@ export default function QuranLesson() {
             body: JSON.stringify({
               surahNumber,
               ayahNumber: currentAyah.number,
-              isCorrect: result.completed,
+              isCorrect: result.passed,
+              mode: learningMode,
+              score: result.score ?? 0,
             }),
           });
 
@@ -538,24 +548,31 @@ export default function QuranLesson() {
       }
 
       const wasAlreadyCompleted = ayahProgress[currentAyah.number]?.completed || false;
-      const wasPassed = submitResult?.isPassed ?? result.completed;
+      const wasPassed = submitResult?.isPassed ?? result.passed;
       const isSoftPass = submitResult?.isSoftPass ?? false;
       const nextAttemptCount = submitResult?.attemptNumber ?? ((ayahProgress[currentAyah.number]?.attempts || 0) + 1);
+      const completedNow = submitResult?.completed ?? (learningMode === "memorize" && wasPassed);
       const nextResult: CheckResult = wasPassed
         ? {
             outcome: "correct",
-            completed: true,
-            message: isSoftPass ? "✨ Waad saxday, sii wad!" : result.message,
+            completed: completedNow,
+            score: result.score,
+            message: learningMode === "repeat"
+              ? "Fiican! Hadda qoraalka waan qarinaynaa, qalbigaagana ka akhri."
+              : (isSoftPass ? "✨ Waad saxday, sii wad!" : result.message),
           }
-        : result;
+        : {
+            ...result,
+            completed: false,
+          };
       const updatedProgress = {
         ...ayahProgress,
         [currentAyah.number]: {
           ayahNumber: currentAyah.number,
           attempts: nextAttemptCount,
-          bestScore: wasPassed ? 100 : (ayahProgress[currentAyah.number]?.bestScore || 0),
-          lastScore: wasPassed ? 100 : 40,
-          completed: wasPassed || wasAlreadyCompleted,
+          bestScore: Math.max(ayahProgress[currentAyah.number]?.bestScore || 0, result.score || 0),
+          lastScore: result.score || 0,
+          completed: completedNow || wasAlreadyCompleted,
         }
       };
       setAyahProgress(updatedProgress);
@@ -568,7 +585,17 @@ export default function QuranLesson() {
         }, 1500);
       }
 
-      if (wasPassed && !wasAlreadyCompleted) {
+      if (learningMode === "repeat" && wasPassed) {
+        setCurrentAyahFailures(0);
+        setSlowMode(false);
+        setHintAvailable(false);
+        setCurrentStage("memorizing");
+
+        if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+        feedbackTimeoutRef.current = setTimeout(() => {
+          setCheckResult(null);
+        }, 1800);
+      } else if (wasPassed && completedNow && !wasAlreadyCompleted) {
         setCurrentAyahFailures(0);
         setSlowMode(false);
         setHintAvailable(false);
@@ -583,7 +610,6 @@ export default function QuranLesson() {
         const isLast = newCompletedCount >= totalAyahs;
         if (isLast) {
           setSurahComplete(true);
-          setFullSurahReview(true); // show full text + sequential audio before games
         } else {
           const showMilestone = nextSessionLearned.length > 0 && nextSessionLearned.length % 3 === 0;
           if (showMilestone) {
@@ -624,7 +650,6 @@ export default function QuranLesson() {
           }, showMilestone ? 2000 : (isSoftPass ? 1500 : 2200));
         }
       } else if (!wasPassed) {
-        // Smart Retry: replay audio after each mistake (text is always visible)
         const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
         setAyahMistakes(prev => ({ ...prev, [currentAyah.number]: mistakeNum }));
         const nextFailureCount = currentAyahFailures + 1;
@@ -632,11 +657,10 @@ export default function QuranLesson() {
         if (nextFailureCount >= 3) {
           setSlowMode(true);
         }
-        if (nextFailureCount >= 5) {
+        if (learningMode === "memorize" && nextFailureCount >= 3) {
           setHintAvailable(true);
         }
 
-        // Always replay audio so child can listen and compare
         const delay = mistakeNum >= 3 ? 400 : 800;
         setTimeout(() => {
           const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
@@ -652,7 +676,7 @@ export default function QuranLesson() {
     }
     setIsChecking(false);
     submitInFlightRef.current = false;
-  }, [currentAyah, currentAyahIndex, surahNumber, totalAyahs, ayahProgress, ayahMistakes, currentAyahFailures, getAudioUrl, selectedReciter, sessionLearned, surah]);
+  }, [currentAyah, currentAyahIndex, currentStage, surahNumber, totalAyahs, ayahProgress, ayahMistakes, currentAyahFailures, getAudioUrl, selectedReciter, sessionLearned, surah]);
 
   const goToAyah = (index: number) => {
     if (index >= 0 && index < totalAyahs && isAyahAccessible(index)) {
@@ -669,140 +693,27 @@ export default function QuranLesson() {
     }
   };
 
-  const playFullSurahSequential = useCallback(() => {
-    if (!surah) return;
-    setReviewPlaying(true);
-    setReviewState("listening");
-    setReviewAyahIndex(0);
-    let idx = 0;
-    const playNext = () => {
-      if (idx >= surah.ayahs.length) {
-        setReviewPlaying(false);
-        setReviewState("ready");
-        return;
-      }
-      setReviewAyahIndex(idx);
-      const url = getAudioUrl(surahNumber, surah.ayahs[idx].number, selectedReciter);
-      const a = new Audio(url);
-      reviewAudioRef.current = a;
-      a.onended = () => { idx++; setTimeout(playNext, 600); };
-      a.onerror = () => { idx++; setTimeout(playNext, 300); };
-      a.play().catch(() => { idx++; setTimeout(playNext, 300); });
-    };
-    playNext();
-  }, [surah, surahNumber, selectedReciter, getAudioUrl]);
-
-  const startSurahRecordingTest = async () => {
-    if (!surah) return;
-    setReviewState("recording");
-    finalTestChunksRef.current = [];
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"].find(m => MediaRecorder.isTypeSupported(m)) || "";
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) finalTestChunksRef.current.push(e.data); };
-      recorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
-      recorder.start();
-      finalTestMediaRecorderRef.current = recorder;
-    } catch {
-      alert("Fadlan oggolow microphone-ka kadibna isku day mar kale!");
-      setReviewState("ready");
-    }
-  };
-
-  const stopSurahRecordingTest = async () => {
-    if (!finalTestMediaRecorderRef.current || !surah) return;
-    setReviewState("checking");
-    const recorder = finalTestMediaRecorderRef.current;
-    await new Promise<void>((resolve) => {
-      recorder.onstop = () => { recorder.stream.getTracks().forEach(t => t.stop()); resolve(); };
-      recorder.stop();
-    });
-    const mimeType = finalTestChunksRef.current[0]?.type || "audio/webm";
-    const blob = new Blob(finalTestChunksRef.current, { type: mimeType });
-    const formData = new FormData();
-    formData.append("audio", blob, "surah-test.webm");
-    formData.append("surahNumber", surahNumber.toString());
-    formData.append("ayahNumbers", JSON.stringify(surah.ayahs.map(a => a.number)));
-    try {
-      const response = await fetch("/api/quran/check-session", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const result = await response.json();
-      if (result.passed && result.score >= 75) {
-        setSurahComplete(true);
-        setFullSurahReview(false);
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 6000);
-      } else {
-        setReviewState("failed");
-      }
-    } catch {
-      setReviewState("failed");
-    }
-  };
-
-  const finishFullReview = () => {
-    if (reviewAudioRef.current) { reviewAudioRef.current.pause(); reviewAudioRef.current = null; }
-    setReviewPlaying(false);
-    setFullSurahReview(false);
-    setShowCelebration(true);
-    setTimeout(() => setShowCelebration(false), 6000);
-  };
-
-  const startFinalTest = async () => {
-    if (isFinalRecording || isFinalChecking) return;
-    finalTestChunksRef.current = [];
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"].find(m => MediaRecorder.isTypeSupported(m)) || "";
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) finalTestChunksRef.current.push(e.data); };
-      recorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
-      recorder.start();
-      finalTestMediaRecorderRef.current = recorder;
-      setIsFinalRecording(true);
-    } catch {
-      alert("Fadlan oggolow microphone-ka kadibna isku day mar kale!");
-    }
-  };
-
-  const stopFinalTest = async () => {
-    if (!finalTestMediaRecorderRef.current || !surah) return;
-    setIsFinalRecording(false);
-    setIsFinalChecking(true);
-    const recorder = finalTestMediaRecorderRef.current;
-    await new Promise<void>((resolve) => {
-      recorder.onstop = () => { recorder.stream.getTracks().forEach(t => t.stop()); resolve(); };
-      recorder.stop();
-    });
-    const mimeType = finalTestChunksRef.current[0]?.type || "audio/webm";
-    const blob = new Blob(finalTestChunksRef.current, { type: mimeType });
-    const ayahNumbers = sessionLearned.map(idx => surah.ayahs[idx]?.number).filter(Boolean);
-    const formData = new FormData();
-    formData.append("audio", blob, "session-xifdi.webm");
-    formData.append("surahNumber", surahNumber.toString());
-    formData.append("ayahNumbers", JSON.stringify(ayahNumbers));
-    try {
-      const response = await fetch("/api/quran/check-session", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const result = await response.json();
-      setFinalTestResult(result);
-    } catch {
-      setFinalTestResult({ passed: false, score: 0, starsEarned: 0, message: "Khalad ayaa dhacay. Isku day mar kale!" });
-    }
-    setIsFinalChecking(false);
-  };
-
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
   const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
-  const canRecord = !isCurrentCompleted && !autoAdvancing;
+  const canRecord = !isCurrentCompleted && !autoAdvancing && currentStage !== "listening";
+  const stageOrder: AyahLearningStage[] = ["listening", "repeating", "memorizing"];
+  const currentStageIndex = stageOrder.indexOf(currentStage);
+  const isTextHidden = currentStage === "memorizing" && !isCurrentCompleted;
+  const stageDescriptions: Record<AyahLearningStage, { title: string; detail: string }> = {
+    listening: {
+      title: "Marxaladda 1: Dhageyso",
+      detail: `Sheekha dhageyso ${REQUIRED_LISTENS} jeer. Markaasi ayaad u gudbaysaa ku-celinta.`,
+    },
+    repeating: {
+      title: "Marxaladda 2: Ku celi",
+      detail: "Qoraalka wuu muuqdaa. Ku celi aayada adigoo eegaya.",
+    },
+    memorizing: {
+      title: "Marxaladda 3: Qalbiga",
+      detail: "Qoraalka waa qarsoon yahay. Hadda qalbigaaga ka akhri.",
+    },
+  };
 
   if (authLoading || surahLoading) {
     return (
@@ -832,213 +743,6 @@ export default function QuranLesson() {
         <button onClick={() => setLocation("/child-dashboard")} className="bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] px-8 py-3 rounded-2xl font-bold w-full max-w-xs active:scale-95 transition-transform" data-testid="button-session-expired-back">
           Ku noqo Dashboard
         </button>
-      </div>
-    );
-  }
-
-  // ==============================
-  // SESSION REVIEW SCREEN
-  // ==============================
-  if (sessionPhase === "review" && surah) {
-    const learnedAyahs = sessionLearned.map(idx => surah.ayahs[idx]).filter(Boolean);
-    return (
-      <div className="min-h-screen bg-[#1a1a2e] flex flex-col px-4 py-6" data-testid="session-review-screen">
-        <div className="flex items-center mb-6">
-          <button onClick={() => setSessionPhase("learning")} className="text-white/60 mr-3 p-2 rounded-xl bg-white/5 active:scale-95 transition-transform">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          </button>
-          <div>
-            <h1 className="text-white text-lg font-bold">Dib u Eegis</h1>
-            <p className="text-white/50 text-xs">{learnedAyahs.length} aayad oo aad baratay</p>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-3xl p-4 mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">📖</span>
-            <div>
-              <p className="text-emerald-300 font-bold text-sm">Aayaadaad Maanta Baratay</p>
-              <p className="text-white/50 text-xs">Akhri 3 jeer si xifdiga u adkeyso</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {learnedAyahs.map((ayah, i) => (
-              <div key={ayah.number} className="bg-white/5 rounded-2xl p-3 border border-white/10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-emerald-400 text-xs font-bold">Aayada {i + 1}</span>
-                  <span className="text-white/30 text-xs">#{ayah.number}</span>
-                </div>
-                <p className="text-white text-right text-xl leading-loose font-arabic" dir="rtl">{ayah.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-4 mb-5">
-          <p className="text-white font-bold text-center mb-3">
-            Inteed u akhriyay?
-          </p>
-          <div className="flex justify-center gap-3 mb-4">
-            {[1, 2, 3].map(n => (
-              <div key={n} className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black border-2 transition-all ${reviewReadCount >= n ? "bg-emerald-500 border-emerald-400 text-white scale-105" : "bg-white/5 border-white/20 text-white/30"}`}>
-                {reviewReadCount >= n ? "✓" : n}
-              </div>
-            ))}
-          </div>
-          {reviewReadCount < 3 ? (
-            <button
-              onClick={() => setReviewReadCount(c => Math.min(c + 1, 3))}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-transform"
-              data-testid="button-review-read"
-            >
-              ✅ Waan Akhriyay ({reviewReadCount}/3)
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <div className="text-center text-emerald-400 font-bold text-sm mb-2">MaashaAllah! 3 jeer ayaad u akhriyay! ⭐</div>
-              <button
-                onClick={() => setSessionPhase("finaltest")}
-                className="w-full bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform"
-                data-testid="button-go-finaltest"
-              >
-                🎯 Diyaar baan ahay — Xifdi Bilow!
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ==============================
-  // FINAL TEST (XIFDI) SCREEN
-  // ==============================
-  if (sessionPhase === "finaltest" && surah) {
-    const learnedAyahs = sessionLearned.map(idx => surah.ayahs[idx]).filter(Boolean);
-    return (
-      <div className="min-h-screen bg-[#1a1a2e] flex flex-col px-4 py-6" data-testid="session-finaltest-screen">
-        <div className="flex items-center mb-6">
-          {!isFinalRecording && !isFinalChecking && !finalTestResult && (
-            <button onClick={() => setSessionPhase("review")} className="text-white/60 mr-3 p-2 rounded-xl bg-white/5 active:scale-95 transition-transform">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
-          )}
-          <div>
-            <h1 className="text-white text-lg font-bold">Xifdi Qabso 🎯</h1>
-            <p className="text-white/50 text-xs">Qoraalka waa la qariyay — akhri xifdi ah</p>
-          </div>
-        </div>
-
-        {/* Ayah count tiles — text hidden */}
-        <div className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border border-purple-500/30 rounded-3xl p-4 mb-5">
-          <p className="text-purple-300 text-sm font-bold mb-3 text-center">
-            📜 {learnedAyahs.length} Aayad — Akhri isku xiga oo xifdi ah
-          </p>
-          <div className="space-y-2">
-            {learnedAyahs.map((ayah, i) => (
-              <div key={ayah.number} className="bg-white/5 rounded-2xl p-3 border border-white/10 flex items-center justify-between">
-                <span className="text-purple-400 font-bold text-sm">Aayada {i + 1}</span>
-                <span className="text-white/20 text-xs italic">— Qoraalka waa qarsan yahay —</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Result screen */}
-        {finalTestResult ? (
-          <div className={`rounded-3xl p-6 mb-5 border-2 text-center ${finalTestResult.passed ? "bg-emerald-900/40 border-emerald-400" : "bg-red-900/30 border-red-400/40"}`}>
-            <div className="text-5xl mb-3">{finalTestResult.passed ? "🌟" : "💪"}</div>
-            <p className={`font-black text-xl mb-2 ${finalTestResult.passed ? "text-emerald-300" : "text-red-300"}`}>
-              {finalTestResult.passed ? "MaashaAllah! Ku guuleysatay!" : "Weli ma guuleysanin"}
-            </p>
-            <p className="text-white/70 text-sm mb-4">{finalTestResult.message}</p>
-            {finalTestResult.passed && finalTestResult.starsEarned > 0 && (
-              <div className="bg-[#FFD93D]/10 border border-[#FFD93D]/30 rounded-2xl p-3 mb-4">
-                <p className="text-[#FFD93D] font-bold">+{finalTestResult.starsEarned} ⭐ Xiddig ayaad heshay!</p>
-              </div>
-            )}
-            <div className="space-y-3">
-              {finalTestResult.passed ? (
-                <>
-                  <button
-                    onClick={() => {
-                      // Find next uncompleted ayah to continue from
-                      let nextToLearn = currentAyahIndex;
-                      if (surah) {
-                        for (let i = currentAyahIndex; i < surah.ayahs.length; i++) {
-                          if (!ayahProgress[surah.ayahs[i].number]?.completed) {
-                            nextToLearn = i;
-                            break;
-                          }
-                        }
-                      }
-                      setFinalTestResult(null);
-                      setReviewReadCount(0);
-                      setSessionLearned([]);
-                      setSessionPhase("learning");
-                      setCurrentAyahIndex(nextToLearn);
-                    }}
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform"
-                    data-testid="button-continue-hifdi"
-                  >
-                    📖 Sii wad Xifdiga
-                  </button>
-                  <button
-                    onClick={() => setLocation("/child-dashboard")}
-                    className="w-full bg-white/10 border border-white/20 text-white/70 py-3 rounded-2xl font-bold active:scale-95 transition-transform"
-                    data-testid="button-dashboard-after-xifdi"
-                  >
-                    🏠 Ku noqo Dashbordka
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => { setFinalTestResult(null); setReviewReadCount(0); setSessionPhase("review"); }}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-2xl font-bold active:scale-95 transition-transform"
-                    data-testid="button-retry-xifdi"
-                  >
-                    🔄 Dib u isku day
-                  </button>
-                  <button
-                    onClick={() => setLocation("/child-dashboard")}
-                    className="w-full bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] py-3 rounded-2xl font-bold active:scale-95 transition-transform"
-                    data-testid="button-dashboard-after-xifdi-fail"
-                  >
-                    🏠 Ku noqo Dashbordka
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-4 mb-5">
-            {isFinalChecking ? (
-              <div className="flex flex-col items-center gap-3 py-8">
-                <div className="w-16 h-16 rounded-full border-4 border-purple-400/20 border-t-purple-400 animate-spin" />
-                <p className="text-white/70 text-sm">AI waxay hubinaysaa xifdigaaga...</p>
-              </div>
-            ) : (
-              <>
-                <p className="text-white/60 text-sm text-center px-4">
-                  {isFinalRecording ? "🔴 Xifdi akhri — aayahaas oo dhan isku xiga..." : "Riix badhankaas oo bilow akhridda aayahaas oo dhan isku xiga"}
-                </p>
-                <button
-                  onClick={isFinalRecording ? stopFinalTest : startFinalTest}
-                  className={`w-32 h-32 rounded-full flex items-center justify-center text-5xl font-black border-4 transition-all active:scale-95 ${isFinalRecording ? "bg-red-500/20 border-red-400 animate-pulse text-red-400" : "bg-purple-600/20 border-purple-400 text-purple-300"}`}
-                  data-testid="button-final-mic"
-                >
-                  {isFinalRecording ? "⏹" : "🎙"}
-                </button>
-                {isFinalRecording && (
-                  <p className="text-red-400 text-sm font-bold animate-pulse">
-                    Duubista socotaa... Jooji markuu dhammaado
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </div>
     );
   }
@@ -1224,7 +928,11 @@ export default function QuranLesson() {
                 )}
               </div>
 
-              {/* Quran text: always visible */}
+              <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
+                <p className="text-[#FFD93D] text-sm font-black">{stageDescriptions[currentStage].title}</p>
+                <p className="mt-1 text-white/65 text-xs">{stageDescriptions[currentStage].detail}</p>
+              </div>
+
               <div className="text-right mb-5" dir="rtl">
                 {isCurrentCompleted ? (
                   <div className="rounded-2xl border-2 border-green-400/40 bg-green-500/10 p-4" data-testid="text-ayah-arabic">
@@ -1233,29 +941,42 @@ export default function QuranLesson() {
                     </p>
                   </div>
                 ) : (
-                  <div className={`rounded-2xl p-4 transition-all duration-500 ${isPlaying ? "border-2 border-[#4ECDC4]/60 bg-[#4ECDC4]/10 shadow-lg shadow-[#4ECDC4]/10" : "border border-white/15 bg-white/5"}`} data-testid="text-ayah-arabic">
-                    {isPlaying && (
+                  <div className={`rounded-2xl p-4 transition-all duration-500 ${isTextHidden ? "border border-purple-400/30 bg-purple-500/10" : isPlaying ? "border-2 border-[#4ECDC4]/60 bg-[#4ECDC4]/10 shadow-lg shadow-[#4ECDC4]/10" : "border border-white/15 bg-white/5"}`} data-testid="text-ayah-arabic">
+                    {isPlaying && currentStage === "listening" && (
                       <p className="text-[#4ECDC4] text-xs font-bold mb-2 text-center tracking-wide">🔊 Dhageyso aayada</p>
                     )}
-                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
-                      {currentAyah.text}
-                    </p>
+                    {isTextHidden ? (
+                      <div className="py-5 text-center">
+                        <p className="text-white/20 text-3xl tracking-[0.35em] select-none">░░░░░░░░░░░░</p>
+                        <p className="mt-3 text-sm font-bold text-purple-200">Qoraalka waa qarsan yahay</p>
+                        <p className="mt-1 text-xs text-white/55">Qalbigaaga ka akhri hadda.</p>
+                      </div>
+                    ) : (
+                      <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
+                        {currentAyah.text}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
 
               {!isCurrentCompleted && (
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount > 0 ? "bg-green-500/20 text-green-300" : "bg-[#4ECDC4]/20 text-[#4ECDC4]"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount > 0 ? "bg-green-500/30" : "bg-[#4ECDC4]/30"}`}>
-                      {listenCount > 0 ? "✓" : "1"}
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "bg-green-500/20 text-green-300" : currentStage === "listening" ? "bg-[#4ECDC4]/20 text-[#4ECDC4]" : "bg-white/5 text-white/50"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "bg-green-500/30" : currentStage === "listening" ? "bg-[#4ECDC4]/30" : "bg-white/10"}`}>
+                      {currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "✓" : "1"}
                     </span>
-                    Dhageyso {listenCount > 0 && <span className="font-black">({listenCount}x)</span>}
+                    Dhageyso <span className="font-black">({listenCount}/{REQUIRED_LISTENS})</span>
                   </div>
                   <div className="flex-1 h-px bg-white/10" />
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-[#FFD93D]/20 text-[#FFD93D]">
-                    <span className="w-5 h-5 rounded-full bg-[#FFD93D]/30 flex items-center justify-center text-[10px] font-bold">2</span>
-                    Akhri
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/20 text-[#FFD93D]" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/30" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{currentStageIndex > 1 || isCurrentCompleted ? "✓" : "2"}</span>
+                    Ku celi
+                  </div>
+                  <div className="flex-1 h-px bg-white/10" />
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "memorizing" ? "bg-purple-500/20 text-purple-200" : isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "memorizing" ? "bg-purple-500/30" : isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{isCurrentCompleted ? "✓" : "3"}</span>
+                    Qalbiga
                   </div>
                 </div>
               )}
@@ -1309,7 +1030,7 @@ export default function QuranLesson() {
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> Isku day
                     </button>
-                    <button onClick={() => { setAudioFailed(false); setHasListened(true); }}
+                    <button onClick={() => { setAudioFailed(false); setHasListened(true); setListenCount(REQUIRED_LISTENS); setCurrentStage("repeating"); }}
                       className="px-4 py-2 rounded-full bg-white/5 text-white/50 text-sm font-medium border border-white/10 hover:bg-white/10 active:scale-95 transition-all"
                       data-testid="button-skip-listen"
                     >
@@ -1321,7 +1042,7 @@ export default function QuranLesson() {
 
               {canRecord && !isRecording && !isChecking && !autoAdvancing && (
                 <p className="text-center text-[#FFD93D]/80 text-sm mt-4 px-2">
-                  🎙 Mic-ka riix oo aayada akhri!
+                  {currentStage === "repeating" ? "🎙 Mic-ka riix oo aayada ku celi adigoo qoraalka eegaya!" : "🎙 Mic-ka riix oo qalbigaaga ka akhri!"}
                 </p>
               )}
 
@@ -1335,7 +1056,7 @@ export default function QuranLesson() {
                 </button>
               )}
 
-              {hintAvailable && !isCurrentCompleted && !isRecording && !isChecking && !autoAdvancing && (
+              {hintAvailable && currentStage === "memorizing" && !isCurrentCompleted && !isRecording && !isChecking && !autoAdvancing && (
                 <button
                   onClick={playHintAndRecord}
                   disabled={hintPlaying}
@@ -1404,7 +1125,7 @@ export default function QuranLesson() {
                 <h3 className="text-orange-300 font-bold text-xl mb-1">Waad Khaladay</h3>
                 <p className="text-white/70 text-sm mb-3" data-testid="text-feedback">{checkResult.message}</p>
                 <p className="text-orange-200 text-xs bg-orange-500/10 rounded-xl px-3 py-2 mb-3">
-                    📖 Aayada aqri oo dhageyso, ka dibna mar kale isku day
+                    {currentStage === "memorizing" ? "🧠 Marka hore dhageyso, kadibna qalbiga ka celi mar kale" : "📖 Qoraalka eeg oo si deggan mar kale ugu celi"}
                   </p>
                 <div className="flex gap-3">
                   <button onClick={playAyah}
@@ -1418,7 +1139,7 @@ export default function QuranLesson() {
                     className="flex-1 py-3 rounded-2xl bg-[#FFD93D]/20 text-[#FFD93D] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all border border-[#FFD93D]/30"
                     data-testid="button-try-again"
                   >
-                    <Mic className="w-4 h-4" /> Isku day!
+                    <Mic className="w-4 h-4" /> {currentStage === "memorizing" ? "Qalbiga ku celi!" : "Ku celi!"}
                   </button>
                 </div>
               </div>
@@ -1426,134 +1147,7 @@ export default function QuranLesson() {
           </div>
         )}
 
-        {/* ═══ FULL SURAH REVIEW SCREEN ═══ */}
-        {fullSurahReview && (
-          <div className="px-4 mb-6">
-            <div className="bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f3460] rounded-3xl p-6 border-2 border-[#FFD93D]/40 text-center">
-              <div className="text-5xl mb-3">📖</div>
-              <h3 className="text-[#FFD93D] font-bold text-xl mb-1">Aad baad u mahadsantahay!</h3>
-              <p className="text-white/70 text-sm mb-4">
-                Suurada oo dhan waa bartay — hadda dhageyso oo dib u akhriso!
-              </p>
-
-              {/* Full surah text display - only show when failed */}
-              {reviewState === "failed" && (
-                <div className="bg-black/30 rounded-2xl p-4 mb-4 text-right max-h-64 overflow-y-auto border border-[#FFD93D]/20">
-                  {surah?.ayahs.map((ayah, i) => (
-                    <p key={ayah.number}
-                      className="font-arabic text-xl leading-loose mb-2 text-white/80"
-                      dir="rtl"
-                    >
-                      {ayah.text} {ayah.number === 1 && surahNumber !== 9 ? "" : `﴿${ayah.number}﴾`}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              {/* Visual feedback during other states */}
-              {reviewState !== "failed" && (
-                <div className="bg-black/30 rounded-2xl p-8 mb-4 text-center border border-[#FFD93D]/20">
-                  {reviewState === "listening" && (
-                    <>
-                      <div className="text-5xl mb-3">👂</div>
-                      <p className="text-white/60 text-sm">Dhageyso si fiican</p>
-                    </>
-                  )}
-                  {reviewState === "ready" && (
-                    <>
-                      <div className="text-5xl mb-3">🎤</div>
-                      <p className="text-white/60 text-sm">Diyaar u ahow inaad akhrisho</p>
-                    </>
-                  )}
-                  {(reviewState === "recording" || reviewState === "checking") && (
-                    <>
-                      <div className="text-5xl mb-3">🎙️</div>
-                      <p className="text-white/60 text-sm">Akhri hadda...</p>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                {reviewState === "listening" && !reviewPlaying && (
-                  <button
-                    onClick={playFullSurahSequential}
-                    className="w-full py-4 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
-                    data-testid="button-play-full-surah"
-                  >
-                    🔊 Dhageyso Suurada oo dhan
-                  </button>
-                )}
-                
-                {reviewState === "listening" && reviewPlaying && (
-                  <div className="flex items-center justify-center gap-3 py-4">
-                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-3 h-3 bg-[#FFD93D] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    <span className="text-white/60 text-sm">
-                      Aayah {(reviewAyahIndex + 1)}/{surah?.ayahs.length}...
-                    </span>
-                  </div>
-                )}
-
-                {reviewState === "ready" && (
-                  <button
-                    onClick={startSurahRecordingTest}
-                    className="w-full py-4 bg-gradient-to-r from-[#FFD93D] to-[#FFA502] text-[#1a1a2e] font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
-                    data-testid="button-ready-to-recite"
-                  >
-                    🎤 Diyaar ma tahay?
-                  </button>
-                )}
-
-                {reviewState === "recording" && (
-                  <button
-                    onClick={stopSurahRecordingTest}
-                    className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-bold text-lg rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 animate-pulse"
-                    data-testid="button-stop-recording"
-                  >
-                    ⏹️ Jooji oo soo dir
-                  </button>
-                )}
-
-                {reviewState === "checking" && (
-                  <div className="flex items-center justify-center gap-3 py-4">
-                    <Loader2 className="w-6 h-6 text-[#FFD93D] animate-spin" />
-                    <span className="text-white/60 text-sm">AI ayaa hubinaya...</span>
-                  </div>
-                )}
-
-                {reviewState === "failed" && (
-                  <>
-                    <div className="bg-red-500/20 border border-red-400/40 rounded-2xl p-4 text-center mb-2">
-                      <p className="text-red-300 font-bold text-base mb-2">❌ Akhri mar kale</p>
-                      <p className="text-red-200/70 text-sm">Waxaad u baahan tahay 75% si aad casharka u dhameyso</p>
-                    </div>
-                    <button
-                      onClick={() => setReviewState("listening")}
-                      className="w-full py-3 bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-[#1a1a2e] font-bold text-base rounded-2xl active:scale-95 transition-all"
-                      data-testid="button-retry-listen"
-                    >
-                      🔄 Dib u dhageyso
-                    </button>
-                  </>
-                )}
-
-                {reviewState !== "checking" && (
-                  <button
-                    onClick={finishFullReview}
-                    className="w-full py-3 bg-white/10 text-white/70 border border-white/20 font-bold text-base rounded-2xl active:scale-95 transition-all"
-                    data-testid="button-finish-review"
-                  >
-                    Ka bax casharka
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {surahComplete && !showCelebration && !fullSurahReview && (
+        {surahComplete && !showCelebration && (
           <div className="px-4 mb-6">
             <div className="bg-gradient-to-r from-[#FFD93D]/20 to-[#FFA502]/20 rounded-3xl p-6 border-2 border-[#FFD93D]/30 text-center">
               <Trophy className="w-16 h-16 text-[#FFD93D] mx-auto mb-3" />
@@ -1563,16 +1157,18 @@ export default function QuranLesson() {
                 {[1, 2, 3].map(i => <Star key={i} className="w-10 h-10 text-[#FFD93D] fill-[#FFD93D]" />)}
               </div>
               <div className="flex flex-col gap-3">
-                <button 
-                  onClick={() => { 
-                    setFullSurahReview(true); 
-                    setReviewState("listening");
+                <button
+                  onClick={() => {
                     setSurahComplete(false);
+                    setCurrentAyahIndex(0);
+                    setCurrentStage("listening");
+                    setCheckResult(null);
+                    setListenCount(0);
                   }}
                   className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-lg rounded-2xl hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2"
                   data-testid="button-practice-again"
                 >
-                  🔁 Dib u ciyaar
+                  🔁 Ku celi mar kale
                 </button>
                 {nextSurahNumber && (
                   <button onClick={() => setLocation(`/quran-lesson/${nextSurahNumber}`)}
@@ -1790,14 +1386,14 @@ export default function QuranLesson() {
         )}
 
         {/* Floating "Diyaar ma ahay" button — shows when 2+ ayahs learned this session */}
-        {sessionLearned.length >= 2 && !surahComplete && !fullSurahReview && activeTab === "quran" && (
+        {sessionLearned.length >= 2 && !surahComplete && activeTab === "quran" && (
           <div className="fixed bottom-6 left-4 right-4 z-40">
             <button
-              onClick={() => { setReviewReadCount(0); setSessionPhase("review"); }}
+              onClick={() => setActiveTab("games")}
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-4 rounded-2xl font-black text-base shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
               data-testid="button-ready-to-leave"
             >
-              ✅ Diyaar ma ahay — Waan Ka Baxayaa ({sessionLearned.length} aayad)
+              ✅ {sessionLearned.length} aayad waad baratay — Ciyaaraha fur
             </button>
           </div>
         )}

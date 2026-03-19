@@ -65,6 +65,152 @@ function getQuranSoftPassThreshold(childAge: number | null | undefined): number 
   return 4;
 }
 
+type QuranLearningMode = "repeat" | "memorize";
+
+function getQuranPassingScore(mode: QuranLearningMode, childAge: number | null | undefined): number {
+  if (mode === "repeat") {
+    if (!childAge || childAge <= 8) {
+      return 25;
+    }
+
+    return 50;
+  }
+
+  if (!childAge || childAge <= 6) {
+    return 50;
+  }
+
+  return 75;
+}
+
+async function finalizeCompletedSurah(childId: string, surahNumber: number) {
+  const { JUZ_AMMA_CURRICULUM } = await import("./quranLessons");
+  const surah = JUZ_AMMA_CURRICULUM.find((item) => item.number === surahNumber);
+  if (!surah) {
+    return;
+  }
+
+  const allAyahProgress = await db.select().from(quranLessonProgress).where(
+    and(eq(quranLessonProgress.childId, childId), eq(quranLessonProgress.surahNumber, surahNumber))
+  );
+
+  const completedAyahs = allAyahProgress.filter((item) => item.completed).length;
+  if (completedAyahs < surah.ayahCount) {
+    return;
+  }
+
+  const existingSurah = await db.select().from(childProgress).where(
+    and(eq(childProgress.childId, childId), eq(childProgress.surahNumber, surahNumber))
+  );
+
+  if (existingSurah.length > 0) {
+    return;
+  }
+
+  const avgScore = Math.round(allAyahProgress.reduce((sum, item) => sum + (item.bestScore || 0), 0) / allAyahProgress.length);
+  const totalTime = allAyahProgress.reduce((sum, item) => sum + ((item.attempts || 1) * 15), 0);
+  const stars = avgScore >= 90 ? 3 : avgScore >= 75 ? 2 : 1;
+
+  await db.insert(childProgress).values({
+    childId,
+    surahNumber,
+    surahName: surah.name,
+    completed: true,
+    accuracy: avgScore,
+    timeSpentSeconds: totalTime,
+    starsEarned: stars,
+    completedAt: new Date(),
+  });
+
+  const allCompleted = await db.select().from(childProgress).where(
+    and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
+  );
+
+  const surahBadgeDefs = [
+    { key: "first_surah", name: "Bilowga Qur'aan", icon: "🌟", color: "#FFD93D", requirement: 1 },
+    { key: "surah_3", name: "3 Surah Xaafidh", icon: "📖", color: "#4ECDC4", requirement: 3 },
+    { key: "surah_5", name: "5 Surah Master", icon: "⭐", color: "#FF6B6B", requirement: 5 },
+    { key: "surah_10", name: "10 Surah Champion", icon: "🏆", color: "#A855F7", requirement: 10 },
+    { key: "surah_20", name: "20 Surah Legend", icon: "👑", color: "#F59E0B", requirement: 20 },
+  ];
+
+  for (const badge of surahBadgeDefs) {
+    if (allCompleted.length >= badge.requirement) {
+      try {
+        await db.insert(childBadges).values({
+          childId,
+          badgeKey: badge.key,
+          badgeName: badge.name,
+          badgeIcon: badge.icon,
+          badgeColor: badge.color,
+        });
+      } catch {}
+    }
+  }
+
+  const allAvgAccuracy = allCompleted.length > 0
+    ? Math.round(allCompleted.reduce((sum, item) => sum + (item.accuracy || 0), 0) / allCompleted.length)
+    : 0;
+
+  if (allAvgAccuracy >= 90 && allCompleted.length >= 3) {
+    try {
+      await db.insert(childBadges).values({
+        childId,
+        badgeKey: "high_accuracy",
+        badgeName: "Cod Qurux Badan",
+        badgeIcon: "🎯",
+        badgeColor: "#10B981",
+      });
+    } catch {}
+  }
+
+  for (const gameType of ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"]) {
+    try {
+      await db.insert(childGameUnlocks).values({
+        childId,
+        surahNumber,
+        gameType,
+        unlockSource: "surah_completion",
+      });
+    } catch {}
+  }
+
+  const tokenGrant = avgScore >= 85 ? 2 : 1;
+  const [existingBalance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
+
+  if (existingBalance) {
+    await db.update(childRewardBalances).set({
+      totalTokens: existingBalance.totalTokens + tokenGrant,
+      totalStars: existingBalance.totalStars + stars,
+      updatedAt: new Date(),
+    }).where(eq(childRewardBalances.childId, childId));
+  } else {
+    await db.insert(childRewardBalances).values({
+      childId,
+      totalTokens: tokenGrant,
+      totalStars: stars,
+      totalCoins: 0,
+      tokensUsed: 0,
+    });
+  }
+
+  await db.insert(childRewardLedger).values({
+    childId,
+    type: "token",
+    amount: tokenGrant,
+    source: "surah_completion",
+    sourceId: surahNumber,
+  });
+
+  await db.insert(childRewardLedger).values({
+    childId,
+    type: "star",
+    amount: stars,
+    source: "surah_completion",
+    sourceId: surahNumber,
+  });
+}
+
 /**
  * POST /api/quran/lesson/submit
  * Soft Pass Feature: Auto-pass after a small number of attempts to prevent discouragement.
@@ -73,7 +219,8 @@ function getQuranSoftPassThreshold(childAge: number | null | undefined): number 
 async function submitQuranLesson(req: Request, res: Response) {
   try {
     const childId = req.session.childId;
-    const { surahNumber, ayahNumber, isCorrect } = req.body;
+    const { surahNumber, ayahNumber, isCorrect, mode, score } = req.body;
+    const learningMode: QuranLearningMode = mode === "repeat" ? "repeat" : "memorize";
 
     if (!childId || !surahNumber || ayahNumber === undefined) {
       return res.status(400).json({ error: "Missing fields" });
@@ -103,28 +250,35 @@ async function submitQuranLesson(req: Request, res: Response) {
 
     const childAge = childRecord[0]?.age ?? null;
     const softPassThreshold = getQuranSoftPassThreshold(childAge);
+    const numericScore = Math.max(0, Math.min(100, Number(score || 0)));
 
-    // Soft pass becomes gentler for younger children.
     let isPassed = false;
     let isSoftPass = false;
+    let completed = record?.completed ?? false;
 
-    if (currentAttempt >= softPassThreshold) {
-      isPassed = true;
-      isSoftPass = true;
+    if (learningMode === "memorize") {
+      if (currentAttempt >= softPassThreshold) {
+        isPassed = true;
+        isSoftPass = true;
+      } else {
+        isPassed = isCorrect === true;
+      }
+
+      completed = completed || isPassed;
     } else {
       isPassed = isCorrect === true;
     }
 
-    // Update progress
     if (record) {
       await db
         .update(quranLessonProgress)
         .set({
           attempts: currentAttempt,
-          lastScore: isPassed ? 100 : 0,
+          bestScore: Math.max(record.bestScore || 0, numericScore),
+          lastScore: numericScore,
           lastAttemptAt: new Date(),
-          completed: !record.completed && isPassed ? true : record.completed,
-          completedAt: !record.completed && isPassed ? new Date() : record.completedAt,
+          completed,
+          completedAt: !record.completed && completed ? new Date() : record.completedAt,
         })
         .where(
           and(
@@ -139,12 +293,16 @@ async function submitQuranLesson(req: Request, res: Response) {
         surahNumber,
         ayahNumber,
         attempts: currentAttempt,
-        lastScore: isPassed ? 100 : 0,
-        bestScore: isPassed ? 100 : 0,
-        completed: isPassed,
-        completedAt: isPassed ? new Date() : null,
+        lastScore: numericScore,
+        bestScore: numericScore,
+        completed,
+        completedAt: completed ? new Date() : null,
         lastAttemptAt: new Date(),
       });
+    }
+
+    if (learningMode === "memorize" && completed && !record?.completed) {
+      await finalizeCompletedSurah(childId, Number(surahNumber));
     }
 
     return res.json({
@@ -152,8 +310,12 @@ async function submitQuranLesson(req: Request, res: Response) {
       isPassed,
       isSoftPass,
       attemptNumber: currentAttempt,
+      completed,
+      mode: learningMode,
       softPassThreshold,
-      message: isSoftPass ? "Saxday! (Ku sahamaynay oo sii wad)" : isPassed ? "Sax!" : "Calaf, mar kale isku day",
+      message: learningMode === "repeat"
+        ? (isPassed ? "Fiican! Hadda qalbiga ka akhri." : "Ku celi mar kale adigoo qoraalka eegaya.")
+        : (isSoftPass ? "Saxday! Qalbigaaguna wuu qabsaday, sii wad." : isPassed ? "Sax! Qalbiga ayaad ka akhriday." : "Qalbigaaga ka celi mar kale."),
     });
   } catch (error) {
     console.error("Quran lesson error:", error);
@@ -12860,14 +13022,10 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
   app.post("/api/quran/check", requireChildAuth, quranAudioUpload.single("audio"), async (req: Request, res: Response) => {
     try {
       const { surahNumber, ayahNumber } = req.body;
+      const learningMode: QuranLearningMode = req.body?.mode === "repeat" ? "repeat" : "memorize";
       if (!req.file || !surahNumber || !ayahNumber) {
         return res.status(400).json({ error: "Audio, surah, iyo ayah number waa loo baahan yahay" });
       }
-      const childId = req.session.childId!;
-      const { getRandomEncouragement } = await import("./quranLessons");
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayStr = todayStart.toISOString().slice(0, 10);
       const sNum = parseInt(surahNumber);
       const aNum = parseInt(ayahNumber);
       const paddedNum = sNum.toString().padStart(3, "0");
@@ -12887,11 +13045,9 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
       }
 
       // Fetch child age to apply age-appropriate leniency
-      const childRecord = await storage.getChild(childId);
+  const childRecord = await storage.getChild(req.session.childId!);
       const childAge = childRecord?.age ?? 7;
-      // Passing threshold based on age:
-      // young children (<=8) pass with 25% to avoid blocking early learners.
-      const passingScore = childAge <= 8 ? 25 : childAge <= 11 ? 50 : 75;
+  const passingScore = getQuranPassingScore(learningMode, childAge);
 
       const openai = getOpenAIClient();
       const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
@@ -12923,6 +13079,8 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
               role: "system",
               content: `Waxaad tahay macalin Quraan ah oo carruurta wax bara. Ilmo ayaa akhrinaya aayad Quraan ah.
 ${ageContext}
+Habka casharka hadda waa: ${learningMode === "repeat" ? "KU CELI adigoo qoraalka arka" : "QALBIGA adigoo qoraalka qarsan"}.
+${learningMode === "repeat" ? "Marxaladdan waxaad qiimeynaysaa ku-celinta iyadoo qoraalku muuqdo, sidaas darteed ha adkayn; ku filan inuu dhawaaq ahaan ugu dhowaado aayada." : "Marxaladdan waxaad qiimeynaysaa xifdiga dhabta ah; ilmaha waa inuu ka soo saaraa aayada qalbiga, marka ka adkee marxaladda ku-celinta."}
 Is barbar dhig qoraalka saxda ah iyo kan ilmuhu akhriyay.
 Waa inaad ku jawaabto JSON-kan oo kaliya (qoraal kale ha ku darin):
 {
@@ -12956,142 +13114,19 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
         result = { score: passingScore }; // fallback = just enough to pass
       }
       const isCorrect = result.score >= passingScore;
-      console.log(`[QURAN] Child age=${childAge}, score=${result.score}, passingScore=${passingScore}, isCorrect=${isCorrect}`);
-      const completed = isCorrect;
-      const score = isCorrect ? 100 : 40;
-      const existing = await db.select().from(quranLessonProgress).where(
-        and(
-          eq(quranLessonProgress.childId, childId),
-          eq(quranLessonProgress.surahNumber, parseInt(surahNumber)),
-          eq(quranLessonProgress.ayahNumber, parseInt(ayahNumber))
-        )
-      );
-      if (existing.length > 0) {
-        const prev = existing[0];
-        const prevDailyDate = prev.dailyAttemptDate || "";
-        const newDailyAttempts = prevDailyDate === todayStr ? (prev.dailyAttempts || 0) + 1 : 1;
-        await db.update(quranLessonProgress).set({
-          attempts: (prev.attempts || 0) + 1,
-          lastScore: score,
-          bestScore: Math.max(prev.bestScore || 0, score),
-          completed: completed || prev.completed,
-          completedAt: completed && !prev.completed ? new Date() : prev.completedAt,
-          lastAttemptAt: new Date(),
-          dailyAttempts: newDailyAttempts,
-          dailyAttemptDate: todayStr,
-        }).where(eq(quranLessonProgress.id, prev.id));
-      } else {
-        await db.insert(quranLessonProgress).values({
-          childId,
-          surahNumber: parseInt(surahNumber),
-          ayahNumber: parseInt(ayahNumber),
-          attempts: 1,
-          bestScore: score,
-          lastScore: score,
-          completed,
-          completedAt: completed ? new Date() : null,
-          lastAttemptAt: new Date(),
-          dailyAttempts: 1,
-          dailyAttemptDate: todayStr,
-        });
-      }
-      if (completed) {
-        const { JUZ_AMMA_CURRICULUM } = await import("./quranLessons");
-        const surah = JUZ_AMMA_CURRICULUM.find(s => s.number === parseInt(surahNumber));
-        if (surah) {
-          const allAyahProgress = await db.select().from(quranLessonProgress).where(
-            and(eq(quranLessonProgress.childId, childId), eq(quranLessonProgress.surahNumber, parseInt(surahNumber)))
-          );
-          const completedAyahs = allAyahProgress.filter(p => p.completed).length;
-          if (completedAyahs >= surah.ayahCount) {
-            const existingSurah = await db.select().from(childProgress).where(
-              and(eq(childProgress.childId, childId), eq(childProgress.surahNumber, parseInt(surahNumber)))
-            );
-            if (existingSurah.length === 0) {
-              const avgScore = Math.round(allAyahProgress.reduce((s, p) => s + (p.bestScore || 0), 0) / allAyahProgress.length);
-              const totalTime = allAyahProgress.reduce((s, p) => s + ((p.attempts || 1) * 15), 0);
-              const stars = avgScore >= 90 ? 3 : avgScore >= 75 ? 2 : 1;
-              await db.insert(childProgress).values({
-                childId,
-                surahNumber: parseInt(surahNumber),
-                surahName: surah.name,
-                completed: true,
-                accuracy: avgScore,
-                timeSpentSeconds: totalTime,
-                starsEarned: stars,
-                completedAt: new Date(),
-              });
+      const { getRandomEncouragement } = await import("./quranLessons");
+      const encouragement = !isCorrect ? getRandomEncouragement() : "";
 
-              const allCompleted = await db.select().from(childProgress).where(
-                and(eq(childProgress.childId, childId), eq(childProgress.completed, true))
-              );
-              const surahBadgeDefs = [
-                { key: "first_surah", name: "Bilowga Qur'aan", icon: "🌟", color: "#FFD93D", requirement: 1 },
-                { key: "surah_3", name: "3 Surah Xaafidh", icon: "📖", color: "#4ECDC4", requirement: 3 },
-                { key: "surah_5", name: "5 Surah Master", icon: "⭐", color: "#FF6B6B", requirement: 5 },
-                { key: "surah_10", name: "10 Surah Champion", icon: "🏆", color: "#A855F7", requirement: 10 },
-                { key: "surah_20", name: "20 Surah Legend", icon: "👑", color: "#F59E0B", requirement: 20 },
-              ];
-              for (const bd of surahBadgeDefs) {
-                if (allCompleted.length >= bd.requirement) {
-                  try {
-                    await db.insert(childBadges).values({
-                      childId, badgeKey: bd.key, badgeName: bd.name, badgeIcon: bd.icon, badgeColor: bd.color
-                    });
-                  } catch {}
-                }
-              }
-              const allAvgAccuracy = allCompleted.length > 0
-                ? Math.round(allCompleted.reduce((s, p) => s + (p.accuracy || 0), 0) / allCompleted.length) : 0;
-              if (allAvgAccuracy >= 90 && allCompleted.length >= 3) {
-                try {
-                  await db.insert(childBadges).values({
-                    childId, badgeKey: "high_accuracy", badgeName: "Cod Qurux Badan", badgeIcon: "🎯", badgeColor: "#10B981"
-                  });
-                } catch {}
-              }
-
-              for (const gt of ["word_puzzle", "memory_match", "surah_quiz", "somali_flashcards"]) {
-                try {
-                  await db.insert(childGameUnlocks).values({
-                    childId, surahNumber: parseInt(surahNumber), gameType: gt, unlockSource: "surah_completion"
-                  });
-                } catch {}
-              }
-
-              const tokenGrant = avgScore >= 85 ? 2 : 1;
-              const [existingBalance] = await db.select().from(childRewardBalances).where(eq(childRewardBalances.childId, childId));
-              if (existingBalance) {
-                await db.update(childRewardBalances).set({
-                  totalTokens: existingBalance.totalTokens + tokenGrant,
-                  totalStars: existingBalance.totalStars + stars,
-                  updatedAt: new Date(),
-                }).where(eq(childRewardBalances.childId, childId));
-              } else {
-                await db.insert(childRewardBalances).values({
-                  childId,
-                  totalTokens: tokenGrant,
-                  totalStars: stars,
-                  totalCoins: 0,
-                  tokensUsed: 0,
-                });
-              }
-
-              await db.insert(childRewardLedger).values({
-                childId, type: "token", amount: tokenGrant, source: "surah_completion", sourceId: surahNumber
-              });
-              await db.insert(childRewardLedger).values({
-                childId, type: "star", amount: stars, source: "surah_completion", sourceId: surahNumber
-              });
-            }
-          }
-        }
-      }
-      const encouragement = !completed ? getRandomEncouragement() : "";
       res.json({
-        outcome: completed ? "correct" : "needs_retry",
-        completed,
-        message: completed ? "Sax! Aad baad u mahadsantahay! ⭐" : encouragement,
+        outcome: isCorrect ? "correct" : "needs_retry",
+        passed: isCorrect,
+        completed: learningMode === "memorize" && isCorrect,
+        score: result.score,
+        threshold: passingScore,
+        mode: learningMode,
+        message: isCorrect
+          ? (learningMode === "repeat" ? "Fiican! Hadda u gudub qalbiga." : "MaashaAllah! Qalbiga ayaad ka akhriday. ⭐")
+          : encouragement,
       });
     } catch (error: any) {
       console.error("[QURAN] Check error:", error);
