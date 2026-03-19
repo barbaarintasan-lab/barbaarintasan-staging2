@@ -123,7 +123,7 @@ function AnimatedCounter({ value }: { value: number }) {
       setDisplayCount(value);
       lastValueRef.current = value;
       return;
-    }
+        <span ref={ref} className="text-2xl sm:text-3xl font-bold text-orange-500 tabular-nums">
     
     if (value === 0) {
       setDisplayCount(0);
@@ -173,7 +173,7 @@ function AnimatedCounter({ value }: { value: number }) {
   const finalDisplay = hasAnimatedRef.current ? displayCount : (value > 0 ? value : displayCount);
 
   return (
-    <span ref={ref} className="text-3xl font-bold text-orange-500 tabular-nums">
+    <span ref={ref} className="text-2xl sm:text-3xl font-bold text-orange-500 tabular-nums">
       {finalDisplay}
     </span>
   );
@@ -2623,9 +2623,9 @@ export default function Home() {
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
           </div>
           <div className="text-center">
-            <p className="text-sm text-gray-500 font-medium mb-1">Caruurta Quraanka Barata</p>
+            <p className="text-sm text-gray-500 font-medium mb-1">Caruurta</p>
             <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} />
-            <p className="text-xs text-gray-400 mt-1">Waalidku diiwaangeliyey</p>
+            <p className="text-xs text-gray-400 mt-1">Quraanka barata</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">Telegram</p>
