@@ -471,7 +471,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] px-4 py-3 font-bold text-[#1a1a2e] disabled:opacity-60"
           >
             {isCreatingChild ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Ilmo ku dar oo sii wad
+            Ilmaha ku dar oo Gal Aabka
           </button>
         </form>
       </div>
