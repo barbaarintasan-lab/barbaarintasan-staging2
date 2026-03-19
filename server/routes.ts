@@ -344,6 +344,7 @@ async function submitQuranLesson(req: Request, res: Response) {
 
     const childAge = childRecord[0]?.age ?? null;
     const softPassThreshold = getQuranSoftPassThreshold(childAge);
+    const repeatSoftPassThreshold = childAge && childAge <= 8 ? 3 : 4;
     const numericScore = Math.max(0, Math.min(100, Number(score || 0)));
 
     let isPassed = false;
@@ -360,7 +361,15 @@ async function submitQuranLesson(req: Request, res: Response) {
 
       completed = completed || isPassed;
     } else {
-      isPassed = isCorrect === true;
+      if (isCorrect === true) {
+        isPassed = true;
+      } else if (currentAttempt >= repeatSoftPassThreshold) {
+        // Keep repeat stage gentle so children do not get stuck forever.
+        isPassed = true;
+        isSoftPass = true;
+      } else {
+        isPassed = false;
+      }
     }
 
     if (record) {
@@ -408,7 +417,9 @@ async function submitQuranLesson(req: Request, res: Response) {
       mode: learningMode,
       softPassThreshold,
       message: learningMode === "repeat"
-        ? (isPassed ? "Fiican! Hadda qalbiga ka akhri." : "Ku celi mar kale adigoo qoraalka eegaya.")
+        ? (isPassed
+            ? (isSoftPass ? "Fiican! Hadda qalbiga u gudub." : "Fiican! Hadda qalbiga ka akhri.")
+            : "Ku celi mar kale adigoo qoraalka eegaya.")
         : (isSoftPass ? "Saxday! Qalbigaaguna wuu qabsaday, sii wad." : isPassed ? "Sax! Qalbiga ayaad ka akhriday." : "Qalbigaaga ka celi mar kale."),
     });
   } catch (error) {
