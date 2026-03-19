@@ -427,41 +427,53 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             <Users className="h-8 w-8" />
           </div>
           <h2 className="text-2xl font-black text-white">Ku dar ilmahaaga</h2>
-          <p className="mt-2 text-sm text-white/90">
-            Ka hor inta aadan app-ka sii galin, fadlan u samee ilmahaaga akoon si uu Aabka Quraanka iyo Af-Soomaaliga uga barto.
+          <p className="mt-2 text-sm text-white/65">
+            Kahor inta aadan app-ka sii galin, fadlan u samee ilmaha akoon si waxbarashadu u bilaabato.
           </p>
         </div>
 
         <form onSubmit={handleCreateChild} className="space-y-3">
-          <input
-            type="text"
-            value={childName}
-            onChange={(e) => setChildName(e.target.value)}
-            placeholder="Magaca ilmaha"
-            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
-          />
-          <input
-            type="text"
-            inputMode="numeric"
-            value={childAge}
-            onChange={(e) => setChildAge(e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="Da'da ilmaha ku qor halka"
-            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
-          />
-          <input
-            type="password"
-            value={childPassword}
-            onChange={(e) => setChildPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
-          />
-          <input
-            type="Lambar Sir ah oo fudud u samee ilmaha"
-            value={childPasswordConfirm}
-            onChange={(e) => setChildPasswordConfirm(e.target.value)}
-            placeholder="Ku celi mar kale isla lambarkii Sirta ahaa"
-            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
-          />
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-white/85">Magaca ilmaha</label>
+            <input
+              type="text"
+              value={childName}
+              onChange={(e) => setChildName(e.target.value)}
+              placeholder="Magaca ilmaha"
+              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/45 focus:border-[#FFD93D] focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-white/85">Da'da ilmaha</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={childAge}
+              onChange={(e) => setChildAge(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="Da'da ilmaha"
+              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-semibold text-white placeholder-white/45 focus:border-[#FFD93D] focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-white/85">Password</label>
+            <input
+              type="password"
+              value={childPassword}
+              onChange={(e) => setChildPassword(e.target.value)}
+              placeholder="•••••••••"
+              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/45 focus:border-[#FFD93D] focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-white/85">Password mar kale</label>
+            <input
+              type="password"
+              value={childPasswordConfirm}
+              onChange={(e) => setChildPasswordConfirm(e.target.value)}
+              placeholder="Password mar kale"
+              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/45 focus:border-[#FFD93D] focus:outline-none"
+            />
+          </div>
 
           {createError && <p className="text-sm font-medium text-red-300">{createError}</p>}
 
@@ -471,7 +483,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFD93D] to-[#FFA502] px-4 py-3 font-bold text-[#1a1a2e] disabled:opacity-60"
           >
             {isCreatingChild ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Ilmaha ku dar oo Gal Aabka
+            Ilmo ku dar oo sii wad
           </button>
         </form>
       </div>

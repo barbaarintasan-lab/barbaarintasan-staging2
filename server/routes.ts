@@ -48,11 +48,27 @@ function requireChildAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+function getQuranSoftPassThreshold(childAge: number | null | undefined): number {
+  if (!childAge || childAge < 1) {
+    return 4;
+  }
+
+  // Younger children should not get stuck on the same ayah for too long.
+  if (childAge <= 5) {
+    return 2;
+  }
+
+  if (childAge <= 8) {
+    return 3;
+  }
+
+  return 4;
+}
+
 /**
  * POST /api/quran/lesson/submit
- * Soft Pass Feature: Auto-pass on 4th+ attempt to prevent discouragement
- * Attempts 1-3: Show actual correctness
- * Attempt 4+: Auto-pass (show correct) so child can move forward
+ * Soft Pass Feature: Auto-pass after a small number of attempts to prevent discouragement.
+ * Younger children get a lower threshold so the correction stays gentle.
  */
 async function submitQuranLesson(req: Request, res: Response) {
   try {
@@ -79,11 +95,20 @@ async function submitQuranLesson(req: Request, res: Response) {
     const record = existing[0];
     const currentAttempt = (record?.attempts ?? 0) + 1;
 
-    // Soft Pass Logic: On 4th+ attempt, auto-pass
+    const childRecord = await db
+      .select({ age: children.age })
+      .from(children)
+      .where(eq(children.id, childId))
+      .limit(1);
+
+    const childAge = childRecord[0]?.age ?? null;
+    const softPassThreshold = getQuranSoftPassThreshold(childAge);
+
+    // Soft pass becomes gentler for younger children.
     let isPassed = false;
     let isSoftPass = false;
 
-    if (currentAttempt >= 4) {
+    if (currentAttempt >= softPassThreshold) {
       isPassed = true;
       isSoftPass = true;
     } else {
@@ -127,6 +152,7 @@ async function submitQuranLesson(req: Request, res: Response) {
       isPassed,
       isSoftPass,
       attemptNumber: currentAttempt,
+      softPassThreshold,
       message: isSoftPass ? "Saxday! (Ku sahamaynay oo sii wad)" : isPassed ? "Sax!" : "Calaf, mar kale isku day",
     });
   } catch (error) {
