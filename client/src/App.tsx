@@ -445,7 +445,7 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             inputMode="numeric"
             value={childAge}
             onChange={(e) => setChildAge(e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="Da'da ilmaha"
+            placeholder="Da'da ilmaha ku qor halka"
             className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
           />
           <input
@@ -456,10 +456,10 @@ function ParentOnboardingGate({ children }: { children: ReactNode }) {
             className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
           />
           <input
-            type="password"
+            type="Lambar Sir ah oo fudud u samee ilmaha"
             value={childPasswordConfirm}
             onChange={(e) => setChildPasswordConfirm(e.target.value)}
-            placeholder="Password mar kale"
+            placeholder="Ku celi mar kale isla lambarkii Sirta ahaa"
             className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#FFD93D]"
           />
 
