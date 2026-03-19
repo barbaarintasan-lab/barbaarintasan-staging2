@@ -72,6 +72,12 @@ function normalizeArabicForQuranCompare(input: string): string {
     .normalize("NFKC")
     // Remove harakat/tashkeel and Quran annotation marks.
     .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    // Normalize common Arabic letter variants Whisper may output differently.
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه")
     .replace(/ـ/g, "")
     // Remove punctuation/symbols and normalize whitespace.
     .replace(/[.,/#!$%^&*;:{}=\-_`~()"'!?،؛«»…<>\[\]\\|+]/g, " ")
@@ -13157,16 +13163,35 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
       }
 
       const evaluation = evaluateQuranTextScore(correctText, transcribedText);
-      const isCorrect = evaluation.pass;
+      const isRepeatMode = learningMode === "repeat";
+      // Repeat stage should be soft: allow "needs_improvement" to pass.
+      // Memorize/full test stays strict: only "good" passes.
+      const isCorrect = isRepeatMode
+        ? evaluation.status !== "retry"
+        : evaluation.status === "good";
+      const threshold = isRepeatMode ? 60 : 80;
       const { getRandomEncouragement } = await import("./quranLessons");
       const encouragement = !isCorrect ? getRandomEncouragement() : "";
+
+      let message: string;
+      if (!transcribedText) {
+        message = "Codka si cad u akhri, kadib mar kale isku day.";
+      } else if (isCorrect) {
+        message = isRepeatMode
+          ? (evaluation.status === "needs_improvement"
+              ? "Fiican! Wax yar ayaad hagaajin kartaa, hadda qalbiga u gudub."
+              : "Fiican! Hadda qalbiga ka akhri.")
+          : "Hambalyo! Waad ku guuleysatay";
+      } else {
+        message = encouragement;
+      }
 
       res.json({
         outcome: isCorrect ? "correct" : "needs_retry",
         passed: isCorrect,
         completed: learningMode === "memorize" && isCorrect,
         score: evaluation.score,
-        threshold: 80,
+        threshold,
         status: evaluation.status,
         metrics: {
           wordMatchPercent: evaluation.wordMatchPercent,
@@ -13174,9 +13199,7 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
         },
         mode: learningMode,
         recognizedText: transcribedText,
-        message: isCorrect
-          ? (learningMode === "repeat" ? "Fiican! Hadda qalbiga ka akhri." : "Hambalyo! Waad ku guuleysatay")
-          : encouragement,
+        message,
       });
     } catch (error: any) {
       console.error("[QURAN] Check error:", error);
