@@ -79,8 +79,6 @@ const RECITERS: ReciterOption[] = [
   { id: "abdul_basit", name: "Abdul Basit (Mujawwad)", nameAr: "عبد الباسط - مجوّد" },
 ];
 
-const REQUIRED_LISTENS = 2;
-
 const CURRICULUM_ORDER = [
   1, 114, 113, 112,
   111, 110, 109, 108, 107, 106,
@@ -123,7 +121,7 @@ export default function QuranLesson() {
   const [sessionTimeLeft, setSessionTimeLeft] = useState(60 * 60);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [hasListened, setHasListened] = useState(false);
-  const [currentStage, setCurrentStage] = useState<AyahLearningStage>("listening");
+  const [currentStage, setCurrentStage] = useState<AyahLearningStage>("repeating");
   const [selectedReciter, setSelectedReciter] = useState<string>(() => {
     try { return localStorage.getItem("quran_reciter") || "husary_muallim"; } catch { return "husary_muallim"; }
   });
@@ -224,7 +222,7 @@ export default function QuranLesson() {
   useEffect(() => {
     setHasListened(false);
     setCheckResult(null);
-    setCurrentStage("listening");
+    setCurrentStage("repeating");
     setListenCount(0);
     setAudioFailed(false);
     setAutoAdvancing(false);
@@ -330,13 +328,7 @@ export default function QuranLesson() {
       audio.onended = () => {
         setIsPlaying(false);
         setHasListened(true);
-        setListenCount((prev) => {
-          const nextCount = prev + 1;
-          if (currentStage === "listening" && nextCount >= REQUIRED_LISTENS) {
-            setCurrentStage("repeating");
-          }
-          return nextCount;
-        });
+        setListenCount((prev) => prev + 1);
         preloadNextAyah();
       };
       audio.onerror = () => {
@@ -351,7 +343,7 @@ export default function QuranLesson() {
       setAudioFailed(true);
       if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
     }
-  }, [currentAyah, currentStage, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah, slowMode]);
+  }, [currentAyah, isPlaying, surahNumber, selectedReciter, getAudioUrl, preloadNextAyah, slowMode]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -475,13 +467,7 @@ export default function QuranLesson() {
       audio.onended = () => {
         setIsPlaying(false);
         setHasListened(true);
-        setListenCount((prev) => {
-          const nextCount = prev + 1;
-          if (currentStage === "listening" && nextCount >= REQUIRED_LISTENS) {
-            setCurrentStage("repeating");
-          }
-          return nextCount;
-        });
+        setListenCount((prev) => prev + 1);
         setHintPlaying(false);
         setTimeout(() => {
           startRecording().catch(() => {});
@@ -499,7 +485,7 @@ export default function QuranLesson() {
       setHintPlaying(false);
       setAudioFailed(true);
     }
-  }, [autoAdvancing, currentAyah, currentStage, getAudioUrl, hintPlaying, isChecking, isRecording, selectedReciter, slowMode, startRecording, surahNumber]);
+  }, [autoAdvancing, currentAyah, getAudioUrl, hintPlaying, isChecking, isRecording, selectedReciter, slowMode, startRecording, surahNumber]);
 
   const playFullLessonRecitation = useCallback(async () => {
     if (!surah || isLessonReviewPlaying || isLessonReviewRecording || isLessonReviewChecking) return;
@@ -852,14 +838,14 @@ export default function QuranLesson() {
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
   const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
-  const canRecord = !isCurrentCompleted && !autoAdvancing && currentStage !== "listening";
+  const canRecord = !isCurrentCompleted && !autoAdvancing;
   const stageOrder: AyahLearningStage[] = ["listening", "repeating", "memorizing"];
   const currentStageIndex = stageOrder.indexOf(currentStage);
   const isTextHidden = currentStage === "memorizing" && !isCurrentCompleted;
   const stageDescriptions: Record<AyahLearningStage, { title: string; detail: string }> = {
     listening: {
       title: "Dhageyso",
-      detail: `Dhageyso ${REQUIRED_LISTENS} jeer.`,
+      detail: "Dhageysigu waa ikhtiyaari.",
     },
     repeating: {
       title: "Ku celi",
@@ -1224,11 +1210,11 @@ export default function QuranLesson() {
 
               {!isCurrentCompleted && (
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "bg-green-500/20 text-green-300" : currentStage === "listening" ? "bg-[#4ECDC4]/20 text-[#4ECDC4]" : "bg-white/5 text-white/50"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "bg-green-500/30" : currentStage === "listening" ? "bg-[#4ECDC4]/30" : "bg-white/10"}`}>
-                      {currentStageIndex > 0 || listenCount >= REQUIRED_LISTENS ? "✓" : "1"}
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount > 0 ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount > 0 ? "bg-green-500/30" : "bg-white/10"}`}>
+                      {listenCount > 0 ? "✓" : "1"}
                     </span>
-                    Dhageyso <span className="font-black">({listenCount}/{REQUIRED_LISTENS})</span>
+                    Dhageyso ikhtiyaari
                   </div>
                   <div className="flex-1 h-px bg-white/10" />
                   <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/20 text-[#FFD93D]" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
@@ -1284,19 +1270,13 @@ export default function QuranLesson() {
 
               {audioFailed && !hasListened && (
                 <div className="text-center mt-4">
-                  <p className="text-orange-400/80 text-sm mb-2">Audio-ga ma shaqeynayo. Isku day mar kale ama ka bood.</p>
+                  <p className="text-orange-400/80 text-sm mb-2">Audio-ga ma shaqeynayo. Isku day mar kale ama si toos ah mic-ka u isticmaal.</p>
                   <div className="flex items-center justify-center gap-3">
                     <button onClick={playAyah}
                       className="px-4 py-2 rounded-full bg-[#4ECDC4]/10 text-[#4ECDC4] text-sm font-medium border border-[#4ECDC4]/20 hover:bg-[#4ECDC4]/20 active:scale-95 transition-all flex items-center gap-1.5"
                       data-testid="button-retry-audio"
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> Isku day
-                    </button>
-                    <button onClick={() => { setAudioFailed(false); setHasListened(true); setListenCount(REQUIRED_LISTENS); setCurrentStage("repeating"); }}
-                      className="px-4 py-2 rounded-full bg-white/5 text-white/50 text-sm font-medium border border-white/10 hover:bg-white/10 active:scale-95 transition-all"
-                      data-testid="button-skip-listen"
-                    >
-                      Ka bood
                     </button>
                   </div>
                 </div>
@@ -1428,7 +1408,7 @@ export default function QuranLesson() {
                     setLessonPracticeReads(0);
                     setLessonReviewMessage(null);
                     setCurrentAyahIndex(0);
-                    setCurrentStage("listening");
+                    setCurrentStage("repeating");
                     setCheckResult(null);
                     setListenCount(0);
                   }}
