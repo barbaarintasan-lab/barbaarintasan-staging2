@@ -427,7 +427,7 @@ export async function fixMissingThumbnails(): Promise<number> {
   return fixed;
 }
 
-let parentMessagesCache: { data: any[]; timestamp: number } | null = null;
+let parentMessagesCache: { data: any[]; timestamp: number; limit: number } | null = null;
 const CACHE_TTL = 30000;
 const todayCache = new Map<string, { data: any; expiry: number }>();
 
@@ -479,7 +479,11 @@ export function registerParentMessageRoutes(app: Express): void {
   app.get("/api/parent-messages", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;
-      let messages = await storage.getParentMessages(30);
+      const requestedLimit = parseInt(req.query.limit as string, 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 200)
+        : 50;
+      let messages = await storage.getParentMessages(limit);
       messages = await applyTranslationsToMessages(messages, lang);
       res.json(messages);
     } catch (error) {
@@ -490,12 +494,20 @@ export function registerParentMessageRoutes(app: Express): void {
   
   app.get("/api/admin/parent-messages", async (req: Request, res: Response) => {
     try {
+      const requestedLimit = parseInt(req.query.limit as string, 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 500)
+        : 50;
       const now = Date.now();
-      if (parentMessagesCache && (now - parentMessagesCache.timestamp) < CACHE_TTL) {
+      if (
+        parentMessagesCache &&
+        parentMessagesCache.limit === limit &&
+        (now - parentMessagesCache.timestamp) < CACHE_TTL
+      ) {
         return res.json(parentMessagesCache.data);
       }
-      const messages = await storage.getAllParentMessages(30);
-      parentMessagesCache = { data: messages, timestamp: now };
+      const messages = await storage.getAllParentMessages(limit);
+      parentMessagesCache = { data: messages, timestamp: now, limit };
       res.json(messages);
     } catch (error) {
       console.error("Error fetching all parent messages:", error);

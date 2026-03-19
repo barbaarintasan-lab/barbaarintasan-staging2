@@ -5040,7 +5040,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getParentMessages(limit: number = 30): Promise<ParentMessage[]> {
+  async getParentMessages(limit: number = 50): Promise<ParentMessage[]> {
     // Return thumbnailUrl for list view (lightweight), exclude base64 images array
     const results = await db.select({
       id: parentMessages.id,
@@ -5064,7 +5064,7 @@ export class DatabaseStorage implements IStorage {
     return results as ParentMessage[];
   }
 
-  async getAllParentMessages(limit: number = 30): Promise<ParentMessage[]> {
+  async getAllParentMessages(limit: number = 50): Promise<ParentMessage[]> {
     return await db.select()
       .from(parentMessages)
       .orderBy(desc(parentMessages.generatedAt))
