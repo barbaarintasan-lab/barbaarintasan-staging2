@@ -2606,29 +2606,29 @@ export default function Home() {
       {/* Stats Section */}
       {isSectionVisible("stats") && (
       <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
+        <div className="grid grid-cols-5 gap-3 lg:gap-6">
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
+            <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
             <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.lessons")}</p>
+            <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.lessons")}</p>
             <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 70} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.parents")}</p>
+            <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.parents")}</p>
             <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Caruurta</p>
+            <p className="text-[11px] sm:text-sm text-gray-500 font-medium mb-1 whitespace-nowrap">Caruurta Quraanka Barata</p>
             <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} />
-            <p className="text-xs text-gray-400 mt-1">Quraanka barata</p>
+            <p className="text-xs text-gray-400 mt-1 invisible">Quraanka barata</p>
           </div>
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Telegram</p>
+            <p className="text-sm text-gray-500 font-medium mb-1">Telegram</p>
             <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.followUs")}</p>
           </div>
