@@ -117,6 +117,7 @@ export default function QuranLesson() {
   const [isLessonReviewRecording, setIsLessonReviewRecording] = useState(false);
   const [isLessonReviewChecking, setIsLessonReviewChecking] = useState(false);
   const [lessonReviewMessage, setLessonReviewMessage] = useState<string | null>(null);
+  const [finalTestNoMajorErrorAttempts, setFinalTestNoMajorErrorAttempts] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [sessionTimeLeft, setSessionTimeLeft] = useState(60 * 60);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -181,6 +182,7 @@ export default function QuranLesson() {
     setIsLessonReviewRecording(false);
     setIsLessonReviewChecking(false);
     setLessonReviewMessage(null);
+    setFinalTestNoMajorErrorAttempts(0);
     setSurahComplete(false);
   }, [surahNumber]);
 
@@ -595,6 +597,7 @@ export default function QuranLesson() {
       const result: CheckResult = await response.json();
       if (lessonReviewStep === "final_test") {
         if (result.passed) {
+          setFinalTestNoMajorErrorAttempts(0);
           setLessonReviewMessage("Hambalyo! Waad ku guuleysatay");
           setShowCelebration(true);
           setTimeout(() => {
@@ -602,7 +605,25 @@ export default function QuranLesson() {
           }, 1800);
           setLessonFlow("surah_complete");
           setSurahComplete(true);
+        } else if (result.status === "needs_improvement") {
+          const nextNoMajorErrorAttempts = finalTestNoMajorErrorAttempts + 1;
+          setFinalTestNoMajorErrorAttempts(nextNoMajorErrorAttempts);
+
+          if (nextNoMajorErrorAttempts >= 2) {
+            setLessonReviewMessage("Waad ku gudubtay! Khalad weyn ma jirin.");
+            setShowCelebration(true);
+            setTimeout(() => {
+              setShowCelebration(false);
+            }, 1800);
+            setLessonFlow("surah_complete");
+            setSurahComplete(true);
+            setFinalTestNoMajorErrorAttempts(0);
+          } else {
+            setLessonReviewStep("reinforcement");
+            setLessonReviewMessage("Fiican! Hal mar kale isku day si aad u gudubto.");
+          }
         } else {
+          setFinalTestNoMajorErrorAttempts(0);
           setLessonReviewStep("reinforcement");
           setLessonReviewMessage("Wax yar ayaad khalday, aan dib u celino");
         }
@@ -615,7 +636,7 @@ export default function QuranLesson() {
 
     setIsLessonReviewChecking(false);
     submitInFlightRef.current = false;
-  }, [lessonReviewStep, surah, surahNumber]);
+  }, [finalTestNoMajorErrorAttempts, lessonReviewStep, surah, surahNumber]);
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || !currentAyah || submitInFlightRef.current) return;
@@ -748,6 +769,7 @@ export default function QuranLesson() {
         if (isLast) {
           setLessonFlow("lesson_review");
           setLessonReviewStep("full_listen");
+          setFinalTestNoMajorErrorAttempts(0);
           setFullLessonListenRounds(0);
           setLessonPracticeReads(0);
           setLessonReviewMessage("Dhageyso casharka oo dhan");
@@ -1079,6 +1101,7 @@ export default function QuranLesson() {
                   <p className="text-white/80 text-sm">Iskiis u akhri adigoo eegaya</p>
                   <button
                     onClick={() => {
+                      setFinalTestNoMajorErrorAttempts(0);
                       setLessonReviewStep("final_test");
                       setLessonReviewMessage("Quraanka qalbiga ka akhri");
                     }}
@@ -1105,6 +1128,11 @@ export default function QuranLesson() {
                   >
                     {isLessonReviewChecking ? "Waan hubinayaa..." : isLessonReviewRecording ? "⏹️ Jooji Akhriska" : "🎙️ Bilow Akhriska"}
                   </button>
+                  {finalTestNoMajorErrorAttempts > 0 && (
+                    <p className="text-emerald-200 text-xs font-bold">
+                      Isku dayga wanaagsan: {finalTestNoMajorErrorAttempts}/2
+                    </p>
+                  )}
                   <p className="text-white/55 text-xs">Isku day mar kale, waad awooddaa</p>
                 </div>
               )}
@@ -1130,6 +1158,11 @@ export default function QuranLesson() {
                   >
                     ➡️ Mar kale isku day
                   </button>
+                  {finalTestNoMajorErrorAttempts > 0 && (
+                    <p className="text-emerald-200 text-xs font-bold text-center">
+                      Isku dayga wanaagsan: {finalTestNoMajorErrorAttempts}/2
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1407,6 +1440,7 @@ export default function QuranLesson() {
                     setFullLessonListenRounds(0);
                     setLessonPracticeReads(0);
                     setLessonReviewMessage(null);
+                    setFinalTestNoMajorErrorAttempts(0);
                     setCurrentAyahIndex(0);
                     setCurrentStage("repeating");
                     setCheckResult(null);
