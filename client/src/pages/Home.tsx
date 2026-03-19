@@ -2623,9 +2623,8 @@ export default function Home() {
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1 leading-tight">
-              <span className="block sm:inline">Caruurta</span>
-              <span className="block sm:inline sm:ml-1">Quraanka Barata</span>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1 whitespace-nowrap">
+              Caruurta Quraanka Barata
             </p>
             <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} />
             <p className="text-xs text-gray-400 mt-1 invisible">Quraanka barata</p>
