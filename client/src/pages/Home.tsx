@@ -123,7 +123,7 @@ function AnimatedCounter({ value }: { value: number }) {
       setDisplayCount(value);
       lastValueRef.current = value;
       return;
-        <span ref={ref} className="text-2xl sm:text-3xl font-bold text-orange-500 tabular-nums">
+    }
     
     if (value === 0) {
       setDisplayCount(0);
