@@ -67,6 +67,94 @@ function getQuranSoftPassThreshold(childAge: number | null | undefined): number 
 
 type QuranLearningMode = "repeat" | "memorize";
 
+function normalizeArabicForQuranCompare(input: string): string {
+  return (input || "")
+    .normalize("NFKC")
+    // Remove harakat/tashkeel and Quran annotation marks.
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    .replace(/ـ/g, "")
+    // Remove punctuation/symbols and normalize whitespace.
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()"'!?،؛«»…<>\[\]\\|+]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenizeArabic(input: string): string[] {
+  const normalized = normalizeArabicForQuranCompare(input);
+  if (!normalized) {
+    return [];
+  }
+  return normalized.split(" ").filter(Boolean);
+}
+
+function getWordMatchPercent(expectedWords: string[], spokenWords: string[]): number {
+  if (expectedWords.length === 0) {
+    return 0;
+  }
+
+  const spokenCounts = new Map<string, number>();
+  for (const w of spokenWords) {
+    spokenCounts.set(w, (spokenCounts.get(w) || 0) + 1);
+  }
+
+  let matched = 0;
+  for (const expected of expectedWords) {
+    const count = spokenCounts.get(expected) || 0;
+    if (count > 0) {
+      matched += 1;
+      spokenCounts.set(expected, count - 1);
+    }
+  }
+
+  return Math.round((matched / expectedWords.length) * 100);
+}
+
+function getOrderConsistencyPercent(expectedWords: string[], spokenWords: string[]): number {
+  if (expectedWords.length === 0) {
+    return 0;
+  }
+
+  const n = expectedWords.length;
+  const m = spokenWords.length;
+  const dp: number[][] = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (expectedWords[i - 1] === spokenWords[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  const lcsLength = dp[n][m];
+  return Math.round((lcsLength / n) * 100);
+}
+
+function evaluateQuranTextScore(expectedText: string, spokenText: string): {
+  score: number;
+  wordMatchPercent: number;
+  orderPercent: number;
+  status: "retry" | "needs_improvement" | "good";
+  pass: boolean;
+} {
+  const expectedWords = tokenizeArabic(expectedText);
+  const spokenWords = tokenizeArabic(spokenText);
+
+  const wordMatchPercent = getWordMatchPercent(expectedWords, spokenWords);
+  const orderPercent = getOrderConsistencyPercent(expectedWords, spokenWords);
+  const score = Math.round(wordMatchPercent * 0.7 + orderPercent * 0.3);
+
+  if (score < 60) {
+    return { score, wordMatchPercent, orderPercent, status: "retry", pass: false };
+  }
+  if (score <= 80) {
+    return { score, wordMatchPercent, orderPercent, status: "needs_improvement", pass: false };
+  }
+  return { score, wordMatchPercent, orderPercent, status: "good", pass: true };
+}
+
 function getQuranPassingScore(mode: QuranLearningMode, childAge: number | null | undefined): number {
   if (mode === "repeat") {
     if (!childAge || childAge <= 8) {
@@ -13027,7 +13115,8 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
         return res.status(400).json({ error: "Audio, surah, iyo ayah number waa loo baahan yahay" });
       }
       const sNum = parseInt(surahNumber);
-      const aNum = parseInt(ayahNumber);
+      const isFullLessonCheck = String(ayahNumber).toLowerCase() === "full" || String(ayahNumber) === "0";
+      const aNum = isFullLessonCheck ? 0 : parseInt(ayahNumber);
       const paddedNum = sNum.toString().padStart(3, "0");
       const fs = await import("fs");
       const quranFilePath = resolveQuranJsonPath(`${paddedNum}.json`);
@@ -13035,85 +13124,40 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
       try {
         const fileContent = fs.default.readFileSync(quranFilePath, "utf-8");
         const surahData = JSON.parse(fileContent);
-        const ayah = surahData.ayahs?.find((a: any) => a.number === aNum);
-        if (!ayah) {
-          return res.status(400).json({ error: "Aayada lama helin" });
+        if (isFullLessonCheck) {
+          const lessonAyahs = Array.isArray(surahData.ayahs) ? surahData.ayahs : [];
+          correctText = lessonAyahs.map((a: any) => String(a?.text || "").trim()).filter(Boolean).join(" ");
+          if (!correctText) {
+            return res.status(400).json({ error: "Casharka lama helin" });
+          }
+        } else {
+          const ayah = surahData.ayahs?.find((a: any) => a.number === aNum);
+          if (!ayah) {
+            return res.status(400).json({ error: "Aayada lama helin" });
+          }
+          correctText = ayah.text;
         }
-        correctText = ayah.text;
       } catch {
         return res.status(400).json({ error: "Suurada lama helin" });
       }
 
-      // Fetch child age to apply age-appropriate leniency
-  const childRecord = await storage.getChild(req.session.childId!);
-      const childAge = childRecord?.age ?? 7;
-  const passingScore = getQuranPassingScore(learningMode, childAge);
-
       const openai = getOpenAIClient();
       const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
-      let result: { score: number };
+      let transcribedText = "";
       try {
         const transcription = await openai.audio.transcriptions.create({
           model: "whisper-1",
           file: audioFile,
           language: "ar",
         });
-        const transcribedText = transcription.text.trim();
-
-        // Build age-aware system prompt
-        let ageContext: string;
-        if (childAge <= 4) {
-          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo yar oo weli baranaya. Aad u fududee — hadduu akhriyo xitaa qaybta ugu yar ee aayada, ku sii dhawr daraajo.`;
-        } else if (childAge <= 6) {
-          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo da' yar. Fududee, hadduu akhriyo kala badnaanshiyaha kelmadaha.`;
-        } else if (childAge <= 9) {
-          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo dhexdhexaad ah. Eeg in akhrintaydu tahay mid macquul ah.`;
-        } else {
-          ageContext = `Ilmuhu wuxuu leeyahay ${childAge} jir — waa ilmo weyn. Heer sare u raadi saxnaanta.`;
-        }
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Waxaad tahay macalin Quraan ah oo carruurta wax bara. Ilmo ayaa akhrinaya aayad Quraan ah.
-${ageContext}
-Habka casharka hadda waa: ${learningMode === "repeat" ? "KU CELI adigoo qoraalka arka" : "QALBIGA adigoo qoraalka qarsan"}.
-${learningMode === "repeat" ? "Marxaladdan waxaad qiimeynaysaa ku-celinta iyadoo qoraalku muuqdo, sidaas darteed ha adkayn; ku filan inuu dhawaaq ahaan ugu dhowaado aayada." : "Marxaladdan waxaad qiimeynaysaa xifdiga dhabta ah; ilmaha waa inuu ka soo saaraa aayada qalbiga, marka ka adkee marxaladda ku-celinta."}
-Is barbar dhig qoraalka saxda ah iyo kan ilmuhu akhriyay.
-Waa inaad ku jawaabto JSON-kan oo kaliya (qoraal kale ha ku darin):
-{
-  "score": <tiro 0-100>
-}
-- 100: aayada oo dhammi sax u akhriyay
-- 75: kala badnaanshiyaha (75%+) sax u akhriyay
-- 50: kuwa badnaa (50%+) sax u akhriyay
-- 25: qayb yar (25% oo kale) u akhriyay
-- 0: wax aan la aqoon ama been gabi ahaanba
-
-Ilmuhu wuxuu ku baranayaa isku dayga!`
-            },
-            {
-              role: "user",
-              content: `Da'da ilmaha: ${childAge}\nQoraalka saxda ah (Aayada): ${correctText}\n\nKan ilmuhu akhriyay: ${transcribedText}`
-            }
-          ],
-          temperature: 0.3,
-        });
-        try {
-          const responseText = completion.choices[0].message.content || "{}";
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-          result = { score: typeof parsed.score === "number" ? parsed.score : 0 };
-        } catch {
-          result = { score: 0 };
-        }
+        transcribedText = transcription.text.trim();
       } catch (aiError: any) {
         console.warn("[QURAN] AI check fallback - whisper/gpt unavailable:", aiError.code || aiError.message);
-        result = { score: passingScore }; // fallback = just enough to pass
+        transcribedText = "";
       }
-      const isCorrect = result.score >= passingScore;
+
+      const evaluation = evaluateQuranTextScore(correctText, transcribedText);
+      const isCorrect = evaluation.pass;
       const { getRandomEncouragement } = await import("./quranLessons");
       const encouragement = !isCorrect ? getRandomEncouragement() : "";
 
@@ -13121,11 +13165,17 @@ Ilmuhu wuxuu ku baranayaa isku dayga!`
         outcome: isCorrect ? "correct" : "needs_retry",
         passed: isCorrect,
         completed: learningMode === "memorize" && isCorrect,
-        score: result.score,
-        threshold: passingScore,
+        score: evaluation.score,
+        threshold: 80,
+        status: evaluation.status,
+        metrics: {
+          wordMatchPercent: evaluation.wordMatchPercent,
+          orderPercent: evaluation.orderPercent,
+        },
         mode: learningMode,
+        recognizedText: transcribedText,
         message: isCorrect
-          ? (learningMode === "repeat" ? "Fiican! Hadda u gudub qalbiga." : "MaashaAllah! Qalbiga ayaad ka akhriday. ⭐")
+          ? (learningMode === "repeat" ? "Fiican! Hadda qalbiga ka akhri." : "Hambalyo! Waad ku guuleysatay")
           : encouragement,
       });
     } catch (error: any) {
