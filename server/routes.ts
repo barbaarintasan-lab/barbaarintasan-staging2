@@ -11353,13 +11353,24 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   // Stats: Get parent count (for homepage stats)
   app.get("/api/stats/parents", async (req, res) => {
     try {
-      const data = await getCached('stats-parents', 120000, async () => {
-        const count = await storage.getParentCount();
-        return { count };
+      const [parentCountResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(parents);
+
+      const [childrenCountResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(children);
+
+      const parentCount = Number(parentCountResult?.count || 0);
+      const quranChildrenCount = Number(childrenCountResult?.count || 0);
+
+      res.json({
+        count: parentCount,
+        childrenCount: quranChildrenCount,
+        quranChildrenCount,
       });
-      res.json(data);
     } catch (error) {
-      res.json({ count: 0 });
+      res.json({ count: 0, childrenCount: 0, quranChildrenCount: 0 });
     }
   });
 

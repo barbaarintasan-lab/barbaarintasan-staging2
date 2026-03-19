@@ -2310,6 +2310,8 @@ export default function Home() {
       const res = await fetch("/api/stats/parents");
       return res.json();
     },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
   });
 
   const { data: telegramStats } = useQuery({
@@ -2604,7 +2606,7 @@ export default function Home() {
       {/* Stats Section */}
       {isSectionVisible("stats") && (
       <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
-        <div className="grid grid-cols-4 gap-3 lg:gap-6">
+        <div className="grid grid-cols-5 gap-3 lg:gap-6">
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
             <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
@@ -2619,6 +2621,11 @@ export default function Home() {
             <p className="text-sm text-gray-500 font-medium mb-1">{t("home.stats.parents")}</p>
             <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} />
             <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-500 font-medium mb-1">Caruurta Quraanka Barata</p>
+            <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} />
+            <p className="text-xs text-gray-400 mt-1">Waalidku diiwaangeliyey</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-500 font-medium mb-1">Telegram</p>
