@@ -120,6 +120,7 @@ export default function ChildDashboard() {
   };
 
   const orderedJuz = [...JUZ_DATA].sort((a, b) => b.num - a.num);
+  const stickyBaseTop = "calc(env(safe-area-inset-top, 0px) + 96px)";
 
   return (
     <div className="min-h-screen bg-[#0d1117] relative">
@@ -165,8 +166,8 @@ export default function ChildDashboard() {
           {(isYoungChild ? true : true) && (
             <button
               onClick={() => setLocation("/alphabet-folders")}
-              className={`w-full text-left rounded-3xl overflow-hidden relative card-open card-shimmer border-2 border-white/20 shadow-2xl`}
-              style={{ "--glow": "#a78bfa" } as React.CSSProperties}
+              className={`w-full text-left rounded-3xl overflow-hidden relative sticky z-40 card-open card-shimmer border-2 border-white/20 shadow-2xl`}
+              style={{ "--glow": "#a78bfa", top: stickyBaseTop } as React.CSSProperties}
               data-testid="card-alphabet"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-violet-800 via-purple-700 to-indigo-800" />
@@ -200,17 +201,31 @@ export default function ChildDashboard() {
           {/* ══════════ JUZ CARDS 1-30 ══════════ */}
           {orderedJuz.map((juz, idx) => {
             const isOpen = juz.isOpen;
+            const stackStep = Math.min(idx + 1, 10) * 6;
+            const stickyTop = `calc(${stickyBaseTop} + ${stackStep}px)`;
             return (
               <button
                 key={juz.num}
                 onClick={() => handleJuzClick(juz)}
                 disabled={!isOpen}
-                className={`w-full text-left rounded-3xl overflow-hidden relative border-2 shadow-xl transition-all duration-200 ${
+                className={`w-full text-left rounded-3xl overflow-hidden relative sticky border-2 shadow-xl transition-all duration-200 ${
                   isOpen
                     ? "card-open card-shimmer border-white/20 active:scale-[0.98] hover:scale-[1.01]"
                     : "border-white/5 opacity-50 cursor-default"
                 }`}
-                style={isOpen ? { "--glow": juz.glowColor, animationDelay: `${(idx % 5) * 0.6}s` } as React.CSSProperties : {}}
+                style={
+                  isOpen
+                    ? {
+                        "--glow": juz.glowColor,
+                        animationDelay: `${(idx % 5) * 0.6}s`,
+                        top: stickyTop,
+                        zIndex: 39 - idx,
+                      } as React.CSSProperties
+                    : {
+                        top: stickyTop,
+                        zIndex: 39 - idx,
+                      } as React.CSSProperties
+                }
                 data-testid={`card-juz-${juz.num}`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${isOpen ? juz.gradient : "from-slate-800 via-slate-700 to-slate-800"}`} />
