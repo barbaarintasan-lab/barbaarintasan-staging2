@@ -152,7 +152,7 @@ export default function JuzFolder() {
       </div>
 
       {/* Header */}
-      <div className="relative z-10 sticky top-0 bg-[#1a1a2e]/95 backdrop-blur-sm border-b border-white/5 px-4 pt-6 pb-4">
+      <div className="relative z-30 sticky top-0 bg-[#1a1a2e]/95 backdrop-blur-sm border-b border-white/5 px-4 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => setLocation("/child-dashboard")}
@@ -226,7 +226,7 @@ export default function JuzFolder() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 px-4 pb-24">
+      <div className="relative z-0 px-4 pb-24 pt-4">
 
         {/* Quraan tab */}
         {activeTab === "quran" && (
