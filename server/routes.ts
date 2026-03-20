@@ -10575,7 +10575,8 @@ Return a JSON object with:
         return res.status(404).json({ error: "Video not found" });
       }
 
-      await storage.markContentCompleted(parentId, "promo_video", req.params.id);
+      // Record a unique viewer per parent for this promo video.
+      await storage.markContentComplete(parentId, "promo_video", req.params.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error tracking promo video view:", error);
