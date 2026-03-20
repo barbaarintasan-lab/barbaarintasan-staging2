@@ -15398,6 +15398,9 @@ function PromoVideosTab() {
     updateMutation.mutate({ id: video.id, isVisible: !video.isVisible });
   };
 
+  const visibleVideos = videos.filter((video: any) => video.isVisible);
+  const archivedVideos = videos.filter((video: any) => !video.isVisible);
+
   return (
     <div className="space-y-4" data-testid="promo-videos-admin">
       <Card>
@@ -15448,36 +15451,84 @@ function PromoVideosTab() {
           ) : videos.length === 0 ? (
             <p className="text-center text-gray-400 py-8">Weli muuqaal lama gelin. Guji "Ku Dar Cusub".</p>
           ) : (
-            <div className="space-y-3">
-              {videos.map((video: any) => (
-                <div key={video.id} className={`flex items-center gap-3 p-3 rounded-xl border ${video.isVisible ? "bg-white border-gray-200" : "bg-gray-50 border-gray-200 opacity-60"}`} data-testid={`admin-promo-${video.id}`}>
-                  <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
-                    {video.thumbnailUrl ? (
-                      <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-6 h-6 text-gray-300" />
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-2">Muuqaalka Hadda ee Bogga Hore</h4>
+                {visibleVideos.length === 0 ? (
+                  <p className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">Weli muuqaal muuqda ma jiro.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {visibleVideos.map((video: any) => (
+                      <div key={video.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white border-gray-200" data-testid={`admin-promo-${video.id}`}>
+                        <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
+                          {video.thumbnailUrl ? (
+                            <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Play className="w-6 h-6 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm truncate">{video.title}</h4>
+                          {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
+                          <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
+                        </div>
+                        <div className="flex items-center gap-1 flex-none">
+                          <Button variant="outline" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
+                            <Archive className="w-4 h-4 mr-1" /> Maktabada u wareeji
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
+                            <Edit className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm truncate">{video.title}</h4>
-                    {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
-                    <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs uppercase tracking-wide text-gray-600 font-semibold mb-2">Muuqaaladii Hore ee Bogga Hore</h4>
+                {archivedVideos.length === 0 ? (
+                  <p className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">Maktabadda wali wax muuqaal ah kuma jiro.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {archivedVideos.map((video: any) => (
+                      <div key={video.id} className="flex items-center gap-3 p-3 rounded-xl border bg-gray-50 border-gray-200" data-testid={`admin-promo-${video.id}`}>
+                        <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-none">
+                          {video.thumbnailUrl ? (
+                            <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Play className="w-6 h-6 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm truncate">{video.title}</h4>
+                          {video.description && <p className="text-xs text-gray-500 truncate">{video.description}</p>}
+                          <p className="text-xs text-blue-500 truncate mt-0.5">{video.videoUrl}</p>
+                        </div>
+                        <div className="flex items-center gap-1 flex-none">
+                          <Button variant="outline" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
+                            <Eye className="w-4 h-4 mr-1" /> Bogga hore kusoo celi
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
+                            <Edit className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1 flex-none">
-                    <Button variant="ghost" size="sm" onClick={() => toggleVisibility(video)} data-testid={`toggle-promo-${video.id}`}>
-                      {video.isVisible ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(video)} data-testid={`edit-promo-${video.id}`}>
-                      <Edit className="w-4 h-4 text-blue-600" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { if (confirm("Ma tirtirayaa?")) deleteMutation.mutate(video.id); }} data-testid={`delete-promo-${video.id}`}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                )}
+              </div>
             </div>
           )}
         </CardContent>

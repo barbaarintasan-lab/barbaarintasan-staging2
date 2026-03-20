@@ -5,7 +5,7 @@ import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown } from "lucide-react";
+import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown, Eye, Share2 } from "lucide-react";
 import { openSSOLink } from "@/lib/api";
 import { VoiceSpaces } from "@/components/VoiceSpaces";
 import { InstallBanner } from "@/components/InstallBanner";
@@ -79,6 +79,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ContentComments, ContentReactions } from "@/components/engagement";
 
 
 function translateDuration(duration: string | null, t: (key: string) => string): string | null {
@@ -339,13 +341,34 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
 }
 
 function PromoVideoSection() {
+  const { parent } = useParentAuth();
+  const queryClient = useQueryClient();
   const { data: videos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos"],
   });
+  const { data: archivedVideos = [] } = useQuery<any[]>({
+    queryKey: ["/api/promo-videos/archive"],
+    queryFn: async () => {
+      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!parent,
+  });
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const [openCommentsForVideoId, setOpenCommentsForVideoId] = useState<string | null>(null);
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start", dragFree: true });
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+
+  const trackViewMutation = useMutation({
+    mutationFn: async (videoId: string) => {
+      await apiRequest("POST", `/api/promo-videos/${videoId}/view`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
+    },
+  });
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -359,6 +382,11 @@ function PromoVideoSection() {
   }, [emblaApi]);
 
   if (videos.length === 0) return null;
+
+  const archivedOnly = archivedVideos.filter(
+    (video: any) => !videos.some((current: any) => current.id === video.id),
+  );
+  const archivedPreview = archivedOnly.slice(0, 5);
 
   const getGDriveFileId = (url: string) => {
     const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -387,6 +415,25 @@ function PromoVideoSection() {
     const ytMatch = video.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
     if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
     return null;
+  };
+
+  const handleShareVideo = async (video: any) => {
+    const shareData = {
+      title: video.title,
+      text: video.description || "Muuqaal cusub oo waxtar leh",
+      url: video.videoUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(video.videoUrl);
+        toast.success("Link-ga muuqaalka waa la guuriyay");
+      }
+    } catch {
+      // User canceled native share dialog; no toast needed.
+    }
   };
 
   return (
@@ -428,7 +475,12 @@ function PromoVideoSection() {
                 </div>
               ) : (
                 <button
-                  onClick={() => setActiveVideo(video.id)}
+                  onClick={() => {
+                    setActiveVideo(video.id);
+                    if (parent) {
+                      trackViewMutation.mutate(video.id);
+                    }
+                  }}
                   className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
                   data-testid={`promo-play-${video.id}`}
                 >
@@ -451,11 +503,70 @@ function PromoVideoSection() {
                 {video.description && (
                   <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
                 )}
+                <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
+                  <span className="inline-flex items-center gap-1" data-testid={`promo-views-${video.id}`}>
+                    <Eye className="w-4 h-4" />
+                    {video.viewCount || 0}
+                  </span>
+                  <button
+                    onClick={() => handleShareVideo(video)}
+                    className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
+                    data-testid={`promo-share-${video.id}`}
+                  >
+                    <Share2 className="w-4 h-4" />
+                    La wadaag
+                  </button>
+                </div>
+                <div className="mt-3 bg-slate-900 rounded-xl p-3" data-testid={`promo-reactions-${video.id}`}>
+                  <ContentReactions contentType="promo_video" contentId={video.id} />
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <button
+                    onClick={() => setOpenCommentsForVideoId(video.id)}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    data-testid={`promo-comments-open-${video.id}`}
+                  >
+                    Arag faallooyinka
+                  </button>
+                </div>
                 </div>
               </div>
             </div>
           ))}
       </div>
+
+      <Dialog open={!!openCommentsForVideoId} onOpenChange={(open) => !open && setOpenCommentsForVideoId(null)}>
+        <DialogContent className="max-w-2xl bg-slate-950 border-slate-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Faallooyinka Muuqaalka</DialogTitle>
+          </DialogHeader>
+          {openCommentsForVideoId && (
+            <ContentComments contentType="promo_video" contentId={openCommentsForVideoId} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {archivedPreview.length > 0 && (
+        <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4" data-testid="promo-archive-links">
+          <h4 className="text-sm font-bold text-slate-800">Muuqaaladii Hore ee Bogga Hore</h4>
+          <p className="text-xs text-slate-500 mt-1">Linki ahaan dib uga daawo.</p>
+          <div className="mt-3 space-y-2">
+            {archivedPreview.map((video: any) => (
+              <a
+                key={video.id}
+                href={video.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-100"
+                data-testid={`promo-archive-link-${video.id}`}
+              >
+                <span className="truncate pr-2">{video.title}</span>
+                <ExternalLink className="w-4 h-4 text-slate-500" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

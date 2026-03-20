@@ -16,7 +16,7 @@ const REACTION_OPTIONS = [
 ];
 
 interface ContentCommentsProps {
-  contentType: "bedtime_story" | "parent_message";
+  contentType: "bedtime_story" | "parent_message" | "promo_video";
   contentId: string;
 }
 
@@ -119,9 +119,12 @@ export function ContentComments({ contentType, contentId }: ContentCommentsProps
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [replyText, setReplyText] = useState("");
 
-  const apiPath = contentType === "bedtime_story"
-    ? `/api/bedtime-stories/${contentId}/comments`
-    : `/api/parent-messages/${contentId}/comments`;
+  const apiPath =
+    contentType === "bedtime_story"
+      ? `/api/bedtime-stories/${contentId}/comments`
+      : contentType === "parent_message"
+      ? `/api/parent-messages/${contentId}/comments`
+      : `/api/promo-videos/${contentId}/comments`;
 
   const queryKey = [apiPath];
 

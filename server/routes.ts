@@ -10,9 +10,9 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, contentProgress, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { registerObjectStorageRoutes, ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage";
 import { generateImageBuffer } from "./replit_integrations/image/client";
@@ -10492,11 +10492,216 @@ Return a JSON object with:
 
   app.get("/api/promo-videos", async (_req, res) => {
     try {
-      const videos = await db.select().from(promoVideos).where(eq(promoVideos.isVisible, true)).orderBy(promoVideos.order);
+      let videos = await db
+        .select({
+          id: promoVideos.id,
+          title: promoVideos.title,
+          description: promoVideos.description,
+          videoUrl: promoVideos.videoUrl,
+          thumbnailUrl: promoVideos.thumbnailUrl,
+          isVisible: promoVideos.isVisible,
+          order: promoVideos.order,
+          createdAt: promoVideos.createdAt,
+          viewCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int
+            FROM ${contentProgress}
+            WHERE ${contentProgress.contentType} = 'promo_video'
+              AND ${contentProgress.contentId} = ${promoVideos.id}
+          ), 0)`,
+        })
+        .from(promoVideos)
+        .where(eq(promoVideos.isVisible, true))
+        .orderBy(promoVideos.order);
+
+      // Always keep at least one homepage video visible if data exists.
+      if (videos.length === 0) {
+        const latestArchived = await db
+          .select()
+          .from(promoVideos)
+          .where(eq(promoVideos.isVisible, false))
+          .orderBy(sql`${promoVideos.createdAt} DESC`)
+          .limit(1);
+        if (latestArchived[0]) {
+          await db
+            .update(promoVideos)
+            .set({ isVisible: true })
+            .where(eq(promoVideos.id, latestArchived[0].id));
+
+          videos = await db
+            .select({
+              id: promoVideos.id,
+              title: promoVideos.title,
+              description: promoVideos.description,
+              videoUrl: promoVideos.videoUrl,
+              thumbnailUrl: promoVideos.thumbnailUrl,
+              isVisible: promoVideos.isVisible,
+              order: promoVideos.order,
+              createdAt: promoVideos.createdAt,
+              viewCount: sql<number>`COALESCE((
+                SELECT COUNT(*)::int
+                FROM ${contentProgress}
+                WHERE ${contentProgress.contentType} = 'promo_video'
+                  AND ${contentProgress.contentId} = ${promoVideos.id}
+              ), 0)`,
+            })
+            .from(promoVideos)
+            .where(eq(promoVideos.isVisible, true))
+            .orderBy(promoVideos.order);
+        }
+      }
       res.json(videos);
     } catch (error) {
       console.error("Error fetching promo videos:", error);
       res.status(500).json({ error: "Failed to fetch promo videos" });
+    }
+  });
+
+  app.get("/api/promo-videos/archive", async (req, res) => {
+    try {
+      if (!req.session.parentId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const archived = await db
+        .select({
+          id: promoVideos.id,
+          title: promoVideos.title,
+          description: promoVideos.description,
+          videoUrl: promoVideos.videoUrl,
+          thumbnailUrl: promoVideos.thumbnailUrl,
+          isVisible: promoVideos.isVisible,
+          order: promoVideos.order,
+          createdAt: promoVideos.createdAt,
+          viewCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int
+            FROM ${contentProgress}
+            WHERE ${contentProgress.contentType} = 'promo_video'
+              AND ${contentProgress.contentId} = ${promoVideos.id}
+          ), 0)`,
+        })
+        .from(promoVideos)
+        .where(eq(promoVideos.isVisible, false))
+        .orderBy(sql`${promoVideos.createdAt} DESC`)
+        .limit(20);
+
+      res.json(archived);
+    } catch (error) {
+      console.error("Error fetching archived promo videos:", error);
+      res.status(500).json({ error: "Failed to fetch archived promo videos" });
+    }
+  });
+
+  app.post("/api/promo-videos/:id/view", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const [video] = await db.select().from(promoVideos).where(eq(promoVideos.id, req.params.id)).limit(1);
+      if (!video) {
+        return res.status(404).json({ error: "Video not found" });
+      }
+
+      await storage.markContentCompleted(parentId, "promo_video", req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking promo video view:", error);
+      res.status(500).json({ error: "Failed to track view" });
+    }
+  });
+
+  app.get("/api/promo-videos/:id/reactions", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      const data = await storage.getContentReactions("promo_video", req.params.id, parentId);
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching promo reactions:", error);
+      res.status(500).json({ error: "Failed to fetch reactions" });
+    }
+  });
+
+  app.post("/api/promo-videos/:id/reactions", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const { reactionType } = req.body;
+      if (!["love", "like", "dislike", "sparkle"].includes(reactionType)) {
+        return res.status(400).json({ error: "Invalid reaction type" });
+      }
+      const reaction = await storage.upsertContentReaction(parentId, "promo_video", req.params.id, reactionType);
+      res.json(reaction);
+    } catch (error) {
+      console.error("Error adding promo reaction:", error);
+      res.status(500).json({ error: "Failed to add reaction" });
+    }
+  });
+
+  app.delete("/api/promo-videos/:id/reactions", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      await storage.removeContentReaction(parentId, "promo_video", req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing promo reaction:", error);
+      res.status(500).json({ error: "Failed to remove reaction" });
+    }
+  });
+
+  app.get("/api/promo-videos/:id/comments", async (req, res) => {
+    try {
+      const comments = await storage.getContentComments("promo_video", req.params.id);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching promo comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  app.post("/api/promo-videos/:id/comments", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { body, replyToId } = req.body;
+      if (!body || body.trim().length === 0) {
+        return res.status(400).json({ error: "Comment body is required" });
+      }
+
+      const comment = await storage.createContentComment({
+        parentId,
+        contentType: "promo_video",
+        contentId: req.params.id,
+        body: body.trim(),
+        replyToId: replyToId || null,
+        isHidden: false,
+      });
+      res.json(comment);
+    } catch (error) {
+      console.error("Error adding promo comment:", error);
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
+  app.delete("/api/promo-videos/:id/comments/:commentId", async (req, res) => {
+    try {
+      const parentId = req.session.parentId;
+      if (!parentId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      await storage.deleteContentComment(req.params.commentId, parentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting promo comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 
@@ -10515,12 +10720,14 @@ Return a JSON object with:
       if (!title || !videoUrl) {
         return res.status(400).json({ error: "Title and video URL are required" });
       }
+      await db.update(promoVideos).set({ isVisible: false }).where(eq(promoVideos.isVisible, true));
       const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${promoVideos.order}), 0)` }).from(promoVideos);
       const [video] = await db.insert(promoVideos).values({
         title,
         description: description || null,
         videoUrl,
         thumbnailUrl: thumbnailUrl || null,
+        isVisible: true,
         order: (maxOrder[0]?.max || 0) + 1,
       }).returning();
       res.json(video);
@@ -10541,6 +10748,14 @@ Return a JSON object with:
       if (thumbnailUrl !== undefined) updates.thumbnailUrl = thumbnailUrl;
       if (isVisible !== undefined) updates.isVisible = isVisible;
       if (order !== undefined) updates.order = order;
+
+      if (isVisible === true) {
+        await db
+          .update(promoVideos)
+          .set({ isVisible: false })
+          .where(and(eq(promoVideos.isVisible, true), ne(promoVideos.id, id)));
+      }
+
       const [video] = await db.update(promoVideos).set(updates).where(eq(promoVideos.id, id)).returning();
       if (!video) return res.status(404).json({ error: "Video not found" });
       res.json(video);
