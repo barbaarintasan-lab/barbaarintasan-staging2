@@ -18,26 +18,26 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Deploy with retry and fallback
+      - name: Deploy (local builder)
         shell: bash
         run: |
           set -euo pipefail
 
-          for attempt in 1 2 3; do
-            echo "Remote deploy attempt ${attempt}/3"
-            if flyctl deploy --remote-only; then
-              echo "Remote deploy succeeded"
+          for attempt in 1 2; do
+            echo "Local deploy attempt ${attempt}/2"
+            if flyctl deploy --local-only; then
+              echo "Local deploy succeeded"
               exit 0
             fi
 
-            if [ "$attempt" -lt 3 ]; then
-              wait_seconds=$((attempt * 30))
-              echo "Remote builder unavailable. Retrying in ${wait_seconds}s..."
+            if [ "$attempt" -lt 2 ]; then
+              wait_seconds=20
+              echo "Local deploy failed. Retrying in ${wait_seconds}s..."
               sleep "$wait_seconds"
             fi
           done
 
-          echo "Remote builder still unavailable. Falling back to local build deploy..."
-          flyctl deploy --local-only
+          echo "Local deploy failed after retries"
+          exit 1
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
