@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
 const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -46,6 +46,11 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
+
+  if (url.pathname === '/api/promo-videos' || url.pathname === '/api/promo-videos/archive') {
+    event.respondWith(networkOnlyNoStore(event.request));
+    return;
+  }
   
   // Handle offline course cache requests (video files stored in offline-course-* caches)
   if (url.pathname.match(/\.(mp4|webm|m4v|mov)$/) || url.pathname.includes('/public-files/')) {
@@ -150,6 +155,17 @@ async function networkFirst(request) {
     if (cachedResponse) {
       return cachedResponse;
     }
+    return new Response(JSON.stringify({ error: 'Offline' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function networkOnlyNoStore(request) {
+  try {
+    return await fetch(new Request(request, { cache: 'no-store' }));
+  } catch (error) {
     return new Response(JSON.stringify({ error: 'Offline' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' }

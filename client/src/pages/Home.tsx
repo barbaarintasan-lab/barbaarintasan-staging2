@@ -349,6 +349,14 @@ function PromoVideoSection() {
   const viewedInSession = useRef<Set<string>>(new Set());
   const { data: videos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos"],
+    queryFn: async () => {
+      const res = await fetch("/api/promo-videos", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Failed to fetch promo videos");
+      return res.json();
+    },
     staleTime: 5_000,
     refetchOnWindowFocus: false,
     refetchInterval: 5_000,
@@ -357,7 +365,10 @@ function PromoVideoSection() {
   const { data: archivedVideos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos/archive"],
     queryFn: async () => {
-      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
+      const res = await fetch("/api/promo-videos/archive", {
+        credentials: "include",
+        cache: "no-store",
+      });
       if (!res.ok) return [];
       return res.json();
     },

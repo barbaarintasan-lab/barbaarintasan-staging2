@@ -27,7 +27,10 @@ export default function PromoArchiveVideoPage() {
   const { data: archivedVideos = [], isLoading } = useQuery<PromoArchiveVideo[]>({
     queryKey: ["/api/promo-videos/archive"],
     queryFn: async () => {
-      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
+      const res = await fetch("/api/promo-videos/archive", {
+        credentials: "include",
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Failed to fetch archived promo videos");
       return res.json();
     },

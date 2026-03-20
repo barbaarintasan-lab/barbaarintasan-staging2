@@ -10501,6 +10501,9 @@ Return a JSON object with:
 
   app.get("/api/promo-videos", async (_req, res) => {
     try {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.set("Pragma", "no-cache");
+      res.set("Expires", "0");
       const videos = await db
         .select({
           id: promoVideos.id,
@@ -10538,6 +10541,9 @@ Return a JSON object with:
 
   app.get("/api/promo-videos/archive", async (req, res) => {
     try {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.set("Pragma", "no-cache");
+      res.set("Expires", "0");
       if (!req.session.parentId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -10581,6 +10587,9 @@ Return a JSON object with:
 
   app.post("/api/promo-videos/:id/view", async (req, res) => {
     try {
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.set("Pragma", "no-cache");
+      res.set("Expires", "0");
       const parentId = req.session.parentId;
       const visitorKey = typeof req.body?.visitorKey === "string" ? req.body.visitorKey.slice(0, 120) : null;
 
