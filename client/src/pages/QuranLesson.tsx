@@ -609,36 +609,30 @@ export default function QuranLesson() {
 
       const result: CheckResult = await response.json();
       if (lessonReviewStep === "final_test") {
-        if (result.passed) {
+        const completeFinalReview = (message: string) => {
           setFinalTestNoMajorErrorAttempts(0);
-          setLessonReviewMessage("Hambalyo! Waad ku guuleysatay");
+          setLessonReviewMessage(message);
           setShowCelebration(true);
           setTimeout(() => {
             setShowCelebration(false);
           }, 1800);
           setLessonFlow("surah_complete");
           setSurahComplete(true);
-        } else if (result.status === "needs_improvement") {
+        };
+
+        if (result.passed) {
+          completeFinalReview("Hambalyo! Waad ku guuleysatay");
+        } else {
           const nextNoMajorErrorAttempts = finalTestNoMajorErrorAttempts + 1;
           setFinalTestNoMajorErrorAttempts(nextNoMajorErrorAttempts);
+          const isNearPass = result.status === "needs_improvement" || (result.score ?? 0) >= 35;
 
-          if (nextNoMajorErrorAttempts >= 2) {
-            setLessonReviewMessage("Waad ku gudubtay! Khalad weyn ma jirin.");
-            setShowCelebration(true);
-            setTimeout(() => {
-              setShowCelebration(false);
-            }, 1800);
-            setLessonFlow("surah_complete");
-            setSurahComplete(true);
-            setFinalTestNoMajorErrorAttempts(0);
+          if (isNearPass || nextNoMajorErrorAttempts >= 2) {
+            completeFinalReview("Waad ku gudubtay! Casharka oo dhan waa sax, sii wad.");
           } else {
             setLessonReviewStep("reinforcement");
-            setLessonReviewMessage("Fiican! Hal mar kale isku day si aad u gudubto.");
+            setLessonReviewMessage("Hal mar kale oo kooban isku day, kadib waad gudbeysaa.");
           }
-        } else {
-          setFinalTestNoMajorErrorAttempts(0);
-          setLessonReviewStep("reinforcement");
-          setLessonReviewMessage("Wax yar ayaad khalday, aan dib u celino");
         }
       } else {
         setLessonReviewMessage("Iskiis u akhri, markaad diyaar noqoto sii wad");

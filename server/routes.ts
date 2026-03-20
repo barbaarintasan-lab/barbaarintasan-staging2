@@ -13180,11 +13180,14 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
 
       const evaluation = evaluateQuranTextScore(correctText, transcribedText);
       const isRepeatMode = learningMode === "repeat";
-      // Keep child flow soft in both stages: only clear retries should fail.
+      const isFinalFullLessonMemorize = isFullLessonCheck && !isRepeatMode;
+      // Final full-lesson check is intentionally extra soft to avoid blocking progress.
       const isCorrect = isRepeatMode
         ? evaluation.status !== "retry"
-        : evaluation.status !== "retry";
-      const threshold = isRepeatMode ? 50 : 72;
+        : (isFinalFullLessonMemorize
+            ? (evaluation.status !== "retry" || evaluation.score >= 35)
+            : evaluation.status !== "retry");
+      const threshold = isRepeatMode ? 50 : (isFinalFullLessonMemorize ? 35 : 72);
       const { getRandomEncouragement } = await import("./quranLessons");
       const encouragement = !isCorrect ? getRandomEncouragement() : "";
 
@@ -13196,7 +13199,7 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
           ? (evaluation.status === "needs_improvement"
               ? "Fiican! Wax yar ayaad hagaajin kartaa, hadda qalbiga u gudub."
               : "Fiican! Hadda qalbiga ka akhri.")
-          : (evaluation.status === "needs_improvement"
+          : (evaluation.status === "needs_improvement" || isFinalFullLessonMemorize
             ? "Waad gudubtay, khalad yar ma dhibayo. Aayada xigta u gudub."
             : "Hambalyo! Waad ku guuleysatay");
       } else {
