@@ -15463,7 +15463,7 @@ function PromoVideosTab() {
           ) : (
             <div className="space-y-4">
               <div>
-                <h4 className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-2">Muuqaalka Hadda ee Bogga Hore</h4>
+                <h4 className="text-xs uppercase tracking-wide text-green-700 font-semibold mb-2">Muuqaalada Hadda ee Bogga Hore</h4>
                 {visibleVideos.length === 0 ? (
                   <p className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">Weli muuqaal muuqda ma jiro.</p>
                 ) : (

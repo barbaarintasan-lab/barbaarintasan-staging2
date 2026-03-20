@@ -10693,7 +10693,6 @@ Return a JSON object with:
       if (!title || !videoUrl) {
         return res.status(400).json({ error: "Title and video URL are required" });
       }
-      await db.update(promoVideos).set({ isVisible: false }).where(eq(promoVideos.isVisible, true));
       const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${promoVideos.order}), 0)` }).from(promoVideos);
       const [video] = await db.insert(promoVideos).values({
         title,
@@ -10721,13 +10720,6 @@ Return a JSON object with:
       if (thumbnailUrl !== undefined) updates.thumbnailUrl = thumbnailUrl;
       if (isVisible !== undefined) updates.isVisible = isVisible;
       if (order !== undefined) updates.order = order;
-
-      if (isVisible === true) {
-        await db
-          .update(promoVideos)
-          .set({ isVisible: false })
-          .where(and(eq(promoVideos.isVisible, true), ne(promoVideos.id, id)));
-      }
 
       const [video] = await db.update(promoVideos).set(updates).where(eq(promoVideos.id, id)).returning();
       if (!video) return res.status(404).json({ error: "Video not found" });
