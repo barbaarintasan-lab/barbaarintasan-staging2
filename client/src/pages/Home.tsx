@@ -552,17 +552,15 @@ function PromoVideoSection() {
           <p className="text-xs text-slate-500 mt-1">Linki ahaan dib uga daawo.</p>
           <div className="mt-3 space-y-2">
             {archivedPreview.map((video: any) => (
-              <a
+              <Link
                 key={video.id}
-                href={video.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/maktabada/muuqaal/${video.id}`}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-100"
                 data-testid={`promo-archive-link-${video.id}`}
               >
                 <span className="truncate pr-2">{video.title}</span>
                 <ExternalLink className="w-4 h-4 text-slate-500" />
-              </a>
+              </Link>
             ))}
           </div>
         </div>

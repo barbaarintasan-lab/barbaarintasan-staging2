@@ -66,6 +66,7 @@ const LearningGroups = lazy(() => import("@/pages/LearningGroups"));
 const LearningHub = lazy(() => import("@/pages/LearningHub"));
 const ParentTips = lazy(() => import("@/pages/ParentTips"));
 const MeetWatch = lazy(() => import("@/pages/MeetWatch"));
+const PromoArchiveVideo = lazy(() => import("@/pages/PromoArchiveVideo"));
 const ChildLogin = lazy(() => import("@/pages/ChildLogin"));
 const ChildDashboard = lazy(() => import("@/pages/ChildDashboard"));
 const QuranFolders = lazy(() => import("@/pages/QuranFolders"));
@@ -278,6 +279,7 @@ function Router() {
             <Route path="/baraha" component={ParentFeed} />
             <Route path="/groups" component={LearningGroups} />
             <Route path="/meet-watch/:id" component={MeetWatch} />
+            <Route path="/maktabada/muuqaal/:id" component={PromoArchiveVideo} />
             <Route path="/parent-community-terms" component={ParentCommunityTerms} />
             <Route path="/terms" component={TermsConditions} />
             <Route path="/privacy-policy" component={PrivacyPolicy} />

@@ -217,7 +217,16 @@ const fileTypeColors: Record<string, string> = {
   video: "from-blue-400 to-indigo-500",
 };
 
-type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages" | "meet-recordings";
+type LibrarySection = "main" | "quran" | "hadith" | "siirada" | "duas" | "parenting-books" | "children-books" | "prayer-times" | "sheeko-recordings" | "bedtime-stories" | "parent-messages" | "meet-recordings" | "promo-archive";
+
+interface PromoArchiveVideo {
+  id: string;
+  title: string;
+  description?: string | null;
+  videoUrl: string;
+  viewCount?: number;
+  createdAt?: string;
+}
 
 export default function Resources() {
   const { t } = useTranslation();
@@ -238,7 +247,7 @@ export default function Resources() {
     if (typeof window === "undefined") return "main";
     try {
       const hash = window.location.hash.replace('#', '') as LibrarySection;
-      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages", "meet-recordings"];
+      const validSections: LibrarySection[] = ["main", "quran", "hadith", "siirada", "duas", "parenting-books", "children-books", "prayer-times", "sheeko-recordings", "bedtime-stories", "parent-messages", "meet-recordings", "promo-archive"];
       return validSections.includes(hash) ? hash : "main";
     } catch {
       return "main";
@@ -668,6 +677,16 @@ export default function Resources() {
       return res.json();
     },
     enabled: !!parent,
+  });
+
+  const { data: promoArchiveVideos = [], isLoading: promoArchiveLoading } = useQuery<PromoArchiveVideo[]>({
+    queryKey: ["/api/promo-videos/archive", "resources"],
+    queryFn: async () => {
+      const res = await fetch("/api/promo-videos/archive", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch archived promo videos");
+      return res.json();
+    },
+    enabled: !!parent && activeSection === "promo-archive",
   });
 
   const downloadMutation = useMutation({
@@ -1846,6 +1865,56 @@ export default function Resources() {
     );
   }
 
+  if (activeSection === "promo-archive") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
+        <header className="sticky top-0 z-40 bg-gradient-to-r from-blue-600 to-indigo-600 safe-top shadow-lg">
+          <div className="px-4 py-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setActiveSection("main")} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <div>
+                <h1 className="font-bold text-white text-lg">Muuqaaladii hore halka ka daawo</h1>
+                <p className="text-blue-100 text-sm">Muuqaaladii bogga hore ee Maktabada galay</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="px-4 py-4">
+          {promoArchiveLoading ? (
+            <p className="text-sm text-gray-500">Waa la soo dejinayaa...</p>
+          ) : promoArchiveVideos.length === 0 ? (
+            <div className="border border-dashed border-gray-300 rounded-xl bg-white p-4 text-sm text-gray-600">
+              Maktabadda wali wax muuqaal ah kuma jiro.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {promoArchiveVideos.map((video) => (
+                <Link
+                  key={video.id}
+                  href={`/maktabada/muuqaal/${video.id}`}
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50"
+                  data-testid={`resources-promo-archive-${video.id}`}
+                >
+                  <div className="min-w-0 pr-3">
+                    <h3 className="font-semibold text-gray-900 line-clamp-1">{video.title}</h3>
+                    {video.description && <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{video.description}</p>}
+                    <p className="text-xs text-gray-400 mt-1">Views: {video.viewCount || 0}</p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-gray-500 shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <BottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
       <header className="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 safe-top shadow-lg">
@@ -1980,6 +2049,22 @@ export default function Resources() {
               <div>
                 <h3 className="font-bold text-white text-lg">Kulamadii Hore</h3>
                 <p className="text-red-200 text-xs mt-1">Kulamadii Bahda Tarbiyadda Caruurta ee Hore</p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveSection("promo-archive")}
+            className="bg-gradient-to-br from-blue-500 to-indigo-700 rounded-2xl p-5 text-left shadow-lg active:scale-[0.98] transition-transform col-span-2"
+            data-testid="button-promo-archive-section"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                <span className="text-3xl">🎬</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-lg">Muuqaaladii hore halka ka daawo</h3>
+                <p className="text-blue-200 text-xs mt-1">Xayeysiisyadii hore oo engagement leh</p>
               </div>
             </div>
           </button>
