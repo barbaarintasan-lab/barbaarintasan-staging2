@@ -495,7 +495,7 @@ function PromoVideoSection() {
                 <button
                   onClick={() => {
                     setActiveVideo(video.id);
-                    if (parent && !viewedInSession.current.has(video.id)) {
+                    if (!viewedInSession.current.has(video.id)) {
                       viewedInSession.current.add(video.id);
                       trackViewMutation.mutate(video.id);
                     }
