@@ -50,7 +50,7 @@ function requireChildAuth(req: Request, res: Response, next: NextFunction) {
 
 function getQuranSoftPassThreshold(childAge: number | null | undefined): number {
   if (!childAge || childAge < 1) {
-    return 4;
+    return 3;
   }
 
   // Younger children should not get stuck on the same ayah for too long.
@@ -62,7 +62,7 @@ function getQuranSoftPassThreshold(childAge: number | null | undefined): number 
     return 3;
   }
 
-  return 4;
+  return 3;
 }
 
 type QuranLearningMode = "repeat" | "memorize";
@@ -152,10 +152,10 @@ function evaluateQuranTextScore(expectedText: string, spokenText: string): {
   const orderPercent = getOrderConsistencyPercent(expectedWords, spokenWords);
   const score = Math.round(wordMatchPercent * 0.7 + orderPercent * 0.3);
 
-  if (score < 60) {
+  if (score < 50) {
     return { score, wordMatchPercent, orderPercent, status: "retry", pass: false };
   }
-  if (score <= 80) {
+  if (score <= 72) {
     return { score, wordMatchPercent, orderPercent, status: "needs_improvement", pass: false };
   }
   return { score, wordMatchPercent, orderPercent, status: "good", pass: true };
@@ -344,7 +344,7 @@ async function submitQuranLesson(req: Request, res: Response) {
 
     const childAge = childRecord[0]?.age ?? null;
     const softPassThreshold = getQuranSoftPassThreshold(childAge);
-    const repeatSoftPassThreshold = childAge && childAge <= 8 ? 3 : 4;
+    const repeatSoftPassThreshold = childAge && childAge <= 8 ? 2 : 3;
     const numericScore = Math.max(0, Math.min(100, Number(score || 0)));
 
     let isPassed = false;
@@ -13162,11 +13162,16 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
       const audioFile = new File([req.file.buffer], "recording.webm", { type: req.file.mimetype || "audio/webm" });
       let transcribedText = "";
       try {
-        const transcription = await openai.audio.transcriptions.create({
-          model: "whisper-1",
-          file: audioFile,
-          language: "ar",
-        });
+        const transcription = await Promise.race([
+          openai.audio.transcriptions.create({
+            model: "whisper-1",
+            file: audioFile,
+            language: "ar",
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Quran transcription timeout")), 9000)
+          ),
+        ]);
         transcribedText = transcription.text.trim();
       } catch (aiError: any) {
         console.warn("[QURAN] AI check fallback - whisper/gpt unavailable:", aiError.code || aiError.message);
@@ -13175,12 +13180,11 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
 
       const evaluation = evaluateQuranTextScore(correctText, transcribedText);
       const isRepeatMode = learningMode === "repeat";
-      // Repeat stage should be soft: allow "needs_improvement" to pass.
-      // Memorize/full test stays strict: only "good" passes.
+      // Keep child flow soft in both stages: only clear retries should fail.
       const isCorrect = isRepeatMode
         ? evaluation.status !== "retry"
-        : evaluation.status === "good";
-      const threshold = isRepeatMode ? 60 : 80;
+        : evaluation.status !== "retry";
+      const threshold = isRepeatMode ? 50 : 72;
       const { getRandomEncouragement } = await import("./quranLessons");
       const encouragement = !isCorrect ? getRandomEncouragement() : "";
 
@@ -13192,7 +13196,9 @@ Respond ONLY with JSON: { "correct": boolean, "score": number (0-100), "feedback
           ? (evaluation.status === "needs_improvement"
               ? "Fiican! Wax yar ayaad hagaajin kartaa, hadda qalbiga u gudub."
               : "Fiican! Hadda qalbiga ka akhri.")
-          : "Hambalyo! Waad ku guuleysatay";
+          : (evaluation.status === "needs_improvement"
+            ? "Waad gudubtay, khalad yar ma dhibayo. Aayada xigta u gudub."
+            : "Hambalyo! Waad ku guuleysatay");
       } else {
         message = encouragement;
       }

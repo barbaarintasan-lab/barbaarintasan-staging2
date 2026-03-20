@@ -87,6 +87,19 @@ const CURRICULUM_ORDER = [
   95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78,
 ];
 
+const CHECK_UI_CLEAR_MS = 1200;
+const SOFT_PASS_CLEAR_MS = 900;
+const AUTO_ADVANCE_DELAY_MS = {
+  milestone: 1400,
+  softPass: 900,
+  standard: 1200,
+} as const;
+const NEXT_AYAH_AUTOPLAY_DELAY_MS = 150;
+const RETRY_AUDIO_DELAY_MS = {
+  normal: 300,
+  repeated: 150,
+} as const;
+
 function getNextSurahNumber(currentSurah: number): number | null {
   const idx = CURRICULUM_ORDER.indexOf(currentSurah);
   if (idx === -1 || idx >= CURRICULUM_ORDER.length - 1) return null;
@@ -740,7 +753,7 @@ export default function QuranLesson() {
         if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
         feedbackTimeoutRef.current = setTimeout(() => {
           setCheckResult(null);
-        }, 1500);
+        }, SOFT_PASS_CLEAR_MS);
       }
 
       if (learningMode === "repeat" && wasPassed) {
@@ -752,7 +765,7 @@ export default function QuranLesson() {
         if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
         feedbackTimeoutRef.current = setTimeout(() => {
           setCheckResult(null);
-        }, 1800);
+        }, CHECK_UI_CLEAR_MS);
       } else if (wasPassed && completedNow && !wasAlreadyCompleted) {
         setCurrentAyahFailures(0);
         setSlowMode(false);
@@ -779,7 +792,7 @@ export default function QuranLesson() {
           if (showMilestone) {
             setShowSessionCelebration(true);
           }
-          // auto-advance to next ayah after 2 seconds, then auto-play sheikh audio
+          // Auto-advance quickly so child momentum stays high.
           setAutoAdvancing(true);
           const nextIdx = Math.min(currentAyahIndex + 1, totalAyahs - 1);
           autoAdvanceTimeoutRef.current = setTimeout(() => {
@@ -809,9 +822,9 @@ export default function QuranLesson() {
                 }
               };
               audio.onerror = () => { setIsPlaying(false); setIsLoadingAudio(false); };
-              setTimeout(() => audio.play().catch(() => {}), 400);
+              setTimeout(() => audio.play().catch(() => {}), NEXT_AYAH_AUTOPLAY_DELAY_MS);
             }
-          }, showMilestone ? 2000 : (isSoftPass ? 1500 : 2200));
+          }, showMilestone ? AUTO_ADVANCE_DELAY_MS.milestone : (isSoftPass ? AUTO_ADVANCE_DELAY_MS.softPass : AUTO_ADVANCE_DELAY_MS.standard));
         }
       } else if (!wasPassed) {
         const mistakeNum = (ayahMistakes[currentAyah.number] || 0) + 1;
@@ -825,7 +838,7 @@ export default function QuranLesson() {
           setHintAvailable(true);
         }
 
-        const delay = mistakeNum >= 3 ? 400 : 800;
+        const delay = mistakeNum >= 3 ? RETRY_AUDIO_DELAY_MS.repeated : RETRY_AUDIO_DELAY_MS.normal;
         setTimeout(() => {
           const url = getAudioUrl(surahNumber, currentAyah.number, selectedReciter);
           if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = url; audioRef.current.play().catch(() => {}); }
