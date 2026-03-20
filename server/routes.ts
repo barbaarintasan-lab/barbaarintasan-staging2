@@ -10511,12 +10511,20 @@ Return a JSON object with:
           isVisible: promoVideos.isVisible,
           order: promoVideos.order,
           createdAt: promoVideos.createdAt,
-          viewCount: sql<number>`COALESCE((
-            SELECT COUNT(*)::int
-            FROM ${contentProgress}
-            WHERE ${contentProgress.contentType} = 'promo_video'
-              AND ${contentProgress.contentId} = ${promoVideos.id}
-          ), 0)`,
+          viewCount: sql<number>`(
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${contentProgress}
+              WHERE ${contentProgress.contentType} = 'promo_video'
+                AND ${contentProgress.contentId} = ${promoVideos.id}
+            ), 0)
+            +
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${visitorPings}
+              WHERE ${visitorPings.visitorKey} LIKE ('promo-view:' || ${promoVideos.id} || ':%')
+            ), 0)
+          )`,
         })
         .from(promoVideos)
         .where(eq(promoVideos.isVisible, true))
@@ -10544,12 +10552,20 @@ Return a JSON object with:
           isVisible: promoVideos.isVisible,
           order: promoVideos.order,
           createdAt: promoVideos.createdAt,
-          viewCount: sql<number>`COALESCE((
-            SELECT COUNT(*)::int
-            FROM ${contentProgress}
-            WHERE ${contentProgress.contentType} = 'promo_video'
-              AND ${contentProgress.contentId} = ${promoVideos.id}
-          ), 0)`,
+          viewCount: sql<number>`(
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${contentProgress}
+              WHERE ${contentProgress.contentType} = 'promo_video'
+                AND ${contentProgress.contentId} = ${promoVideos.id}
+            ), 0)
+            +
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${visitorPings}
+              WHERE ${visitorPings.visitorKey} LIKE ('promo-view:' || ${promoVideos.id} || ':%')
+            ), 0)
+          )`,
         })
         .from(promoVideos)
         .where(eq(promoVideos.isVisible, false))
@@ -10566,17 +10582,28 @@ Return a JSON object with:
   app.post("/api/promo-videos/:id/view", async (req, res) => {
     try {
       const parentId = req.session.parentId;
-      if (!parentId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
+      const visitorKey = typeof req.body?.visitorKey === "string" ? req.body.visitorKey.slice(0, 120) : null;
 
       const [video] = await db.select().from(promoVideos).where(eq(promoVideos.id, req.params.id)).limit(1);
       if (!video) {
         return res.status(404).json({ error: "Video not found" });
       }
 
-      // Record a unique viewer per parent for this promo video.
-      await storage.markContentComplete(parentId, "promo_video", req.params.id);
+      if (parentId) {
+        // Record a unique viewer per signed-in parent for this promo video.
+        await storage.markContentComplete(parentId, "promo_video", req.params.id);
+      } else if (visitorKey) {
+        await db
+          .insert(visitorPings)
+          .values({
+            visitorKey: `promo-view:${req.params.id}:${visitorKey}`,
+            lastPingedAt: new Date(),
+          })
+          .onConflictDoNothing();
+      } else {
+        return res.status(400).json({ error: "viewer identity required" });
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error tracking promo video view:", error);
@@ -20154,7 +20181,7 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
       const [visitorResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(visitorPings)
-        .where(sql`${visitorPings.lastPingedAt} > ${cutoff}`);
+        .where(sql`${visitorPings.lastPingedAt} > ${cutoff} AND ${visitorPings.visitorKey} NOT LIKE 'promo-view:%'`);
       const dbVisitorCount = Number(visitorResult?.count || 0);
       const loggedInUsers = getOnlineUsers();
       const onlineCount = Math.max(dbVisitorCount, loggedInUsers.length);

@@ -18,6 +18,16 @@ const barahaWaalidiintaImg = "/images/somali_parents_community_gathering.png";
 const bsaAppIcon = "/images/bsa_app_icon_orange_gradient.png";
 const sheekoAppIcon = "/images/sheeko_app_icon_purple_gradient.png";
 const tarbiyaddaLogo = "/images/tarbiyadda-logo.png";
+
+function getPromoViewerKey(): string | null {
+  if (typeof window === "undefined") return null;
+  const storageKey = "promo-viewer-key";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const generated = `browser-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(storageKey, generated);
+  return generated;
+}
 // Furud (Fruits) - 10 items
 const bananaImg = "/images/banana_white_background.png";
 const mangoImg = "/images/mango_white_background.png";
@@ -363,7 +373,9 @@ function PromoVideoSection() {
 
   const trackViewMutation = useMutation({
     mutationFn: async (videoId: string) => {
-      await apiRequest("POST", `/api/promo-videos/${videoId}/view`);
+      await apiRequest("POST", `/api/promo-videos/${videoId}/view`, {
+        visitorKey: getPromoViewerKey(),
+      });
     },
     onSuccess: (_data, videoId) => {
       queryClient.setQueryData<any[]>(["/api/promo-videos"], (current = []) =>
