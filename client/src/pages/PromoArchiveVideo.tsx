@@ -31,8 +31,10 @@ export default function PromoArchiveVideoPage() {
       if (!res.ok) throw new Error("Failed to fetch archived promo videos");
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 5_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 
   const video = useMemo(

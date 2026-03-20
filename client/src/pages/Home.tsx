@@ -339,8 +339,10 @@ function PromoVideoSection() {
   const viewedInSession = useRef<Set<string>>(new Set());
   const { data: videos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos"],
-    staleTime: 60_000,
+    staleTime: 5_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
   const { data: archivedVideos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos/archive"],
