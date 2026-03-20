@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Download, FileText, Image, Headphones, Video, X, ExternalLink, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Cloud, FolderOpen, Play, Pause, SkipBack, SkipForward, Volume2, BookOpenText, List, Eye, EyeOff } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useState, useCallback, useRef, useEffect } from "react";
 import BottomNav from "@/components/BottomNav";
 import { Dialog, DialogContent, DialogContentFullscreen } from "@/components/ui/dialog";
@@ -231,6 +231,7 @@ interface PromoArchiveVideo {
 export default function Resources() {
   const { t } = useTranslation();
   const { parent } = useParentAuth();
+  const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [selectedDriveFile, setSelectedDriveFile] = useState<DriveFile | null>(null);
@@ -1920,7 +1921,7 @@ export default function Resources() {
       <header className="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-purple-600 safe-top shadow-lg">
         <div className="px-4 py-4">
           <div className="flex items-center gap-3">
-              <button onClick={() => window.history.back()} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
+              <button onClick={() => setLocation("/")} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" data-testid="button-back">
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
             <div>
