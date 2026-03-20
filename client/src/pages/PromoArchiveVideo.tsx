@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Eye, ExternalLink, Play, Share2, Video, X } from "lucide-react";
+import { ArrowLeft, Eye, Play, Share2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/queryClient";
 import { ContentComments, ContentReactions } from "@/components/engagement";
@@ -182,10 +182,6 @@ export default function PromoArchiveVideoPage() {
                 <Share2 className="w-4 h-4" />
                 La wadaag
               </button>
-              <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-blue-600">
-                <ExternalLink className="w-4 h-4" />
-                Fur source
-              </a>
             </div>
 
             <div className="mt-4 bg-slate-900 rounded-xl p-3">

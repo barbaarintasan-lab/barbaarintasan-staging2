@@ -392,7 +392,7 @@ function PromoVideoSection() {
   const archivedOnly = archivedVideos.filter(
     (video: any) => !videos.some((current: any) => current.id === video.id),
   );
-  const archivedPreview = archivedOnly.slice(0, 5);
+  const latestArchivedVideo = archivedOnly[0] ?? null;
 
   const getGDriveFileId = (url: string) => {
     const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -553,22 +553,18 @@ function PromoVideoSection() {
         </DialogContent>
       </Dialog>
 
-      {archivedPreview.length > 0 && (
+      {latestArchivedVideo && (
         <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4" data-testid="promo-archive-links">
           <h4 className="text-sm font-bold text-slate-800">Muuqaaladii Hore ee Bogga Hore</h4>
-          <p className="text-xs text-slate-500 mt-1">Linki ahaan dib uga daawo.</p>
-          <div className="mt-3 space-y-2">
-            {archivedPreview.map((video: any) => (
-              <Link
-                key={video.id}
-                href={`/maktabada/muuqaal/${video.id}`}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-100"
-                data-testid={`promo-archive-link-${video.id}`}
-              >
-                <span className="truncate pr-2">{video.title}</span>
-                <ExternalLink className="w-4 h-4 text-slate-500" />
-              </Link>
-            ))}
+          <div className="mt-3">
+            <Link
+              href={`/maktabada/muuqaal/${latestArchivedVideo.id}`}
+              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-100"
+              data-testid={`promo-archive-link-${latestArchivedVideo.id}`}
+            >
+              <span className="truncate pr-2">{latestArchivedVideo.title}</span>
+              <ExternalLink className="w-4 h-4 text-slate-500" />
+            </Link>
           </div>
         </div>
       )}
