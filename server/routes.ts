@@ -10694,14 +10694,36 @@ Return a JSON object with:
         return res.status(400).json({ error: "Title and video URL are required" });
       }
       const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${promoVideos.order}), 0)` }).from(promoVideos);
-      const [video] = await db.insert(promoVideos).values({
-        title,
-        description: description || null,
-        videoUrl,
-        thumbnailUrl: thumbnailUrl || null,
-        isVisible: true,
-        order: (maxOrder[0]?.max || 0) + 1,
-      }).returning();
+      const nextOrder = (maxOrder[0]?.max || 0) + 1;
+
+      let video: any;
+      try {
+        [video] = await db.insert(promoVideos).values({
+          title,
+          description: description || null,
+          videoUrl,
+          thumbnailUrl: thumbnailUrl || null,
+          isVisible: true,
+          order: nextOrder,
+        }).returning();
+      } catch (insertError: any) {
+        const message = String(insertError?.message || "").toLowerCase();
+        // Some older production databases may have a legacy CHECK on order that blocks values above 3.
+        // Retry with a safe fallback order so admins can keep adding links.
+        if (message.includes("order") || message.includes("check")) {
+          [video] = await db.insert(promoVideos).values({
+            title,
+            description: description || null,
+            videoUrl,
+            thumbnailUrl: thumbnailUrl || null,
+            isVisible: true,
+            order: 0,
+          }).returning();
+        } else {
+          throw insertError;
+        }
+      }
+
       res.json(video);
     } catch (error) {
       console.error("Error creating promo video:", error);
