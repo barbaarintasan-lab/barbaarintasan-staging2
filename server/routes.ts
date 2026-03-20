@@ -10604,7 +10604,25 @@ Return a JSON object with:
         return res.status(400).json({ error: "viewer identity required" });
       }
 
-      res.json({ success: true });
+      const [viewCountResult] = await db
+        .select({
+          count: sql<number>`(
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${contentProgress}
+              WHERE ${contentProgress.contentType} = 'promo_video'
+                AND ${contentProgress.contentId} = ${req.params.id}
+            ), 0)
+            +
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM ${visitorPings}
+              WHERE ${visitorPings.visitorKey} LIKE ('promo-view:' || ${req.params.id} || ':%')
+            ), 0)
+          )`,
+        });
+
+      res.json({ success: true, viewCount: Number(viewCountResult?.count || 0) });
     } catch (error) {
       console.error("Error tracking promo video view:", error);
       res.status(500).json({ error: "Failed to track view" });

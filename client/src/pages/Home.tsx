@@ -373,15 +373,16 @@ function PromoVideoSection() {
 
   const trackViewMutation = useMutation({
     mutationFn: async (videoId: string) => {
-      await apiRequest("POST", `/api/promo-videos/${videoId}/view`, {
+      const res = await apiRequest("POST", `/api/promo-videos/${videoId}/view`, {
         visitorKey: getPromoViewerKey(),
       });
+      return res.json();
     },
-    onSuccess: (_data, videoId) => {
+    onSuccess: (data, videoId) => {
       queryClient.setQueryData<any[]>(["/api/promo-videos"], (current = []) =>
         current.map((item) =>
           item.id === videoId
-            ? { ...item, viewCount: (item.viewCount || 0) + 1 }
+            ? { ...item, viewCount: typeof data?.viewCount === "number" ? data.viewCount : (item.viewCount || 0) }
             : item,
         ),
       );

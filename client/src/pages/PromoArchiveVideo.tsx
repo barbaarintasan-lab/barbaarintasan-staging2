@@ -44,10 +44,19 @@ export default function PromoArchiveVideoPage() {
 
   const trackViewMutation = useMutation({
     mutationFn: async (videoId: string) => {
-      await apiRequest("POST", `/api/promo-videos/${videoId}/view`);
+      const res = await apiRequest("POST", `/api/promo-videos/${videoId}/view`, {
+        visitorKey: typeof window !== "undefined" ? (localStorage.getItem("promo-viewer-key") || "archive-viewer") : "archive-viewer",
+      });
+      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos/archive"] });
+    onSuccess: (data, videoId) => {
+      queryClient.setQueryData<PromoArchiveVideo[]>(["/api/promo-videos/archive"], (current = []) =>
+        current.map((item) =>
+          item.id === videoId
+            ? { ...item, viewCount: typeof data?.viewCount === "number" ? data.viewCount : (item.viewCount || 0) }
+            : item,
+        ),
+      );
     },
   });
 
