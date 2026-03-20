@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, contentProgress, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, contentProgress, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, visitorPings, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -20080,31 +20080,38 @@ MUHIIM: Soo celi JSON keliya, wax kale ha ku darin.`;
     }
   });
 
-  // Track all visitors (logged in + anonymous)
-  const activeVisitors = new Map<string, number>();
-
-  const cleanupVisitors = () => {
-    const now = Date.now();
-    for (const [key, lastSeen] of activeVisitors) {
-      if (now - lastSeen > 90000) {
-        activeVisitors.delete(key);
-      }
+  // Track all visitors via DB (works across multiple server instances & restarts)
+  app.post("/api/stats/ping", async (req, res) => {
+    try {
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+        || req.socket.remoteAddress
+        || "unknown";
+      const sessionId = req.sessionID || "anon";
+      const visitorKey = `${ip}-${sessionId}`.slice(0, 200);
+      await db
+        .insert(visitorPings)
+        .values({ visitorKey, lastPingedAt: new Date() })
+        .onConflictDoUpdate({
+          target: visitorPings.visitorKey,
+          set: { lastPingedAt: new Date() },
+        });
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: true });
     }
-  };
-
-  app.post("/api/stats/ping", (req, res) => {
-    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
-    const visitorKey = `${ip}-${req.sessionID || "anon"}`;
-    activeVisitors.set(visitorKey, Date.now());
-    res.json({ ok: true });
   });
 
   // Live stats: online visitors + enrolled users count (public endpoint)
   app.get("/api/stats/live", async (req, res) => {
     try {
-      cleanupVisitors();
+      const cutoff = new Date(Date.now() - 90000);
+      const [visitorResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(visitorPings)
+        .where(sql`${visitorPings.lastPingedAt} > ${cutoff}`);
+      const dbVisitorCount = Number(visitorResult?.count || 0);
       const loggedInUsers = getOnlineUsers();
-      const onlineCount = Math.max(activeVisitors.size, loggedInUsers.length);
+      const onlineCount = Math.max(dbVisitorCount, loggedInUsers.length);
 
       const [enrollmentResult] = await db
         .select({ count: sql<number>`count(distinct ${enrollments.parentId})` })

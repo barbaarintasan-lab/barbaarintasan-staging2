@@ -112,7 +112,7 @@ function isAvailableCourse(courseId: string): boolean {
 }
 
 // Animated counter component for stats
-function AnimatedCounter({ value }: { value: number }) {
+function AnimatedCounter({ value, loading }: { value: number; loading?: boolean }) {
   const [displayCount, setDisplayCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const animationRef = useRef<number | null>(null);
@@ -120,15 +120,11 @@ function AnimatedCounter({ value }: { value: number }) {
   const lastValueRef = useRef(0);
 
   useEffect(() => {
-    // If value changed after animation, update immediately
+    if (loading || value === 0) return;
+
     if (hasAnimatedRef.current && value !== lastValueRef.current) {
       setDisplayCount(value);
       lastValueRef.current = value;
-      return;
-    }
-    
-    if (value === 0) {
-      setDisplayCount(0);
       return;
     }
 
@@ -140,23 +136,19 @@ function AnimatedCounter({ value }: { value: number }) {
           const startTime = performance.now();
           const duration = 1200;
           const targetValue = value;
-          
+
           const animate = (currentTime: number) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            // Ease out cubic
             const eased = 1 - Math.pow(1 - progress, 3);
-            const currentCount = Math.floor(eased * targetValue);
-            
-            setDisplayCount(currentCount);
-            
+            setDisplayCount(Math.floor(eased * targetValue));
             if (progress < 1) {
               animationRef.current = requestAnimationFrame(animate);
             } else {
               setDisplayCount(targetValue);
             }
           };
-          
+
           animationRef.current = requestAnimationFrame(animate);
         }
       },
@@ -164,19 +156,20 @@ function AnimatedCounter({ value }: { value: number }) {
     );
 
     if (ref.current) observer.observe(ref.current);
-    
     return () => {
       observer.disconnect();
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [value]);
+  }, [value, loading]);
 
-  // Show value directly if animation completed or data just loaded
+  if (loading) {
+    return <span className="text-3xl font-bold text-orange-300 tabular-nums">—</span>;
+  }
+
   const finalDisplay = hasAnimatedRef.current ? displayCount : (value > 0 ? value : displayCount);
-
   return (
     <span ref={ref} className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-500 tabular-nums">
-      {finalDisplay}
+      {finalDisplay.toLocaleString()}
     </span>
   );
 }
@@ -2425,7 +2418,7 @@ export default function Home() {
     },
   });
 
-  const { data: parentStats } = useQuery({
+  const { data: parentStats, isLoading: parentStatsLoading } = useQuery({
     queryKey: ["parentStats"],
     queryFn: async () => {
       const res = await fetch("/api/stats/parents");
@@ -2435,7 +2428,7 @@ export default function Home() {
     refetchIntervalInBackground: true,
   });
 
-  const { data: telegramStats } = useQuery({
+  const { data: telegramStats, isLoading: telegramStatsLoading } = useQuery({
     queryKey: ["telegramStats"],
     queryFn: async () => {
       const res = await fetch("/api/stats/telegram-members");
@@ -2521,9 +2514,7 @@ export default function Home() {
       return true;
     }
     const section = homepageSections.find((s: any) => s.sectionKey === sectionKey);
-    if (section !== undefined) return true;
-    if (sectionKey === "gold_membership") return true;
-    return false;
+    return section !== undefined;
   };
 
   const hasEnrollments = enrollments.filter((e: any) => e.status === "active").length > 0;
@@ -2727,33 +2718,31 @@ export default function Home() {
       {/* Stats Section */}
       {isSectionVisible("stats") && (
       <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-5 lg:gap-6">
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.courses")}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.courses")}</p>
             <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
+            <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.available")}</p>
           </div>
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.lessons")}</p>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.lessons")}</p>
             <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 70} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.available")}</p>
+            <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.available")}</p>
           </div>
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">{t("home.stats.parents")}</p>
-            <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.inApp")}</p>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.parents")}</p>
+            <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} loading={parentStatsLoading} />
+            <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.inApp")}</p>
           </div>
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1 whitespace-nowrap">
-              Caruurta Quraanka Barata
-            </p>
-            <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} />
-            <p className="text-xs text-gray-400 mt-1 invisible">Quraanka barata</p>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">Caruurta Quraanka</p>
+            <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} loading={parentStatsLoading} />
+            <p className="text-xs text-gray-400 mt-1 truncate">Barata</p>
           </div>
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Telegram</p>
-            <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} />
-            <p className="text-xs text-gray-400 mt-1">{t("home.stats.followUs")}</p>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">Telegram</p>
+            <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} loading={telegramStatsLoading} />
+            <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.followUs")}</p>
           </div>
         </div>
       </div>

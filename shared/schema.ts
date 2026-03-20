@@ -2402,3 +2402,8 @@ export const ssoTokens = pgTable("sso_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const visitorPings = pgTable("visitor_pings", {
+  visitorKey: text("visitor_key").primaryKey(),
+  lastPingedAt: timestamp("last_pinged_at").notNull().defaultNow(),
+});
