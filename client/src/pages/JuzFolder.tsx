@@ -244,8 +244,6 @@ export default function JuzFolder() {
               <div className="space-y-3">
                 {surahs.map((surah, idx) => {
                   const isLocked = !surah.unlocked;
-                  const stackStep = Math.min(idx + 1, 10) * 5;
-                  const stickyTop = `calc(${surahStickyBaseTop} + ${stackStep}px)`;
                   return (
                     <div
                       key={surah.number}
@@ -257,7 +255,7 @@ export default function JuzFolder() {
                           ? "border-white/5 opacity-40"
                           : "border-[#FFD93D]/20 hover:border-[#FFD93D]/40 hover:bg-white/10 cursor-pointer active:scale-[0.97]"
                       }`}
-                      style={{ top: stickyTop, zIndex: 30 - Math.min(idx, 20) }}
+                      style={{ top: surahStickyBaseTop }}
                       data-testid={`card-surah-${surah.number}`}
                     >
                       <div className="flex items-center gap-4">
@@ -337,7 +335,10 @@ export default function JuzFolder() {
             </div>
 
             {unlockedGames.length === 0 ? (
-              <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
+              <div
+                className="sticky bg-white/5 rounded-2xl p-8 border border-white/10 text-center"
+                style={{ top: surahStickyBaseTop }}
+              >
                 <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
                 <h4 className="text-white/60 font-semibold mb-2">Weli surah ma dhammaysid</h4>
                 <p className="text-white/30 text-sm">
@@ -354,7 +355,11 @@ export default function JuzFolder() {
             ) : (
               <div className="space-y-4">
                 {unlockedGames.map((ug) => (
-                  <div key={ug.surahNumber} className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                  <div
+                    key={ug.surahNumber}
+                    className="sticky bg-white/5 rounded-2xl p-4 border border-white/10"
+                    style={{ top: surahStickyBaseTop }}
+                  >
                     <div className="flex items-center gap-2 mb-3">
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
                       <h4 className="text-white font-semibold text-sm flex-1">{ug.surahName}</h4>
@@ -397,7 +402,10 @@ export default function JuzFolder() {
             </h3>
 
             {rewards?.streak && (
-              <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-2xl p-4 border border-orange-500/20 mb-4">
+              <div
+                className="sticky bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-2xl p-4 border border-orange-500/20 mb-4"
+                style={{ top: surahStickyBaseTop }}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Flame className="w-5 h-5 text-orange-400" />
@@ -423,7 +431,10 @@ export default function JuzFolder() {
             )}
 
             {rewards?.weeklyProgress && (
-              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 mb-4">
+              <div
+                className="sticky bg-white/5 rounded-2xl p-4 border border-white/10 mb-4"
+                style={{ top: surahStickyBaseTop }}
+              >
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-[#4ECDC4]" />
                   <span className="text-white/60 text-sm font-semibold">Usbuucan</span>
@@ -444,7 +455,10 @@ export default function JuzFolder() {
             )}
 
             {rewards?.badges && rewards.badges.length > 0 ? (
-              <div className="mb-4">
+              <div
+                className="sticky mb-4"
+                style={{ top: surahStickyBaseTop }}
+              >
                 <h4 className="text-white/60 text-sm font-semibold mb-3">Badges-kaaga</h4>
                 <div className="grid grid-cols-3 gap-3">
                   {rewards.badges.map((badge) => (
@@ -456,7 +470,10 @@ export default function JuzFolder() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white/5 rounded-2xl p-8 border border-white/10 text-center">
+              <div
+                className="sticky bg-white/5 rounded-2xl p-8 border border-white/10 text-center"
+                style={{ top: surahStickyBaseTop }}
+              >
                 <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" />
                 <p className="text-white/40 text-sm">Sii wad barashada si aad u hesho hadiyad!</p>
               </div>
