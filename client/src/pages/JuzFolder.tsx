@@ -132,6 +132,7 @@ export default function JuzFolder() {
 
   const totalSurahs = surahs.length;
   const completedCount = surahs.filter((s) => s.completed).length;
+  const surahStickyBaseTop = "calc(env(safe-area-inset-top, 0px) + 210px)";
 
   return (
     <div className="min-h-screen bg-[#1a1a2e]">
@@ -243,17 +244,20 @@ export default function JuzFolder() {
               <div className="space-y-3">
                 {surahs.map((surah, idx) => {
                   const isLocked = !surah.unlocked;
+                  const stackStep = Math.min(idx + 1, 10) * 5;
+                  const stickyTop = `calc(${surahStickyBaseTop} + ${stackStep}px)`;
                   return (
                     <div
                       key={surah.number}
                       onClick={() => !isLocked && setLocation(`/quran-lesson/${surah.number}`)}
-                      className={`bg-white/5 backdrop-blur-sm rounded-3xl p-5 border-2 transition-all ${
+                      className={`sticky bg-white/5 backdrop-blur-sm rounded-3xl p-5 border-2 transition-all ${
                         surah.completed
                           ? "border-green-500/30"
                           : isLocked
                           ? "border-white/5 opacity-40"
                           : "border-[#FFD93D]/20 hover:border-[#FFD93D]/40 hover:bg-white/10 cursor-pointer active:scale-[0.97]"
                       }`}
+                      style={{ top: stickyTop, zIndex: 30 - Math.min(idx, 20) }}
                       data-testid={`card-surah-${surah.number}`}
                     >
                       <div className="flex items-center gap-4">
