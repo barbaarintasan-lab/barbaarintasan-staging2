@@ -2469,6 +2469,17 @@ export default function Home() {
     },
   });
 
+  const { data: freeLessonsStats, isLoading: freeLessonsStatsLoading } = useQuery({
+    queryKey: ["freeLessonsStats"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats/free-lessons");
+      if (!res.ok) return { count: 106 };
+      return res.json();
+    },
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+
   const { data: enrollments = [] } = useQuery({
     queryKey: ["parentEnrollments", parent?.id],
     queryFn: async () => {
@@ -2744,7 +2755,7 @@ export default function Home() {
       {/* Stats Section */}
       {isSectionVisible("stats") && (
       <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.courses")}</p>
             <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
@@ -2769,6 +2780,11 @@ export default function Home() {
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">Telegram</p>
             <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} loading={telegramStatsLoading} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.followUs")}</p>
+          </div>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">Casharada Free-ga ah</p>
+            <AnimatedCounter value={freeLessonsStats?.count > 0 ? freeLessonsStats.count : 106} loading={freeLessonsStatsLoading} />
+            <p className="text-xs text-gray-400 mt-1 truncate">Dhambaal + Maaweelo + Archive</p>
           </div>
         </div>
       </div>

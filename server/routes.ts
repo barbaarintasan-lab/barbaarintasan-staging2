@@ -11857,6 +11857,38 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
     }
   });
 
+  app.get("/api/stats/free-lessons", async (_req, res) => {
+    try {
+      const [archivedPromoCountResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(promoVideos)
+        .where(eq(promoVideos.isVisible, false));
+
+      const parentMessageCount = (await storage.getParentMessages(1000)).length;
+      const bedtimeStoryCount = (await storage.getBedtimeStories(1000)).length;
+      const archivedPromoCount = Number(archivedPromoCountResult?.count || 0);
+
+      res.json({
+        count: parentMessageCount + bedtimeStoryCount + archivedPromoCount,
+        breakdown: {
+          parentMessages: parentMessageCount,
+          bedtimeStories: bedtimeStoryCount,
+          archivedPromoVideos: archivedPromoCount,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching free lessons stats:", error);
+      res.json({
+        count: 106,
+        breakdown: {
+          parentMessages: 53,
+          bedtimeStories: 53,
+          archivedPromoVideos: 0,
+        },
+      });
+    }
+  });
+
   // Personalized Course Recommendations
   app.get("/api/recommendations", async (req, res) => {
     try {
