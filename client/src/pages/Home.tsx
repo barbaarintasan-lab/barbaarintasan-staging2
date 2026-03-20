@@ -343,8 +343,11 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
 function PromoVideoSection() {
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
+  const viewedInSession = useRef<Set<string>>(new Set());
   const { data: videos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
   const { data: archivedVideos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos/archive"],
@@ -354,6 +357,8 @@ function PromoVideoSection() {
       return res.json();
     },
     enabled: !!parent,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [openCommentsForVideoId, setOpenCommentsForVideoId] = useState<string | null>(null);
@@ -365,8 +370,14 @@ function PromoVideoSection() {
     mutationFn: async (videoId: string) => {
       await apiRequest("POST", `/api/promo-videos/${videoId}/view`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
+    onSuccess: (_data, videoId) => {
+      queryClient.setQueryData<any[]>(["/api/promo-videos"], (current = []) =>
+        current.map((item) =>
+          item.id === videoId
+            ? { ...item, viewCount: (item.viewCount || 0) + 1 }
+            : item,
+        ),
+      );
     },
   });
 
@@ -477,7 +488,8 @@ function PromoVideoSection() {
                 <button
                   onClick={() => {
                     setActiveVideo(video.id);
-                    if (parent) {
+                    if (parent && !viewedInSession.current.has(video.id)) {
+                      viewedInSession.current.add(video.id);
                       trackViewMutation.mutate(video.id);
                     }
                   }}

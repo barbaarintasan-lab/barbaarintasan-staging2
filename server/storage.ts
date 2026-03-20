@@ -5164,12 +5164,16 @@ export class DatabaseStorage implements IStorage {
 
   // Content Reactions & Comments implementations
   async getContentReactions(contentType: string, contentId: string, parentId?: string): Promise<{ counts: Record<string, number>; userReaction: string | null }> {
-    const allReactions = await db.select()
+    const reactionCounts = await db.select({
+      reactionType: contentReactions.reactionType,
+      count: sql<number>`count(*)::int`,
+    })
       .from(contentReactions)
       .where(and(
         eq(contentReactions.contentType, contentType),
         eq(contentReactions.contentId, contentId)
-      ));
+      ))
+      .groupBy(contentReactions.reactionType);
     
     // Initialize all reaction types to 0
     const counts: Record<string, number> = {
@@ -5179,12 +5183,24 @@ export class DatabaseStorage implements IStorage {
       sparkle: 0
     };
     
-    // Count reactions
-    allReactions.forEach(r => {
-      counts[r.reactionType] = (counts[r.reactionType] || 0) + 1;
+    reactionCounts.forEach((r) => {
+      counts[r.reactionType] = r.count;
     });
-    
-    const userReaction = parentId ? allReactions.find(r => r.parentId === parentId)?.reactionType || null : null;
+
+    let userReaction: string | null = null;
+    if (parentId) {
+      const [existingReaction] = await db.select({
+        reactionType: contentReactions.reactionType,
+      })
+        .from(contentReactions)
+        .where(and(
+          eq(contentReactions.parentId, parentId),
+          eq(contentReactions.contentType, contentType),
+          eq(contentReactions.contentId, contentId)
+        ))
+        .limit(1);
+      userReaction = existingReaction?.reactionType || null;
+    }
     
     return { counts, userReaction };
   }

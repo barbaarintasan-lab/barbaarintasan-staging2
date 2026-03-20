@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, ExternalLink, Play, Share2, Video, X } from "lucide-react";
@@ -22,6 +22,7 @@ export default function PromoArchiveVideoPage() {
   const queryClient = useQueryClient();
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState(false);
+  const viewedInSession = useRef<Set<string>>(new Set());
 
   const { data: archivedVideos = [], isLoading } = useQuery<PromoArchiveVideo[]>({
     queryKey: ["/api/promo-videos/archive"],
@@ -30,6 +31,8 @@ export default function PromoArchiveVideoPage() {
       if (!res.ok) throw new Error("Failed to fetch archived promo videos");
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const video = useMemo(
@@ -43,7 +46,6 @@ export default function PromoArchiveVideoPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/promo-videos/archive"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/promo-videos"] });
     },
   });
 
@@ -143,7 +145,10 @@ export default function PromoArchiveVideoPage() {
             <button
               onClick={() => {
                 setActiveVideo(video.id);
-                trackViewMutation.mutate(video.id);
+                if (!viewedInSession.current.has(video.id)) {
+                  viewedInSession.current.add(video.id);
+                  trackViewMutation.mutate(video.id);
+                }
               }}
               className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
             >
