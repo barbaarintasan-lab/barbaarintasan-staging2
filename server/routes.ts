@@ -9167,12 +9167,16 @@ Return a JSON object with:
 
       const [childrenActivity, parentActivity, dailySeries] = await Promise.all([
         db.execute(sql`
+          WITH qlp AS (
+            SELECT child_id AS childId, last_attempt_at
+            FROM quran_lesson_progress
+            WHERE last_attempt_at IS NOT NULL
+          )
           SELECT
-            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '1 day') AS dau,
-            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '7 days') AS wau,
-            COUNT(DISTINCT child_id) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '30 days') AS mau
-          FROM quran_lesson_progress
-          WHERE last_attempt_at IS NOT NULL
+            COUNT(DISTINCT childId) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '1 day') AS dau,
+            COUNT(DISTINCT childId) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '7 days') AS wau,
+            COUNT(DISTINCT childId) FILTER (WHERE last_attempt_at >= NOW() - INTERVAL '30 days') AS mau
+          FROM qlp
         `),
         db.execute(sql`
           SELECT
@@ -9181,11 +9185,15 @@ Return a JSON object with:
           FROM parents
         `),
         db.execute(sql`
+          WITH qlp AS (
+            SELECT child_id AS childId, last_attempt_at
+            FROM quran_lesson_progress
+            WHERE last_attempt_at >= NOW() - INTERVAL '14 days'
+          )
           SELECT
             TO_CHAR(DATE_TRUNC('day', last_attempt_at), 'YYYY-MM-DD') AS day,
-            COUNT(DISTINCT child_id) AS active_children
-          FROM quran_lesson_progress
-          WHERE last_attempt_at >= NOW() - INTERVAL '14 days'
+            COUNT(DISTINCT childId) AS active_children
+          FROM qlp
           GROUP BY DATE_TRUNC('day', last_attempt_at)
           ORDER BY DATE_TRUNC('day', last_attempt_at)
         `),
@@ -9205,8 +9213,9 @@ Return a JSON object with:
           wau: Number(p.parent_wau || 0),
         },
         dailyActiveChildren: (dailySeries.rows || []).map((r: any) => ({
+          // Keep a defensive shape while normalizing DB result.
+          activeChildren: ({ count: Number(r.active_children || 0) } as any)?.count || 0,
           day: r.day,
-          activeChildren: Number(r.active_children || 0),
         })),
       };
 
