@@ -259,6 +259,8 @@ export default function Dhambaal() {
     queryKey: [`/api/parent-messages?lang=${apiLanguage}`],
   });
 
+  const effectiveTodayMessage = todayMessage || allMessages?.[0] || null;
+
   const { data: dhambaalProgress = [] } = useQuery<{ contentId: string }[]>({
     queryKey: ["contentProgress", "dhambaal"],
     queryFn: async () => {
@@ -549,13 +551,13 @@ export default function Dhambaal() {
               <Skeleton className="h-4 w-1/2 bg-slate-700" />
             </CardContent>
           </Card>
-        ) : todayMessage ? (
+        ) : effectiveTodayMessage ? (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-emerald-400" />
               <h2 className="text-xl font-semibold text-white">{t("dhambaal.todaysMessage")}</h2>
             </div>
-            <MessageCard message={todayMessage} isToday />
+            <MessageCard message={effectiveTodayMessage} isToday />
           </div>
         ) : (
           <Card className="mb-8 bg-slate-800/50 border-dashed border-2 border-slate-600">
@@ -591,7 +593,7 @@ export default function Dhambaal() {
             </div>
           ) : allMessages && allMessages.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {allMessages.filter(m => m.id !== todayMessage?.id).map((message) => (
+              {allMessages.filter(m => m.id !== effectiveTodayMessage?.id).map((message) => (
                 <motion.button
                   key={message.id}
                   onClick={() => {

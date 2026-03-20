@@ -607,7 +607,12 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       }
       let story = await storage.getTodayBedtimeStory();
       if (!story) {
-        return res.status(404).json({ error: "No story available for today" });
+        // Fallback to latest published story if today's row is missing.
+        const latestStories = await storage.getBedtimeStories(1);
+        if (latestStories.length === 0) {
+          return res.status(404).json({ error: "No story available for today" });
+        }
+        story = latestStories[0] as any;
       }
       const translated = await applyTranslationsToStories([story], lang);
       const result = translated[0];

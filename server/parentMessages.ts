@@ -482,7 +482,7 @@ export function registerParentMessageRoutes(app: Express): void {
       const requestedLimit = parseInt(req.query.limit as string, 10);
       const limit = Number.isFinite(requestedLimit)
         ? Math.min(Math.max(requestedLimit, 1), 200)
-        : 50;
+        : 53;
       let messages = await storage.getParentMessages(limit);
       messages = await applyTranslationsToMessages(messages, lang);
       res.json(messages);
@@ -497,7 +497,7 @@ export function registerParentMessageRoutes(app: Express): void {
       const requestedLimit = parseInt(req.query.limit as string, 10);
       const limit = Number.isFinite(requestedLimit)
         ? Math.min(Math.max(requestedLimit, 1), 500)
-        : 50;
+        : 53;
       const now = Date.now();
       if (
         parentMessagesCache &&
@@ -536,7 +536,12 @@ export function registerParentMessageRoutes(app: Express): void {
       }
       let message = await storage.getTodayParentMessage();
       if (!message) {
-        return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
+        // Fallback to latest published message if today's row is missing.
+        const latestMessages = await storage.getParentMessages(1);
+        if (latestMessages.length === 0) {
+          return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
+        }
+        message = latestMessages[0] as any;
       }
       const translated = await applyTranslationsToMessages([message], lang);
       const result = translated[0];

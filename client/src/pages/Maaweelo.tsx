@@ -198,6 +198,8 @@ export default function Maaweelo() {
     queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
   });
 
+  const effectiveTodayStory = todayStory || allStories?.[0] || null;
+
   const { data: fullStoryDetail } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/${selectedStoryId}?lang=${apiLanguage}`],
     enabled: !!selectedStoryId,
@@ -563,13 +565,13 @@ export default function Maaweelo() {
           </div>
         ) : (
           <div className="space-y-6">
-            {todayStory && !showOnlyFavorites && (
+            {effectiveTodayStory && !showOnlyFavorites && (
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <Star className="w-5 h-5 text-[#FFD93D] fill-[#FFD93D]" />
                   <h2 className="text-lg font-bold text-white">{t("maaweelo.tonightsStory")}</h2>
                 </div>
-                <StoryCard story={todayStory} isToday index={0} />
+                <StoryCard story={effectiveTodayStory} isToday index={0} />
               </section>
             )}
 
@@ -588,12 +590,12 @@ export default function Maaweelo() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(showOnlyFavorites ? displayStories : displayStories.filter(s => s.id !== todayStory?.id)).map((story, i) => (
+                  {(showOnlyFavorites ? displayStories : displayStories.filter(s => s.id !== effectiveTodayStory?.id)).map((story, i) => (
                     <StoryCard key={story.id} story={story} index={i} />
                   ))}
                 </div>
               )}
-              {!showOnlyFavorites && displayStories.filter(s => s.id !== todayStory?.id).length === 0 && !loadingAll && (
+              {!showOnlyFavorites && displayStories.filter(s => s.id !== effectiveTodayStory?.id).length === 0 && !loadingAll && (
                 <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-8 border border-white/10 text-center">
                   <Moon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">{t("maaweelo.storiesNotPrepared")}</p>
