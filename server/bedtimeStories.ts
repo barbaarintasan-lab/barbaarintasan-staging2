@@ -570,6 +570,29 @@ async function applyTranslationsToStories<T extends Record<string, any> & { id: 
 }
 
 export function registerBedtimeStoryRoutes(app: Express): void {
+  app.get("/api/bedtime-stories/latest", async (req: Request, res: Response) => {
+    try {
+      const lang = req.query.lang as string;
+      const stories = await storage.getBedtimeStories(1);
+      if (stories.length === 0) {
+        return res.status(404).json({ error: "No story available" });
+      }
+      const translated = await applyTranslationsToStories([stories[0]], lang);
+      const story = translated[0] as any;
+      res.json({
+        id: story.id,
+        titleSomali: story.titleSomali,
+        characterName: story.characterName,
+        thumbnailUrl: story.thumbnailUrl || null,
+        images: Array.isArray(story.images) ? story.images : [],
+        storyDate: story.storyDate,
+      });
+    } catch (error) {
+      console.error("Error fetching latest bedtime story:", error);
+      res.status(500).json({ error: "Failed to fetch latest story" });
+    }
+  });
+
   app.get("/api/bedtime-stories", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;

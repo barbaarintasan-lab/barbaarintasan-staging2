@@ -459,7 +459,7 @@ export interface IStorage {
 
   // Bedtime Stories (Maaweelada Caruurta)
   createBedtimeStory(story: InsertBedtimeStory): Promise<BedtimeStory>;
-  getBedtimeStories(): Promise<BedtimeStory[]>;
+  getBedtimeStories(limit?: number): Promise<BedtimeStory[]>;
   getAllBedtimeStories(): Promise<BedtimeStory[]>;
   getBedtimeStory(id: string): Promise<BedtimeStory | undefined>;
   getTodayBedtimeStory(): Promise<BedtimeStory | undefined>;
@@ -4954,9 +4954,9 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getBedtimeStories(): Promise<BedtimeStory[]> {
+  async getBedtimeStories(limit?: number): Promise<BedtimeStory[]> {
     // Return thumbnailUrl for list view (lightweight), exclude base64 images array
-    const results = await db.select({
+    let query = db.select({
       id: bedtimeStories.id,
       title: bedtimeStories.title,
       titleSomali: bedtimeStories.titleSomali,
@@ -4976,6 +4976,12 @@ export class DatabaseStorage implements IStorage {
       .from(bedtimeStories)
       .where(eq(bedtimeStories.isPublished, true))
       .orderBy(desc(bedtimeStories.storyDate));
+
+    if (typeof limit === "number") {
+      query = query.limit(limit) as any;
+    }
+
+    const results = await query;
     return results as BedtimeStory[];
   }
 

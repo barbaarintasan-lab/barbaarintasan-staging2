@@ -838,24 +838,22 @@ function MaaweeloSection() {
     storyDate: string;
   }
 
-  const { data: todayStory } = useQuery<BedtimeStory>({
-    queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+  const { data: effectiveTodayStory } = useQuery<BedtimeStory | null>({
+    queryKey: [`/api/bedtime-stories/latest?lang=${apiLanguage}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/bedtime-stories/latest?lang=${apiLanguage}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 20_000,
+    refetchInterval: 45_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: 2,
   });
-
-  const { data: latestStories = [] } = useQuery<BedtimeStory[]>({
-    queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  });
-
-  const effectiveTodayStory = todayStory || latestStories[0];
 
   return (
     <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
