@@ -271,10 +271,7 @@ export default function QuranLesson() {
   const isCurrentCompleted = currentAyah ? ayahProgress[currentAyah.number]?.completed : false;
 
   const isAyahAccessible = (index: number): boolean => {
-    if (!surah) return false;
-    if (index === 0) return true;
-    const prevAyah = surah.ayahs[index - 1];
-    return !!ayahProgress[prevAyah.number]?.completed;
+    return !!surah && index >= 0 && index < totalAyahs;
   };
 
   const changeReciter = (reciterId: string) => {
@@ -1184,20 +1181,17 @@ export default function QuranLesson() {
               const prog = ayahProgress[ayah.number];
               const isCurrent = idx === currentAyahIndex;
               const done = prog?.completed;
-              const accessible = isAyahAccessible(idx);
               return (
-                <button key={ayah.number} onClick={() => accessible && goToAyah(idx)}
-                  disabled={!accessible}
+                <button key={ayah.number} onClick={() => goToAyah(idx)}
                   className={`w-10 h-10 rounded-full text-sm font-bold flex items-center justify-center transition-all ${
                     isCurrent ? "ring-3 ring-[#FFD93D] ring-offset-2 ring-offset-[#1a1a2e] scale-110" : ""
                   } ${done ? "bg-green-500/30 text-green-300 border-2 border-green-500/50" :
-                    !accessible ? "bg-white/5 text-white/20 border border-white/5 cursor-not-allowed" :
                     prog ? "bg-yellow-500/20 text-yellow-300 border-2 border-yellow-500/40" :
                     "bg-white/10 text-white/50 border border-white/10"
                   }`}
                   data-testid={`button-ayah-${ayah.number}`}
                 >
-                  {done ? <CheckCircle2 className="w-5 h-5" /> : !accessible ? <Lock className="w-4 h-4" /> : idx + 1}
+                  {done ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
                 </button>
               );
             })}
