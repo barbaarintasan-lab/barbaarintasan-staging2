@@ -15313,6 +15313,16 @@ function PromoVideosTab() {
   const { data: videos = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/promo-videos"],
   });
+
+  const asBool = (value: unknown): boolean => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    if (typeof value === "string") {
+      const v = value.trim().toLowerCase();
+      return v === "true" || v === "t" || v === "1";
+    }
+    return false;
+  };
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -15395,11 +15405,11 @@ function PromoVideosTab() {
   };
 
   const toggleVisibility = (video: any) => {
-    updateMutation.mutate({ id: video.id, isVisible: !video.isVisible });
+    updateMutation.mutate({ id: video.id, isVisible: !asBool(video.isVisible) });
   };
 
-  const visibleVideos = videos.filter((video: any) => video.isVisible);
-  const archivedVideos = videos.filter((video: any) => !video.isVisible);
+  const visibleVideos = videos.filter((video: any) => asBool(video.isVisible));
+  const archivedVideos = videos.filter((video: any) => !asBool(video.isVisible));
 
   return (
     <div className="space-y-4" data-testid="promo-videos-admin">
