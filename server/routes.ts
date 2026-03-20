@@ -10501,7 +10501,7 @@ Return a JSON object with:
 
   app.get("/api/promo-videos", async (_req, res) => {
     try {
-      let videos = await db
+      const videos = await db
         .select({
           id: promoVideos.id,
           title: promoVideos.title,
@@ -10521,43 +10521,6 @@ Return a JSON object with:
         .from(promoVideos)
         .where(eq(promoVideos.isVisible, true))
         .orderBy(promoVideos.order);
-
-      // Always keep at least one homepage video visible if data exists.
-      if (videos.length === 0) {
-        const latestArchived = await db
-          .select()
-          .from(promoVideos)
-          .where(eq(promoVideos.isVisible, false))
-          .orderBy(sql`${promoVideos.createdAt} DESC`)
-          .limit(1);
-        if (latestArchived[0]) {
-          await db
-            .update(promoVideos)
-            .set({ isVisible: true })
-            .where(eq(promoVideos.id, latestArchived[0].id));
-
-          videos = await db
-            .select({
-              id: promoVideos.id,
-              title: promoVideos.title,
-              description: promoVideos.description,
-              videoUrl: promoVideos.videoUrl,
-              thumbnailUrl: promoVideos.thumbnailUrl,
-              isVisible: promoVideos.isVisible,
-              order: promoVideos.order,
-              createdAt: promoVideos.createdAt,
-              viewCount: sql<number>`COALESCE((
-                SELECT COUNT(*)::int
-                FROM ${contentProgress}
-                WHERE ${contentProgress.contentType} = 'promo_video'
-                  AND ${contentProgress.contentId} = ${promoVideos.id}
-              ), 0)`,
-            })
-            .from(promoVideos)
-            .where(eq(promoVideos.isVisible, true))
-            .orderBy(promoVideos.order);
-        }
-      }
       res.json(videos);
     } catch (error) {
       console.error("Error fetching promo videos:", error);
