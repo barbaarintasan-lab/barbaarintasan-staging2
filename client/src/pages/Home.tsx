@@ -767,7 +767,22 @@ function DhambaalSection() {
 
   const { data: todayMessage } = useQuery<ParentMessage>({
     queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`],
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
+
+  const { data: latestMessages = [] } = useQuery<ParentMessage[]>({
+    queryKey: [`/api/parent-messages?limit=1&lang=${apiLanguage}`],
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  const effectiveTodayMessage = todayMessage || latestMessages[0];
 
   return (
     <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
@@ -784,9 +799,9 @@ function DhambaalSection() {
                   Cusub
                 </span>
               </div>
-              {todayMessage ? (
+              {effectiveTodayMessage ? (
                 <p className="text-sm text-emerald-200 truncate mt-0.5">
-                  Maanta: {todayMessage.title}
+                  Maanta: {effectiveTodayMessage.title}
                 </p>
               ) : (
                 <p className="text-sm text-emerald-300 mt-0.5">
@@ -796,11 +811,11 @@ function DhambaalSection() {
             </div>
             <ChevronRight className="w-5 h-5 text-emerald-400" />
           </div>
-          {(todayMessage?.thumbnailUrl || todayMessage?.images?.[0]) && (
+          {(effectiveTodayMessage?.thumbnailUrl || effectiveTodayMessage?.images?.[0]) && (
             <div className="h-24 overflow-hidden">
               <img 
-                src={todayMessage.thumbnailUrl || todayMessage.images[0]} 
-                alt={todayMessage.title}
+                src={effectiveTodayMessage.thumbnailUrl || effectiveTodayMessage.images[0]} 
+                alt={effectiveTodayMessage.title}
                 className="w-full h-full object-cover opacity-60"
               />
             </div>
@@ -825,7 +840,22 @@ function MaaweeloSection() {
 
   const { data: todayStory } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
+
+  const { data: latestStories = [] } = useQuery<BedtimeStory[]>({
+    queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  const effectiveTodayStory = todayStory || latestStories[0];
 
   return (
     <div className="mt-4 px-4 max-w-7xl mx-auto lg:px-8">
@@ -842,9 +872,9 @@ function MaaweeloSection() {
                   Cusub
                 </span>
               </div>
-              {todayStory ? (
+              {effectiveTodayStory ? (
                 <p className="text-sm text-purple-200 truncate mt-0.5">
-                  Sheekada Caawa: {todayStory.titleSomali}
+                  Sheekada Caawa: {effectiveTodayStory.titleSomali}
                 </p>
               ) : (
                 <p className="text-sm text-purple-300 mt-0.5">
@@ -854,11 +884,11 @@ function MaaweeloSection() {
             </div>
             <ChevronRight className="w-5 h-5 text-purple-400" />
           </div>
-          {(todayStory?.thumbnailUrl || todayStory?.images?.[0]) && (
+          {(effectiveTodayStory?.thumbnailUrl || effectiveTodayStory?.images?.[0]) && (
             <div className="h-24 overflow-hidden">
               <img 
-                src={todayStory.thumbnailUrl || todayStory.images[0]} 
-                alt={todayStory.titleSomali}
+                src={effectiveTodayStory.thumbnailUrl || effectiveTodayStory.images[0]} 
+                alt={effectiveTodayStory.titleSomali}
                 className="w-full h-full object-cover opacity-60"
               />
             </div>
@@ -2384,7 +2414,13 @@ export default function Home() {
   const [selectedAgeFilter, setSelectedAgeFilter] = useState<string | null>(null);
   const [showFlashcards, setShowFlashcards] = useState(false);
   const [comingSoonCourse, setComingSoonCourse] = useState<Course | null>(null);
+  const [deferHeavyQueries, setDeferHeavyQueries] = useState(false);
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDeferHeavyQueries(true), 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const ageFilters = [
     { value: null, label: t("common.all") },
@@ -2414,6 +2450,7 @@ export default function Home() {
       const res = await fetch("/api/lessons");
       return res.json();
     },
+    enabled: deferHeavyQueries,
   });
 
   const { data: parentStats, isLoading: parentStatsLoading } = useQuery({
@@ -2444,17 +2481,8 @@ export default function Home() {
     enabled: !!parent,
   });
 
-  const { data: recommendationsData } = useQuery({
-    queryKey: ["recommendations"],
-    queryFn: async () => {
-      const res = await fetch("/api/recommendations", { credentials: "include" });
-      if (!res.ok) return { recommendations: [], reason: "popular" };
-      return res.json();
-    },
-  });
-
-  const recommendations = recommendationsData?.recommendations || [];
-  const recommendationReason = recommendationsData?.reason || "popular";
+  const recommendations: Course[] = [];
+  const recommendationReason = "popular";
 
   const { data: parentFeedback = [] } = useQuery<any[]>({
     queryKey: ["parentFeedback"],
@@ -2463,6 +2491,7 @@ export default function Home() {
       if (!res.ok) return [];
       return res.json();
     },
+    enabled: deferHeavyQueries,
   });
 
   const { data: announcements = [] } = useQuery<any[]>({
@@ -2472,6 +2501,7 @@ export default function Home() {
       if (!res.ok) return [];
       return res.json();
     },
+    enabled: deferHeavyQueries,
   });
 
   // Check if parent has completed any assessment (scoped by parent ID)
