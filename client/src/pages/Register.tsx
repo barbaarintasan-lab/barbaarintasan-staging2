@@ -60,6 +60,7 @@ export default function Register() {
   const urlParams = new URLSearchParams(window.location.search);
   const redirectUrl = urlParams.get("redirect") || "/";
   const returnUrl = urlParams.get("returnUrl");
+  const registrationRedirectUrl = redirectUrl.startsWith("/child-") ? "/" : redirectUrl;
   
   const [isLogin, setIsLogin] = useState(location.includes("/login"));
   const [isLoading, setIsLoading] = useState(false);
@@ -154,7 +155,8 @@ export default function Register() {
         registerData.country
       );
       toast.success("Hambalyo! Akoonkaaga waa la sameeyey.");
-      setLocation(redirectUrl);
+      // Child setup should stay optional after parent registration.
+      setLocation(registrationRedirectUrl);
     } catch (error: any) {
       toast.error(error.message || "Is-diiwaangelinta khalad ka dhacay.");
     } finally {
