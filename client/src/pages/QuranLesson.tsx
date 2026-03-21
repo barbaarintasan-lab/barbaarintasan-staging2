@@ -13,6 +13,15 @@ type AyahLearningStage = "listening" | "repeating" | "memorizing";
 type LessonFlowState = "ayah_learning" | "lesson_review" | "surah_complete";
 type LessonReviewStep = "full_listen" | "practice_with_text" | "final_test" | "reinforcement";
 
+interface QuranLessonResumeState {
+  currentAyahIndex: number;
+  currentStage: AyahLearningStage;
+  lessonFlow: LessonFlowState;
+  lessonReviewStep: LessonReviewStep;
+  activeTab: DashboardTab;
+  updatedAt: number;
+}
+
 interface UnlockedGame {
   surahNumber: number;
   surahName: string;
@@ -100,6 +109,11 @@ const RETRY_AUDIO_DELAY_MS = {
   repeated: 150,
 } as const;
 
+const LESSON_FLOW_VALUES: LessonFlowState[] = ["ayah_learning", "lesson_review", "surah_complete"];
+const LESSON_REVIEW_STEP_VALUES: LessonReviewStep[] = ["full_listen", "practice_with_text", "final_test", "reinforcement"];
+const DASHBOARD_TAB_VALUES: DashboardTab[] = ["quran", "games", "rewards"];
+const AYAH_STAGE_VALUES: AyahLearningStage[] = ["listening", "repeating", "memorizing"];
+
 function getNextSurahNumber(currentSurah: number): number | null {
   const idx = CURRICULUM_ORDER.indexOf(currentSurah);
   if (idx === -1 || idx >= CURRICULUM_ORDER.length - 1) return null;
@@ -168,6 +182,12 @@ export default function QuranLesson() {
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submitInFlightRef = useRef(false);
   const resumeAppliedRef = useRef<number | null>(null);
+  const pendingRestoredStageRef = useRef<AyahLearningStage | null>(null);
+
+  const getResumeStorageKey = useCallback(() => {
+    if (!child?.id || !surahNumber) return null;
+    return `quran_lesson_resume:${child.id}:${surahNumber}`;
+  }, [child?.id, surahNumber]);
 
   useEffect(() => {
     if (!authLoading && !child) setLocation("/child-login");
@@ -237,7 +257,9 @@ export default function QuranLesson() {
   useEffect(() => {
     setHasListened(false);
     setCheckResult(null);
-    setCurrentStage("repeating");
+    const restoredStage = pendingRestoredStageRef.current;
+    setCurrentStage(restoredStage ?? "repeating");
+    pendingRestoredStageRef.current = null;
     setListenCount(0);
     setAudioFailed(false);
     setAutoAdvancing(false);
@@ -259,11 +281,86 @@ export default function QuranLesson() {
   }, []);
 
   useEffect(() => {
-    if (!surah || !progressLoaded || resumeAppliedRef.current === surahNumber) return;
+    if (!surah || !progressLoaded || !child || resumeAppliedRef.current === surahNumber) return;
+
     const firstIncompleteIndex = surah.ayahs.findIndex((ayah) => !ayahProgress[ayah.number]?.completed);
-    setCurrentAyahIndex(firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0);
+
+    let targetAyahIndex = firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0;
+    let targetStage: AyahLearningStage = "repeating";
+    let targetFlow: LessonFlowState = "ayah_learning";
+    let targetReviewStep: LessonReviewStep = "full_listen";
+    let targetTab: DashboardTab = "quran";
+
+    try {
+      const storageKey = getResumeStorageKey();
+      if (storageKey) {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<QuranLessonResumeState>;
+
+          if (typeof parsed.currentAyahIndex === "number" && parsed.currentAyahIndex >= 0 && parsed.currentAyahIndex < surah.ayahs.length) {
+            targetAyahIndex = parsed.currentAyahIndex;
+          }
+
+          if (parsed.currentStage && AYAH_STAGE_VALUES.includes(parsed.currentStage)) {
+            targetStage = parsed.currentStage;
+          }
+
+          if (parsed.lessonFlow && LESSON_FLOW_VALUES.includes(parsed.lessonFlow)) {
+            targetFlow = parsed.lessonFlow;
+          }
+
+          if (parsed.lessonReviewStep && LESSON_REVIEW_STEP_VALUES.includes(parsed.lessonReviewStep)) {
+            targetReviewStep = parsed.lessonReviewStep;
+          }
+
+          if (parsed.activeTab && DASHBOARD_TAB_VALUES.includes(parsed.activeTab)) {
+            targetTab = parsed.activeTab;
+          }
+        }
+      }
+    } catch {
+      // Ignore invalid resume payloads and fallback to server-derived first incomplete ayah.
+    }
+
+    pendingRestoredStageRef.current = targetStage;
+    setCurrentAyahIndex(targetAyahIndex);
+    setLessonFlow(targetFlow);
+    setLessonReviewStep(targetReviewStep);
+    setActiveTab(targetTab);
     resumeAppliedRef.current = surahNumber;
-  }, [surah, progressLoaded, surahNumber, ayahProgress]);
+  }, [surah, progressLoaded, surahNumber, ayahProgress, child, getResumeStorageKey]);
+
+  useEffect(() => {
+    if (!child || !progressLoaded) return;
+
+    const storageKey = getResumeStorageKey();
+    if (!storageKey) return;
+
+    const resumeState: QuranLessonResumeState = {
+      currentAyahIndex,
+      currentStage,
+      lessonFlow,
+      lessonReviewStep,
+      activeTab,
+      updatedAt: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(resumeState));
+    } catch {
+      // Ignore storage failures (private mode/quota) and continue with in-memory lesson state.
+    }
+  }, [
+    child,
+    progressLoaded,
+    getResumeStorageKey,
+    currentAyahIndex,
+    currentStage,
+    lessonFlow,
+    lessonReviewStep,
+    activeTab,
+  ]);
 
   const currentAyah = surah?.ayahs?.[currentAyahIndex];
   const totalAyahs = surah?.numberOfAyahs || 0;
