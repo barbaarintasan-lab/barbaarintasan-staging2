@@ -739,6 +739,7 @@ export default function Dhambaal() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
+                            type="button"
                             onClick={goToPreviousLesson}
                             disabled={currentMessageIndex === 0}
                             size="sm"
@@ -749,6 +750,7 @@ export default function Dhambaal() {
                             <span className="text-xs text-white">{t("dhambaal.previous")}</span>
                           </Button>
                           <Button
+                            type="button"
                             onClick={goToNextLesson}
                             disabled={currentMessageIndex === allMessages.length - 1}
                             size="sm"
@@ -763,6 +765,7 @@ export default function Dhambaal() {
                     )}
                     <div className="flex items-center gap-3">
                       <Button
+                        type="button"
                         onClick={seekBackward}
                         size="icon"
                         className="h-10 w-10 rounded-full bg-teal-700/50 hover:bg-teal-600/50 flex-shrink-0"
@@ -784,6 +787,7 @@ export default function Dhambaal() {
                         )}
                       </Button>
                       <Button
+                        type="button"
                         onClick={seekForward}
                         size="icon"
                         className="h-10 w-10 rounded-full bg-teal-700/50 hover:bg-teal-600/50 flex-shrink-0"

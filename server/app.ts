@@ -4,7 +4,7 @@ import path from "node:path";
 import express, { type Express, type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes, registerHealthCheck } from "./routes";
-import { startCronJobs } from "./cron";
+import { ensureDailyContentAvailable, startCronJobs } from "./cron";
 // STRIPE DISABLED - not needed for this app
 // import { runMigrations } from 'stripe-replit-sync';
 // import { getStripeSync } from './stripeClient';
@@ -125,7 +125,10 @@ export default async function runApp(
   }, () => {
     log(`serving on port ${port}`);
     if (isStaging) {
-      log(`[STAGING] Cron jobs disabled in staging environment`);
+      log(`[STAGING] Cron schedules disabled; running daily content self-heal only`);
+      setTimeout(() => {
+        ensureDailyContentAvailable("staging-startup");
+      }, 15000);
     } else {
       startCronJobs();
     }

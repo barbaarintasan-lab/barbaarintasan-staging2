@@ -267,6 +267,7 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
+                      type="button"
                       onClick={goToPreviousStory}
                       disabled={isFirstStory}
                       size="sm"
@@ -277,6 +278,7 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
                       <span className="text-xs text-white">Hore</span>
                     </Button>
                     <Button
+                      type="button"
                       onClick={goToNextStory}
                       disabled={isLastStory}
                       size="sm"
@@ -292,6 +294,7 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
               
               <div className="flex items-center gap-3">
                 <Button
+                  type="button"
                   onClick={seekBackward}
                   size="icon"
                   className="h-10 w-10 rounded-full bg-purple-700/50 hover:bg-purple-600/50 flex-shrink-0"
@@ -300,6 +303,7 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
                   <RotateCcw className="w-5 h-5 text-white" />
                 </Button>
                 <Button
+                  type="button"
                   onClick={toggleAudio}
                   size="icon"
                   className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 flex-shrink-0"
@@ -312,6 +316,7 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
                   )}
                 </Button>
                 <Button
+                  type="button"
                   onClick={seekForward}
                   size="icon"
                   className="h-10 w-10 rounded-full bg-purple-700/50 hover:bg-purple-600/50 flex-shrink-0"

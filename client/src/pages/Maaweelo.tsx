@@ -139,7 +139,11 @@ export default function Maaweelo() {
     localStorage.setItem('maaweelo_favorites', JSON.stringify(newFavorites));
   };
 
-  const toggleAudio = () => {
+  const toggleAudio = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const audio = audioRef.current;
     if (!audio) return;
     if (isPlaying) {
@@ -732,6 +736,7 @@ export default function Maaweelo() {
                   >
                     <div className="flex items-center gap-3">
                       <button
+                        type="button"
                         onClick={seekBackward}
                         className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors"
                         data-testid="button-seek-backward"
@@ -739,7 +744,8 @@ export default function Maaweelo() {
                         <RotateCcw className="w-4 h-4 text-[#FFD93D]" />
                       </button>
                       <button
-                        onClick={toggleAudio}
+                        type="button"
+                        onClick={(e) => toggleAudio(e)}
                         className="h-14 w-14 rounded-full bg-gradient-to-br from-[#FFD93D] to-[#FF6B6B] hover:shadow-lg hover:shadow-[#FFD93D]/20 flex items-center justify-center flex-shrink-0 transition-all"
                         data-testid="button-play-audio"
                       >
@@ -750,6 +756,7 @@ export default function Maaweelo() {
                         )}
                       </button>
                       <button
+                        type="button"
                         onClick={seekForward}
                         className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors"
                         data-testid="button-seek-forward"

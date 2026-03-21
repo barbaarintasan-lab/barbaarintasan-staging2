@@ -945,6 +945,30 @@ async function sendInactiveParentNotifications() {
   }
 }
 
+export async function ensureDailyContentAvailable(source: string = "manual") {
+  try {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Mogadishu" });
+    const todayDhambaal = await storage.getTodayParentMessage();
+    const todayStory = await storage.getTodayBedtimeStory();
+
+    if (!todayDhambaal) {
+      console.log(`[CRON] [${source}] Missing Dhambaal for ${today}, generating...`);
+      await generateAndSaveParentMessage();
+    }
+
+    if (!todayStory) {
+      console.log(`[CRON] [${source}] Missing Maaweelo for ${today}, generating...`);
+      await generateDailyBedtimeStory();
+    }
+
+    if (todayDhambaal && todayStory) {
+      console.log(`[CRON] [${source}] Daily Dhambaal and Maaweelo already available for ${today}`);
+    }
+  } catch (error) {
+    console.error(`[CRON] [${source}] Failed ensuring daily content availability:`, error);
+  }
+}
+
 export function startCronJobs() {
   console.log("[CRON] Starting subscription management cron jobs...");
 
@@ -964,6 +988,11 @@ export function startCronJobs() {
   cron.schedule("*/15 * * * *", async () => {
     await checkAppointmentReminders();
   });
+
+  // Ensure Dhambaal and Maaweelo exist every morning.
+  cron.schedule("5 8 * * *", async () => {
+    await ensureDailyContentAvailable("8am-check");
+  }, { timezone: "Africa/Mogadishu" });
 
   // Generate AI parenting tip every 3 hours from 6:00 AM to 9:00 PM East Africa Time
   // Runs at: 6:00 AM, 9:00 AM, 12:00 PM, 3:00 PM, 6:00 PM, 9:00 PM EAT
@@ -1024,18 +1053,9 @@ export function startCronJobs() {
     await expireSubscriptions();
   }, 10000);
 
-  // DISABLED: Auto-generation on startup - content is now created manually by admin
+  // Startup self-heal: if content for today is missing, generate it once.
   setTimeout(async () => {
-    const today = new Date();
-    const todayStr = today.toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
-    const todayDhambaal = await storage.getTodayParentMessage();
-    const todayStory = await storage.getTodayBedtimeStory();
-    if (!todayDhambaal) {
-      console.log(`[CRON] Xusuusin: Maanta (${todayStr}) Dhambaal cusub lama abuurin - Admin panel-ka ka samee`);
-    }
-    if (!todayStory) {
-      console.log(`[CRON] Xusuusin: Maanta (${todayStr}) Sheeko cusub lama abuurin - Admin panel-ka ka samee`);
-    }
+    await ensureDailyContentAvailable("startup-self-heal");
   }, 15000);
 }
 
