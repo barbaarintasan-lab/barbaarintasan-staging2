@@ -4955,7 +4955,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBedtimeStories(limit?: number): Promise<BedtimeStory[]> {
-    // Return a lightweight list payload while preserving one displayable image.
+    // Keep list payload lightweight: avoid returning inline base64/data URLs for every row.
     let query = db.select({
       id: bedtimeStories.id,
       title: bedtimeStories.title,
@@ -4965,12 +4965,12 @@ export class DatabaseStorage implements IStorage {
       characterType: bedtimeStories.characterType,
       moralLesson: bedtimeStories.moralLesson,
       ageRange: bedtimeStories.ageRange,
-      images: sql<string[]>`CASE
-        WHEN ${bedtimeStories.thumbnailUrl} IS NOT NULL THEN ARRAY[${bedtimeStories.thumbnailUrl}]::text[]
-        WHEN array_length(${bedtimeStories.images}, 1) > 0 THEN ${bedtimeStories.images}[1:1]
-        ELSE ARRAY[]::text[]
-      END`,
-      thumbnailUrl: sql<string | null>`coalesce(${bedtimeStories.thumbnailUrl}, ${bedtimeStories.images}[1])`,
+      images: sql<string[]>`ARRAY[]::text[]`,
+      thumbnailUrl: sql<string | null>`coalesce(
+        CASE WHEN ${bedtimeStories.thumbnailUrl} IS NOT NULL AND ${bedtimeStories.thumbnailUrl} NOT LIKE 'data:%' THEN ${bedtimeStories.thumbnailUrl} END,
+        CASE WHEN ${bedtimeStories.images}[1] IS NOT NULL AND ${bedtimeStories.images}[1] NOT LIKE 'data:%' THEN ${bedtimeStories.images}[1] END,
+        '/images/sheeko_app_icon_purple_gradient.png'
+      )`,
       audioUrl: bedtimeStories.audioUrl,
       storyDate: bedtimeStories.storyDate,
       generatedAt: bedtimeStories.generatedAt,

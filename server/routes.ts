@@ -10,7 +10,7 @@ import webpush from "web-push";
 import OpenAI from "openai";
 import multer from "multer";
 import { initializeWebSocket, broadcastNewMessage, broadcastVoiceRoomUpdate, broadcastMessageStatus, broadcastAppreciation, getOnlineUsers } from "./websocket/presence";
-import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, contentProgress, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, visitorPings, type Parent, type PushSubscription } from "@shared/schema";
+import { insertUserSchema, insertCourseSchema, insertLessonSchema, insertQuizSchema, insertQuizQuestionSchema, insertPaymentSubmissionSchema, insertTestimonialSchema, insertAssignmentSubmissionSchema, insertDailyTipScheduleSchema, insertResourceSchema, insertExpenseSchema, insertBankTransferSchema, receiptFingerprints, commentReactions, contentProgress, parents, pushSubscriptions, pushBroadcastLogs, enrollments, translations, ssoTokens, courses, promoVideos, parentMessages, bedtimeStories, childSessions, childProgress, quranLessonProgress, childGameScores, childBadges, childGameUnlocks, childRewardBalances, childRewardLedger, children, alphabetLetters, alphabetProgress, alphabetGameScores, visitorPings, type Parent, type PushSubscription } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -11921,8 +11921,18 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
           .from(promoVideos)
           .where(eq(promoVideos.isVisible, false));
 
-        const parentMessageCount = (await storage.getParentMessages(1000)).length;
-        const bedtimeStoryCount = (await storage.getBedtimeStories(1000)).length;
+        const [parentMessageCountResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(parentMessages)
+          .where(eq(parentMessages.isPublished, true));
+
+        const [bedtimeStoryCountResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(bedtimeStories)
+          .where(eq(bedtimeStories.isPublished, true));
+
+        const parentMessageCount = Number(parentMessageCountResult?.count || 0);
+        const bedtimeStoryCount = Number(bedtimeStoryCountResult?.count || 0);
         const archivedPromoCount = Number(archivedPromoCountResult?.count || 0);
 
         return {
