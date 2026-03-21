@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -38,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { toast } from "sonner";
 import { ShareButton, ContentReactions, ContentComments, ThankYouModal } from "@/components/engagement";
-import { scheduleIdleTask, trackedFetchJson, useDroppedFrameWarning, useExcessiveRenderWarning, useSlowRenderWarning } from "@/lib/performance";
 import { useLanguage } from "@/hooks/useLanguage";
 
 function getProxyAudioUrl(audioUrl: string | null): string | null {
@@ -103,12 +101,6 @@ export default function Maaweelo() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const storiesListRef = useRef<HTMLDivElement | null>(null);
-  const storiesPauseTimerRef = useRef<number | null>(null);
-
-  useExcessiveRenderWarning("Maaweelo", 3, 700);
-  useSlowRenderWarning("Maaweelo", 16);
-  useDroppedFrameWarning("Maaweelo", 16);
 
   const formatTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return "0:00";
@@ -204,34 +196,16 @@ export default function Maaweelo() {
 
   const { data: todayStory, isLoading: loadingToday } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
-    queryFn: () => trackedFetchJson<BedtimeStory>(`/api/bedtime-stories/today?lang=${apiLanguage}`, undefined, "Maaweelo.today", { priority: "high" }),
-    placeholderData: (prev) => prev,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   });
 
   const { data: allStories, isLoading: loadingAll } = useQuery<BedtimeStory[]>({
     queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
-    queryFn: () => trackedFetchJson<BedtimeStory[]>(`/api/bedtime-stories?lang=${apiLanguage}`, undefined, "Maaweelo.list", { priority: "high" }),
-    placeholderData: (prev) => prev,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   });
 
   const effectiveTodayStory = todayStory || allStories?.[0] || null;
 
   const { data: fullStoryDetail } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/${selectedStoryId}?lang=${apiLanguage}`],
-    queryFn: () => trackedFetchJson<BedtimeStory>(`/api/bedtime-stories/${selectedStoryId}?lang=${apiLanguage}`, undefined, "Maaweelo.detail", { priority: "high" }),
-    placeholderData: (prev) => prev,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
     enabled: !!selectedStoryId,
   });
 
@@ -239,12 +213,11 @@ export default function Maaweelo() {
 
   const { data: sheekoProgress = [] } = useQuery<{ contentId: string }[]>({
     queryKey: ["contentProgress", "sheeko"],
-    queryFn: () => trackedFetchJson<{ contentId: string }[]>("/api/content-progress?type=sheeko", { credentials: "include" }, "Maaweelo.progress", { priority: "high" }).catch(() => []),
-    placeholderData: (prev) => prev,
-    staleTime: 3 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    queryFn: async () => {
+      const res = await fetch("/api/content-progress?type=sheeko", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!parent,
   });
   const readIds = new Set(sheekoProgress.map(p => p.contentId));
@@ -392,11 +365,6 @@ export default function Maaweelo() {
     }
   };
 
-  const handleSelectStory = useCallback((storyId: string) => {
-    setSelectedStoryId(storyId);
-    setCurrentImageIndex(0);
-  }, []);
-
   const displayStories = useMemo(() => {
     if (!allStories) return [];
     const stories = showOnlyFavorites 
@@ -405,26 +373,16 @@ export default function Maaweelo() {
     return stories;
   }, [allStories, showOnlyFavorites, favorites]);
 
-  const previousStories = useMemo(
-    () => (showOnlyFavorites ? displayStories : displayStories.filter(s => s.id !== effectiveTodayStory?.id)),
-    [displayStories, effectiveTodayStory?.id, showOnlyFavorites],
-  );
-
-  const storiesVirtualizer = useVirtualizer({
-    count: previousStories.length,
-    getScrollElement: () => storiesListRef.current,
-    estimateSize: () => 380,
-    overscan: 2,
-    enabled: !showOnlyFavorites || previousStories.length > 0,
-  });
-
   const StoryCard = ({ story, isToday = false, index = 0 }: { story: BedtimeStory; isToday?: boolean; index?: number }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       whileHover={{ y: -8 }}
-      onClick={() => handleSelectStory(story.id)}
+      onClick={() => {
+        setSelectedStoryId(story.id);
+        setCurrentImageIndex(0);
+      }}
       className="flex flex-col text-left bg-white/5 backdrop-blur-md rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 shadow-xl hover:shadow-[#FFD93D]/10 transition-all border border-white/10 group relative overflow-hidden cursor-pointer"
       data-testid={`story-card-${story.id}`}
     >
@@ -510,57 +468,6 @@ export default function Maaweelo() {
       </div>
     </motion.div>
   );
-
-  useEffect(() => {
-    if (!storiesListRef.current) return;
-
-    const container = storiesListRef.current;
-
-    const prefetchNearBottom = () => {
-      queryClient.prefetchQuery({
-        queryKey: [`/api/bedtime-stories?lang=${apiLanguage}&limit=40`],
-        queryFn: () => trackedFetchJson(`/api/bedtime-stories?lang=${apiLanguage}&limit=40`, undefined, "Maaweelo.prefetch.nearBottom", { priority: "low" }).catch(() => []),
-        staleTime: 5 * 60 * 1000,
-      });
-    };
-
-    const prefetchOnPause = () => {
-      scheduleIdleTask(() => {
-        queryClient.prefetchQuery({
-          queryKey: [`/api/bedtime-stories/latest?lang=${apiLanguage}`],
-          queryFn: () => trackedFetchJson(`/api/bedtime-stories/latest?lang=${apiLanguage}`, undefined, "Maaweelo.prefetch.latest", { priority: "low" }).catch(() => null),
-          staleTime: 5 * 60 * 1000,
-        });
-        queryClient.prefetchQuery({
-          queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
-          queryFn: () => trackedFetchJson(`/api/bedtime-stories/today?lang=${apiLanguage}`, undefined, "Maaweelo.prefetch.today", { priority: "low" }).catch(() => null),
-          staleTime: 5 * 60 * 1000,
-        });
-      }, 350);
-    };
-
-    const onScroll = () => {
-      const remaining = container.scrollHeight - (container.clientHeight + container.scrollTop);
-      if (remaining < 700) {
-        prefetchNearBottom();
-      }
-
-      if (storiesPauseTimerRef.current) {
-        window.clearTimeout(storiesPauseTimerRef.current);
-      }
-      storiesPauseTimerRef.current = window.setTimeout(() => {
-        prefetchOnPause();
-      }, 180);
-    };
-
-    container.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      container.removeEventListener("scroll", onScroll);
-      if (storiesPauseTimerRef.current) {
-        window.clearTimeout(storiesPauseTimerRef.current);
-      }
-    };
-  }, [apiLanguage, queryClient]);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-[#1a1a1a] text-white">
@@ -686,30 +593,13 @@ export default function Maaweelo() {
                   <p className="text-gray-600 text-sm mt-1">Riix ♥ si aad u keydi sheekooyin</p>
                 </div>
               ) : (
-                <div
-                  ref={storiesListRef}
-                  className="max-h-[75vh] overflow-y-auto pr-1"
-                  data-testid="maaweelo-virtual-list"
-                >
-                  <div className="relative" style={{ height: `${storiesVirtualizer.getTotalSize()}px` }}>
-                    {storiesVirtualizer.getVirtualItems().map((virtualItem) => {
-                      const story = previousStories[virtualItem.index];
-                      return (
-                        <div
-                          key={story.id}
-                          ref={storiesVirtualizer.measureElement}
-                          data-index={virtualItem.index}
-                          className="absolute left-0 top-0 w-full pb-4"
-                          style={{ transform: `translateY(${virtualItem.start}px)` }}
-                        >
-                          <StoryCard story={story} index={virtualItem.index} />
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(showOnlyFavorites ? displayStories : displayStories.filter(s => s.id !== effectiveTodayStory?.id)).map((story, i) => (
+                    <StoryCard key={story.id} story={story} index={i} />
+                  ))}
                 </div>
               )}
-              {!showOnlyFavorites && previousStories.length === 0 && !loadingAll && (
+              {!showOnlyFavorites && displayStories.filter(s => s.id !== effectiveTodayStory?.id).length === 0 && !loadingAll && (
                 <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-8 border border-white/10 text-center">
                   <Moon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400">{t("maaweelo.storiesNotPrepared")}</p>
