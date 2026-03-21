@@ -324,6 +324,28 @@ function buildFallbackImageDataUrl(title: string, subtitle: string, bgA: string,
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+function resolveImageResponseSource(record: { thumbnailUrl?: string | null; images?: string[] | null }, fallbackPath: string): string {
+  if (record.thumbnailUrl) return record.thumbnailUrl;
+  if (Array.isArray(record.images) && record.images[0]) return record.images[0];
+  return fallbackPath;
+}
+
+function sendImageSource(res: Response, source: string, fallbackPath: string): void {
+  const finalSource = source || fallbackPath;
+  res.setHeader("Cache-Control", "public, max-age=300");
+
+  if (finalSource.startsWith("data:")) {
+    const match = finalSource.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      res.setHeader("Content-Type", match[1]);
+      res.send(Buffer.from(match[2], "base64"));
+      return;
+    }
+  }
+
+  return res.redirect(finalSource);
+}
+
 export async function generateParentMessage(): Promise<InsertParentMessage> {
   console.log("[Parent Messages] Starting daily message generation...");
   
@@ -548,10 +570,30 @@ export function registerParentMessageRoutes(app: Express): void {
         : 53;
       let messages = await storage.getParentMessages(limit);
       messages = await applyTranslationsToMessages(messages, lang);
-      res.json(messages);
+      const lightweightMessages = messages.map((message) => ({
+        ...message,
+        images: [],
+        thumbnailUrl: `/api/parent-messages/${message.id}/cover`,
+      }));
+      res.json(lightweightMessages);
     } catch (error) {
       console.error("Error fetching parent messages:", error);
       res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.get("/api/parent-messages/:id/cover", async (req: Request, res: Response) => {
+    try {
+      const message = await storage.getParentMessage(req.params.id);
+      if (!message) {
+        return res.redirect("/images/bsa_app_icon_orange_gradient.png");
+      }
+
+      const source = resolveImageResponseSource(message as any, "/images/bsa_app_icon_orange_gradient.png");
+      return sendImageSource(res, source, "/images/bsa_app_icon_orange_gradient.png");
+    } catch (error) {
+      console.error("Error fetching parent message cover:", error);
+      return res.redirect("/images/bsa_app_icon_orange_gradient.png");
     }
   });
   

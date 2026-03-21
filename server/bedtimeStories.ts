@@ -464,6 +464,28 @@ function buildFallbackImageDataUrl(title: string, subtitle: string, bgA: string,
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+function resolveImageResponseSource(record: { thumbnailUrl?: string | null; images?: string[] | null }, fallbackPath: string): string {
+  if (record.thumbnailUrl) return record.thumbnailUrl;
+  if (Array.isArray(record.images) && record.images[0]) return record.images[0];
+  return fallbackPath;
+}
+
+function sendImageSource(res: Response, source: string, fallbackPath: string): void {
+  const finalSource = source || fallbackPath;
+  res.setHeader("Cache-Control", "public, max-age=300");
+
+  if (finalSource.startsWith("data:")) {
+    const match = finalSource.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      res.setHeader("Content-Type", match[1]);
+      res.send(Buffer.from(match[2], "base64"));
+      return;
+    }
+  }
+
+  return res.redirect(finalSource);
+}
+
 export async function generateDailyBedtimeStory(): Promise<void> {
   const today = getSomaliaToday();
   
@@ -703,11 +725,31 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
       let stories = await storage.getBedtimeStories(limit);
       stories = await applyTranslationsToStories(stories, lang);
-      listStoriesCache.set(cacheKey, { data: stories as any[], expiry: Date.now() + LIST_STORIES_TTL });
-      res.json(stories);
+      const lightweightStories = stories.map((story) => ({
+        ...story,
+        images: [],
+        thumbnailUrl: `/api/bedtime-stories/${story.id}/cover`,
+      }));
+      listStoriesCache.set(cacheKey, { data: lightweightStories as any[], expiry: Date.now() + LIST_STORIES_TTL });
+      res.json(lightweightStories);
     } catch (error) {
       console.error("Error fetching bedtime stories:", error);
       res.status(500).json({ error: "Failed to fetch stories" });
+    }
+  });
+
+  app.get("/api/bedtime-stories/:id/cover", async (req: Request, res: Response) => {
+    try {
+      const story = await storage.getBedtimeStory(req.params.id);
+      if (!story) {
+        return res.redirect("/images/sheeko_app_icon_purple_gradient.png");
+      }
+
+      const source = resolveImageResponseSource(story as any, "/images/sheeko_app_icon_purple_gradient.png");
+      return sendImageSource(res, source, "/images/sheeko_app_icon_purple_gradient.png");
+    } catch (error) {
+      console.error("Error fetching bedtime story cover:", error);
+      return res.redirect("/images/sheeko_app_icon_purple_gradient.png");
     }
   });
   

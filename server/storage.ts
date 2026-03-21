@@ -5051,19 +5051,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParentMessages(limit: number = 53): Promise<ParentMessage[]> {
-    // Return a lightweight list payload while preserving one displayable image.
+    // Keep list payload lightweight: avoid returning inline base64/data URLs for every row.
     const results = await db.select({
       id: parentMessages.id,
       title: parentMessages.title,
       content: parentMessages.content,
       topic: parentMessages.topic,
       keyPoints: parentMessages.keyPoints,
-      images: sql<string[]>`CASE
-        WHEN ${parentMessages.thumbnailUrl} IS NOT NULL THEN ARRAY[${parentMessages.thumbnailUrl}]::text[]
-        WHEN array_length(${parentMessages.images}, 1) > 0 THEN ${parentMessages.images}[1:1]
-        ELSE ARRAY[]::text[]
-      END`,
-      thumbnailUrl: sql<string | null>`coalesce(${parentMessages.thumbnailUrl}, ${parentMessages.images}[1])`,
+      images: sql<string[]>`ARRAY[]::text[]`,
+      thumbnailUrl: sql<string | null>`coalesce(
+        CASE WHEN ${parentMessages.thumbnailUrl} IS NOT NULL AND ${parentMessages.thumbnailUrl} NOT LIKE 'data:%' THEN ${parentMessages.thumbnailUrl} END,
+        CASE WHEN ${parentMessages.images}[1] IS NOT NULL AND ${parentMessages.images}[1] NOT LIKE 'data:%' THEN ${parentMessages.images}[1] END,
+        '/images/bsa_app_icon_orange_gradient.png'
+      )`,
       audioUrl: parentMessages.audioUrl,
       messageDate: parentMessages.messageDate,
       generatedAt: parentMessages.generatedAt,
