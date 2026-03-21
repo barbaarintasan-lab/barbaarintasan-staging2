@@ -128,7 +128,12 @@ export default async function runApp(
       log(`[STAGING] Cron schedules disabled; running daily content self-heal only`);
       setTimeout(() => {
         ensureDailyContentAvailable("staging-startup");
-      }, 15000);
+      }, 3000);
+
+      // Keep staging content fresh without enabling all cron jobs.
+      setInterval(() => {
+        ensureDailyContentAvailable("staging-hourly-self-heal");
+      }, 60 * 60 * 1000);
     } else {
       startCronJobs();
     }
