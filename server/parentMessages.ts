@@ -536,12 +536,22 @@ export function registerParentMessageRoutes(app: Express): void {
       }
       let message = await storage.getTodayParentMessage();
       if (!message) {
-        // Fallback to latest published message if today's row is missing.
-        const latestMessages = await storage.getParentMessages(1);
-        if (latestMessages.length === 0) {
-          return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
+        // Self-heal: try generating today's Dhambaal before falling back.
+        try {
+          await generateAndSaveParentMessage();
+          message = await storage.getTodayParentMessage();
+        } catch (genError) {
+          console.error("[Parent Messages] Auto-generate on /today failed:", genError);
         }
-        message = latestMessages[0] as any;
+
+        if (!message) {
+          // Final fallback to latest published message.
+          const latestMessages = await storage.getParentMessages(1);
+          if (latestMessages.length === 0) {
+            return res.status(404).json({ error: "Dhambaalka maanta lama helin" });
+          }
+          message = latestMessages[0] as any;
+        }
       }
       const translated = await applyTranslationsToMessages([message], lang);
       const result = translated[0];
