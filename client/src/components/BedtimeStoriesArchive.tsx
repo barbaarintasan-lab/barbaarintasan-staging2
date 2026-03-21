@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Moon, Star, Calendar, BookOpen, Loader2, Volume2, Play, Pause, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ArrowLeft, Moon, Star, Calendar, BookOpen, Volume2, Play, Pause, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState, useRef, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { scheduleIdleTask, trackedFetchJson, useExcessiveRenderWarning, useSlowRenderWarning } from "@/lib/performance";
+import { memo, useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 
 const BLESSING_TEXT = "(Allaha ka Raali Noqdo)";
@@ -37,7 +40,56 @@ interface BedtimeStoriesArchiveProps {
   onBack: () => void;
 }
 
+const StoryListCard = memo(function StoryListCard({
+  story,
+  formatDate,
+  onSelectStory,
+}: {
+  story: BedtimeStory;
+  formatDate: (dateString: string) => string;
+  onSelectStory: (story: BedtimeStory) => void;
+}) {
+  return (
+    <Card
+      className="bg-slate-800/60 border-slate-700 overflow-hidden cursor-pointer hover:bg-slate-800/80 transition-all duration-200 active:scale-[0.99]"
+      onClick={() => onSelectStory(story)}
+      data-testid={`card-story-${story.id}`}
+    >
+      <CardContent className="p-0">
+        <div className="flex gap-4 min-h-[96px]">
+          {story.images && story.images[0] && (
+            <div className="w-24 h-24 flex-shrink-0">
+              <img
+                src={story.images[0]}
+                alt={story.titleSomali}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <div className="py-3 pr-4 flex-1">
+            <h3 className="text-white font-medium mb-1 line-clamp-1">
+              {story.titleSomali}
+            </h3>
+            <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+              <Calendar className="w-3 h-3" />
+              <span>{formatDate(story.storyDate)}</span>
+              <span className="text-slate-600">•</span>
+              <span className={story.characterType === "sahabi" ? "text-emerald-400" : "text-blue-400"}>
+                {story.characterName}
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm line-clamp-2">
+              {story.content.substring(0, 100)}...
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
 export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveProps) {
+  const queryClient = useQueryClient();
   const [selectedStory, setSelectedStory] = useState<BedtimeStory | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,14 +98,33 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
   const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const listPauseTimerRef = useRef<number | null>(null);
+
+  useExcessiveRenderWarning("BedtimeStoriesArchive", 3, 700);
+  useSlowRenderWarning("BedtimeStoriesArchive", 16);
 
   const { data: allStories = [], isLoading } = useQuery<BedtimeStory[]>({
     queryKey: ["/api/bedtime-stories"],
-    queryFn: () => fetch("/api/bedtime-stories").then(r => r.json()),
+    queryFn: () => trackedFetchJson<BedtimeStory[]>("/api/bedtime-stories", undefined, "BedtimeStoriesArchive.list", { priority: "high" }),
+    placeholderData: (prev) => prev,
     staleTime: 60000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
-  const stories = allStories.filter(story => story.isPublished);
+  const stories = useMemo(() => allStories.filter(story => story.isPublished), [allStories]);
+  const storyCount = stories.length;
+
+  const storyVirtualizer = useVirtualizer({
+    count: storyCount,
+    getScrollElement: () => listContainerRef.current,
+    estimateSize: () => 112,
+    overscan: 5,
+    enabled: !selectedStory,
+  });
 
   // Get current story index in the playlist
   const currentStoryIndex = selectedStory 
@@ -71,6 +142,11 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
       return dateString;
     }
   };
+
+  const handleSelectStory = useCallback((story: BedtimeStory) => {
+    setSelectedStory(story);
+    setCurrentImageIndex(0);
+  }, []);
 
   const formatTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return "0:00";
@@ -205,6 +281,52 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedStory || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+
+    const prefetchStoryPages = () => {
+      queryClient.prefetchQuery({
+        queryKey: ["/api/bedtime-stories?limit=40"],
+        queryFn: () => trackedFetchJson("/api/bedtime-stories?limit=40", undefined, "BedtimeStoriesArchive.prefetch.nearBottom", { priority: "low" }).catch(() => []),
+        staleTime: 5 * 60 * 1000,
+      });
+    };
+
+    const prefetchAdjacent = () => {
+      scheduleIdleTask(() => {
+        queryClient.prefetchQuery({
+          queryKey: ["/api/bedtime-stories/latest"],
+          queryFn: () => trackedFetchJson("/api/bedtime-stories/latest", { credentials: "include", cache: "no-store" }, "BedtimeStoriesArchive.prefetch.adjacent", { priority: "low" }).catch(() => null),
+          staleTime: 5 * 60 * 1000,
+        });
+      }, 400);
+    };
+
+    const onScroll = () => {
+      const remaining = container.scrollHeight - (container.clientHeight + container.scrollTop);
+      if (remaining < 600) {
+        prefetchStoryPages();
+      }
+
+      if (listPauseTimerRef.current) {
+        window.clearTimeout(listPauseTimerRef.current);
+      }
+      listPauseTimerRef.current = window.setTimeout(() => {
+        prefetchAdjacent();
+      }, 200);
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      if (listPauseTimerRef.current) {
+        window.clearTimeout(listPauseTimerRef.current);
+      }
+    };
+  }, [queryClient, selectedStory]);
 
   if (selectedStory) {
     return (
@@ -412,8 +534,21 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+          <div className="space-y-4 py-2">
+            {[0, 1, 2].map((idx) => (
+              <Card key={idx} className="bg-slate-800/60 border-slate-700 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex gap-4 min-h-[96px]">
+                    <Skeleton className="w-24 h-24 flex-shrink-0 rounded-none" />
+                    <div className="py-3 pr-4 flex-1 space-y-2">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : stories.length === 0 ? (
           <Card className="bg-slate-800/50 border-dashed border-2 border-slate-600">
@@ -428,45 +563,31 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {stories.map((story) => (
-              <Card
-                key={story.id}
-                className="bg-slate-800/60 border-slate-700 overflow-hidden cursor-pointer hover:bg-slate-800/80 transition-colors"
-                onClick={() => setSelectedStory(story)}
-                data-testid={`card-story-${story.id}`}
-              >
-                <CardContent className="p-0">
-                  <div className="flex gap-4">
-                    {story.images && story.images[0] && (
-                      <div className="w-24 h-24 flex-shrink-0">
-                        <img
-                          src={story.images[0]}
-                          alt={story.titleSomali}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="py-3 pr-4 flex-1">
-                      <h3 className="text-white font-medium mb-1 line-clamp-1">
-                        {story.titleSomali}
-                      </h3>
-                      <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                        <Calendar className="w-3 h-3" />
-                        <span>{formatDate(story.storyDate)}</span>
-                        <span className="text-slate-600">•</span>
-                        <span className={story.characterType === "sahabi" ? "text-emerald-400" : "text-blue-400"}>
-                          {story.characterName}
-                        </span>
-                      </div>
-                      <p className="text-slate-400 text-sm line-clamp-2">
-                        {story.content.substring(0, 100)}...
-                      </p>
-                    </div>
+          <div
+            ref={listContainerRef}
+            className="max-h-[70vh] overflow-y-auto pr-1"
+            data-testid="bedtime-stories-virtual-list"
+          >
+            <div className="relative" style={{ height: `${storyVirtualizer.getTotalSize()}px` }}>
+              {storyVirtualizer.getVirtualItems().map((virtualItem) => {
+                const story = stories[virtualItem.index];
+                return (
+                  <div
+                    key={story.id}
+                    ref={storyVirtualizer.measureElement}
+                    data-index={virtualItem.index}
+                    className="absolute left-0 top-0 w-full pb-4"
+                    style={{ transform: `translateY(${virtualItem.start}px)` }}
+                  >
+                    <StoryListCard
+                      story={story}
+                      formatDate={formatDate}
+                      onSelectStory={handleSelectStory}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
