@@ -123,7 +123,6 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
     getScrollElement: () => listContainerRef.current,
     estimateSize: () => 112,
     overscan: 5,
-    enabled: !selectedStory,
   });
 
   // Get current story index in the playlist

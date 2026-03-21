@@ -619,7 +619,6 @@ function PromoVideoSection() {
     getScrollElement: () => promoListRef.current,
     estimateSize: () => 420,
     overscan: 2,
-    enabled: shouldVirtualizePromoList,
   });
 
   const archivedOnly = archivedVideos.filter(

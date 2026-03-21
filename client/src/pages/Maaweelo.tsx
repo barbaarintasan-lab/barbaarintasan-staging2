@@ -415,7 +415,6 @@ export default function Maaweelo() {
     getScrollElement: () => storiesListRef.current,
     estimateSize: () => 380,
     overscan: 2,
-    enabled: !showOnlyFavorites || previousStories.length > 0,
   });
 
   const StoryCard = ({ story, isToday = false, index = 0 }: { story: BedtimeStory; isToday?: boolean; index?: number }) => (
