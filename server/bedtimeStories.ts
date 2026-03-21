@@ -442,6 +442,28 @@ Aasaasaha Barbaarintasan Akademi`;
   return { title, titleSomali, content, moralLesson };
 }
 
+function buildFallbackImageDataUrl(title: string, subtitle: string, bgA: string, bgB: string): string {
+  const safeTitle = title.replace(/[<>&"']/g, "");
+  const safeSubtitle = subtitle.replace(/[<>&"']/g, "");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="${safeTitle}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bgA}"/>
+      <stop offset="100%" stop-color="${bgB}"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="860" cy="180" r="120" fill="#ffffff22"/>
+  <circle cx="190" cy="860" r="150" fill="#ffffff1a"/>
+  <rect x="96" y="640" width="832" height="220" rx="28" fill="#00000055"/>
+  <text x="128" y="720" fill="#ffffff" font-size="50" font-family="Arial, sans-serif" font-weight="700">${safeTitle}</text>
+  <text x="128" y="782" fill="#f5edff" font-size="34" font-family="Arial, sans-serif">${safeSubtitle}</text>
+  <text x="128" y="838" fill="#ede9fe" font-size="26" font-family="Arial, sans-serif">Maaweelada Caruurta</text>
+</svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 export async function generateDailyBedtimeStory(): Promise<void> {
   const today = getSomaliaToday();
   
@@ -487,6 +509,12 @@ export async function generateDailyBedtimeStory(): Promise<void> {
       } catch (error) {
         console.error(`[Bedtime Stories] Failed to generate image for scene: ${scene}`, error);
       }
+    }
+
+    if (images.length === 0) {
+      console.log("[Bedtime Stories] Using local fallback images");
+      images.push(buildFallbackImageDataUrl(storyText.titleSomali, character.nameSomali, "#4c1d95", "#1e1b4b"));
+      images.push(buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"));
     }
 
     const storyData: InsertBedtimeStory = {

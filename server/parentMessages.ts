@@ -302,6 +302,28 @@ Aasaasaha Barbaarintasan Akademi`;
   return { title, content, keyPoints };
 }
 
+function buildFallbackImageDataUrl(title: string, subtitle: string, bgA: string, bgB: string): string {
+  const safeTitle = title.replace(/[<>&"']/g, "");
+  const safeSubtitle = subtitle.replace(/[<>&"']/g, "");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="${safeTitle}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bgA}"/>
+      <stop offset="100%" stop-color="${bgB}"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="860" cy="170" r="110" fill="#ffffff22"/>
+  <circle cx="170" cy="860" r="140" fill="#ffffff18"/>
+  <rect x="96" y="640" width="832" height="220" rx="28" fill="#00000055"/>
+  <text x="128" y="720" fill="#ffffff" font-size="52" font-family="Arial, sans-serif" font-weight="700">${safeTitle}</text>
+  <text x="128" y="782" fill="#e5f4ff" font-size="34" font-family="Arial, sans-serif">${safeSubtitle}</text>
+  <text x="128" y="838" fill="#dbeafe" font-size="26" font-family="Arial, sans-serif">Barbaarintasan Academy</text>
+</svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 export async function generateParentMessage(): Promise<InsertParentMessage> {
   console.log("[Parent Messages] Starting daily message generation...");
   
@@ -331,6 +353,12 @@ export async function generateParentMessage(): Promise<InsertParentMessage> {
     } catch (error) {
       console.error(`[Parent Messages] Failed to generate image ${i + 1}:`, error);
     }
+  }
+
+  if (images.length === 0) {
+    console.log("[Parent Messages] Using local fallback images");
+    images.push(buildFallbackImageDataUrl(topic.topic, "Dhambaalka Waalidka", "#0f766e", "#0f172a"));
+    images.push(buildFallbackImageDataUrl(topic.topic, "Talo maalinle ah", "#065f46", "#1e293b"));
   }
 
   console.log(`[Parent Messages] Generated ${images.length} images`);
