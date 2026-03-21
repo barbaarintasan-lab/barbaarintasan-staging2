@@ -281,13 +281,40 @@ async function generateMessageImage(topic: string, sceneDescription: string): Pr
   throw new Error("No image generated");
 }
 
+function buildFallbackParentMessage(topic: { topic: string; description: string }): { title: string; content: string; keyPoints: string } {
+  const title = `${topic.topic}: Talo Maalinle ah oo Waalid`;
+  const content = `Maanta waxaan ka hadlaynaa mawduuca "${topic.topic}".
+
+Waalidnimadu waa safar u baahan dulqaad, qorshe, iyo naxariis. Marka aad ilmaha la joogto, isku day inaad si degan u dhageysato dareenkooda, una sharaxdo talaabada xigta adigoo adeegsanaya erayo fudud.
+
+Waxaad sameyn kartaa jadwal kooban oo maalinle ah: waqtiga hurdada, waqtiga ciyaarta, iyo waqtiga waxbarashada. Caruurtu waxay si fiican uga jawaabaan joogteyn iyo xuduudo cad.
+
+Sidoo kale, ku dhiirri geli ilmaha hadallo togan: "waad karti badan tahay", "waan ku jeclahay", iyo "aad baan kuugu faanaa". Tani waxay xoojisaa kalsoonida iyo xiriirka qoyska.
+
+Mar kasta ku dayo tarbiya ku dhisan naxariis iyo diirranaan, adigoo ilaalinaya anshax iyo xushmad.
+
+Mahadsanidiin!
+
+Muuse Siciid Aw-Muuse
+Aasaasaha Barbaarintasan Akademi`;
+
+  const keyPoints = "Jadwal joogto ah, Hadal togan, Dulqaad iyo xuduud cad";
+  return { title, content, keyPoints };
+}
+
 export async function generateParentMessage(): Promise<InsertParentMessage> {
   console.log("[Parent Messages] Starting daily message generation...");
   
   const topic = await selectTopicForToday();
   console.log(`[Parent Messages] Selected topic: ${topic.topic}`);
 
-  const messageText = await generateMessageText(topic);
+  let messageText: { title: string; content: string; keyPoints: string };
+  try {
+    messageText = await generateMessageText(topic);
+  } catch (error) {
+    console.error("[Parent Messages] AI text generation failed, using fallback template:", error);
+    messageText = buildFallbackParentMessage(topic);
+  }
   console.log(`[Parent Messages] Generated message: ${messageText.title}`);
 
   const imageScenes = [

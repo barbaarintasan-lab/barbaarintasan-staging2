@@ -423,6 +423,25 @@ async function generateStoryImage(scene: string, characterName: string): Promise
   throw new Error("No image generated");
 }
 
+function buildFallbackStoryText(character: { name: string; nameSomali: string; type: string }): { title: string; titleSomali: string; content: string; moralLesson: string } {
+  const titleSomali = `Sheeko ku Saabsan ${character.nameSomali}`;
+  const title = `Story of ${character.name}`;
+  const content = `Caawa waxaan idiinka sheekaynayaa ${character.nameSomali}.
+
+Wuxuu ahaa qof iimaan leh, akhlaaq wanaagsan leh, oo dadka ku dhiirri geliya samir iyo run sheegid. Sheekadiisu waxay ina xasuusinaysaa in caruurtu bartaan edeb, naxariis, iyo xushmad.
+
+Marka qoyska oo dhan is maqlo oo wada hadlo, ilmuhu wuxuu bartaa kalsooni, jacayl, iyo anshax. Talo yar: habeen kasta waqti gaaban u qoondee sheeko iyo duco.
+
+aan ku salino Nabigeeni Muxammed Salalaahu Caleyhi Wasalam, aana akhrino ducadii hurdada Bismikalaahu ma Amuutu wa Axyaa.
+
+Mahadsanidiin!
+
+Muuse Siciid Aw-Muuse
+Aasaasaha Barbaarintasan Akademi`;
+  const moralLesson = "Samir, akhlaaq wanaagsan, iyo ixtiraam waalid waa furaha guusha.";
+  return { title, titleSomali, content, moralLesson };
+}
+
 export async function generateDailyBedtimeStory(): Promise<void> {
   const today = getSomaliaToday();
   
@@ -444,7 +463,13 @@ export async function generateDailyBedtimeStory(): Promise<void> {
       .map(s => s.titleSomali);
     console.log(`[Bedtime Stories] Previous titles for ${character.nameSomali}: ${previousTitles.length}`);
 
-    const storyText = await generateStoryText(character, previousTitles);
+    let storyText: { title: string; titleSomali: string; content: string; moralLesson: string };
+    try {
+      storyText = await generateStoryText(character, previousTitles);
+    } catch (textError) {
+      console.error("[Bedtime Stories] AI text generation failed, using fallback template:", textError);
+      storyText = buildFallbackStoryText(character);
+    }
     console.log(`[Bedtime Stories] Generated story: ${storyText.titleSomali}`);
 
     const imageScenes = [
@@ -573,7 +598,17 @@ export function registerBedtimeStoryRoutes(app: Express): void {
   app.get("/api/bedtime-stories/latest", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;
-      const stories = await storage.getBedtimeStories(1);
+      let todayStory = await storage.getTodayBedtimeStory();
+      if (!todayStory) {
+        try {
+          await generateDailyBedtimeStory();
+          todayStory = await storage.getTodayBedtimeStory();
+        } catch (genError) {
+          console.error("[Bedtime Stories] Auto-generate on /latest failed:", genError);
+        }
+      }
+
+      const stories = todayStory ? [todayStory] : await storage.getBedtimeStories(1);
       if (stories.length === 0) {
         return res.status(404).json({ error: "No story available" });
       }
