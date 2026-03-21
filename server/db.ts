@@ -10,6 +10,18 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+function normalizeDatabaseUrl(url: string): string {
+  const parsed = new URL(url);
+  const sslmode = (parsed.searchParams.get('sslmode') || '').toLowerCase();
+
+  // Future-proof against clients that deprecate prefer/require behavior.
+  if (!sslmode || sslmode === 'prefer' || sslmode === 'require') {
+    parsed.searchParams.set('sslmode', 'verify-full');
+  }
+
+  return parsed.toString();
+}
+
 function validateDatabaseUrl(url: string): void {
   try {
     if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
@@ -37,12 +49,13 @@ function validateDatabaseUrl(url: string): void {
   }
 }
 
-validateDatabaseUrl(process.env.DATABASE_URL);
+const normalizedDatabaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+validateDatabaseUrl(normalizedDatabaseUrl);
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
+  connectionString: normalizedDatabaseUrl,
   // Keep production pool conservative across multiple Fly machines.
   max: isProduction ? 6 : 5,
   min: 1,
