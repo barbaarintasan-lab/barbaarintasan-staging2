@@ -2782,12 +2782,12 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.courses")}</p>
-            <AnimatedCounter value={courses.filter(c => c.isLive).length > 0 ? courses.filter(c => c.isLive).length : 10} />
+            <AnimatedCounter value={10} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.available")}</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.lessons")}</p>
-            <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 125} />
+            <AnimatedCounter value={125} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.available")}</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
