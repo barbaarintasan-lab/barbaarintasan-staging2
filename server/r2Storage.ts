@@ -7,20 +7,20 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 // Multiple buckets for different content types
 const R2_BUCKETS = {
   dhambaal: {
-    name: 'barbaarintasan-dhambaal',
-    publicUrl: 'https://pub-449d3a9b2aea4f7eabbbaecddd5424a3.r2.dev'
+    name: process.env.R2_BUCKET_DHAMBAAL || 'barbaarintasan-dhambaal',
+    publicUrl: process.env.R2_PUBLIC_URL_DHAMBAAL || 'https://pub-449d3a9b2aea4f7eabbbaecddd5424a3.r2.dev'
   },
   sheeko: {
-    name: 'barbaarintasan-sheeko',
-    publicUrl: 'https://pub-aa07832f2cb447b49400a607d94e4843.r2.dev'
+    name: process.env.R2_BUCKET_SHEEKO || process.env.R2_BUCKET_MAAWEELO || 'barbaarintasan-sheeko',
+    publicUrl: process.env.R2_PUBLIC_URL_SHEEKO || process.env.R2_PUBLIC_URL_MAAWEELO || 'https://pub-aa07832f2cb447b49400a607d94e4843.r2.dev'
   },
   sawirada: {
-    name: 'sawirada',
-    publicUrl: 'https://pub-45a105402fad43a3a6b592cf21a1d1fa.r2.dev'
+    name: process.env.R2_BUCKET_SAWIRADA || 'sawirada',
+    publicUrl: process.env.R2_PUBLIC_URL_SAWIRADA || 'https://pub-45a105402fad43a3a6b592cf21a1d1fa.r2.dev'
   }
 };
 
-export type R2BucketType = 'dhambaal' | 'sheeko' | 'sawirada' | 'talo';
+export type R2BucketType = 'dhambaal' | 'sheeko' | 'sawirada' | 'talo' | 'maaweelo';
 
 let s3Client: S3Client | null = null;
 
@@ -59,9 +59,16 @@ export async function uploadToR2(
   bucketType: R2BucketType = 'dhambaal'
 ): Promise<{ url: string; key: string }> {
   const client = getR2Client();
-  // Map 'talo' to 'dhambaal' bucket if not specifically defined, or add it
-  const actualBucketType = bucketType === 'talo' ? 'dhambaal' : bucketType;
+  // Map aliases to concrete buckets.
+  const actualBucketType = bucketType === 'talo'
+    ? 'dhambaal'
+    : bucketType === 'maaweelo'
+      ? 'sheeko'
+      : bucketType;
   const bucket = R2_BUCKETS[actualBucketType as keyof typeof R2_BUCKETS];
+  if (!bucket) {
+    throw new Error(`Unknown R2 bucket type: ${bucketType}`);
+  }
   const key = `${folder}/${fileName}`;
 
   await client.send(new PutObjectCommand({

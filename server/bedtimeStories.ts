@@ -634,7 +634,7 @@ export async function generateDailyBedtimeStory(): Promise<void> {
         `maaweelo-${newStory.id}`,
         "tts-audio/maaweelada",
         { azureVoice: "so-SO-UbaxNeural" },
-        'maaweelo'
+        'sheeko'
       );
       await storage.updateBedtimeStory(newStory.id, { audioUrl });
       console.log(`[Bedtime Stories] Audio generated and saved to R2: ${audioUrl}`);
