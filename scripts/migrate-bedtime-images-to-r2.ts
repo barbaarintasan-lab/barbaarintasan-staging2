@@ -10,6 +10,10 @@ type StoryRow = {
   thumbnailUrl: string | null;
 };
 
+type StoryIdRow = {
+  id: string;
+};
+
 const BATCH_SIZE = Number.parseInt(process.env.BEDTIME_MIGRATION_BATCH_SIZE || "50", 10);
 const BATCH_SLEEP_MS = Number.parseInt(process.env.BEDTIME_MIGRATION_BATCH_SLEEP_MS || "75", 10);
 const RETRY_COUNT = Number.parseInt(process.env.BEDTIME_MIGRATION_RETRIES || "3", 10);
@@ -50,33 +54,27 @@ function isReadTimeoutError(error: unknown): boolean {
   return typeof message === "string" && message.toLowerCase().includes("query read timeout");
 }
 
-async function fetchStoriesPage(lastId?: string): Promise<StoryRow[]> {
+async function fetchStoriesPage(lastId?: string): Promise<StoryIdRow[]> {
   for (let attempt = 1; attempt <= READ_RETRY_COUNT; attempt++) {
     try {
       if (lastId) {
         return (await db
           .select({
             id: bedtimeStories.id,
-            storyDate: bedtimeStories.storyDate,
-            images: bedtimeStories.images,
-            thumbnailUrl: bedtimeStories.thumbnailUrl,
           })
           .from(bedtimeStories)
           .where(gt(bedtimeStories.id, lastId))
           .orderBy(asc(bedtimeStories.id))
-          .limit(BATCH_SIZE)) as StoryRow[];
+          .limit(BATCH_SIZE)) as StoryIdRow[];
       }
 
       return (await db
         .select({
           id: bedtimeStories.id,
-          storyDate: bedtimeStories.storyDate,
-          images: bedtimeStories.images,
-          thumbnailUrl: bedtimeStories.thumbnailUrl,
         })
         .from(bedtimeStories)
         .orderBy(asc(bedtimeStories.id))
-        .limit(BATCH_SIZE)) as StoryRow[];
+        .limit(BATCH_SIZE)) as StoryIdRow[];
     } catch (error) {
       if (!isReadTimeoutError(error) || attempt === READ_RETRY_COUNT) {
         throw error;
@@ -88,6 +86,33 @@ async function fetchStoriesPage(lastId?: string): Promise<StoryRow[]> {
   }
 
   return [];
+}
+
+async function fetchStoryById(id: string): Promise<StoryRow | undefined> {
+  for (let attempt = 1; attempt <= READ_RETRY_COUNT; attempt++) {
+    try {
+      const [story] = (await db
+        .select({
+          id: bedtimeStories.id,
+          storyDate: bedtimeStories.storyDate,
+          images: bedtimeStories.images,
+          thumbnailUrl: bedtimeStories.thumbnailUrl,
+        })
+        .from(bedtimeStories)
+        .where(eq(bedtimeStories.id, id))
+        .limit(1)) as StoryRow[];
+      return story;
+    } catch (error) {
+      if (!isReadTimeoutError(error) || attempt === READ_RETRY_COUNT) {
+        throw error;
+      }
+      const waitMs = 300 * attempt;
+      console.warn(`[Maaweelo Migration] Read timeout loading story ${id}, retry ${attempt}/${READ_RETRY_COUNT} in ${waitMs}ms`);
+      await sleep(waitMs);
+    }
+  }
+
+  return undefined;
 }
 
 async function uploadWithRetry(
@@ -181,19 +206,25 @@ async function main(): Promise<void> {
   let lastId: string | undefined;
 
   while (true) {
-    const page = await fetchStoriesPage(lastId);
-    if (page.length === 0) {
+    const idPage = await fetchStoriesPage(lastId);
+    if (idPage.length === 0) {
       break;
     }
 
     batchNumber++;
-    scanned += page.length;
-    lastId = page[page.length - 1].id;
+    scanned += idPage.length;
+    lastId = idPage[idPage.length - 1].id;
 
-    const batchCandidates = page.filter(needsMigration);
+    const batchCandidates: StoryRow[] = [];
+    for (const idRow of idPage) {
+      const story = await fetchStoryById(idRow.id);
+      if (story && needsMigration(story)) {
+        batchCandidates.push(story);
+      }
+    }
     candidatesSeen += batchCandidates.length;
 
-    console.log(`\n[Batch ${batchNumber}] Scanned ${page.length} rows, candidates ${batchCandidates.length} (total scanned ${scanned})`);
+    console.log(`\n[Batch ${batchNumber}] Scanned ${idPage.length} rows, candidates ${batchCandidates.length} (total scanned ${scanned})`);
 
     for (const story of batchCandidates) {
       const result = await migrateStory(story);
