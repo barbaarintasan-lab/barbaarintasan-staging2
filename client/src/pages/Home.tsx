@@ -2493,20 +2493,16 @@ export default function Home() {
     },
   });
 
-  const { data: freeLessonsStats = { count: 106 } } = useQuery<{ count: number }>({
+  const { data: freeLessonsStats, isLoading: freeLessonsStatsLoading } = useQuery<{ count: number }>({
     queryKey: ["freeLessonsStats"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/stats/free-lessons", { cache: "no-store" });
-        if (!res.ok) return { count: 106 };
-        const payload = await res.json();
-        const count = Number(payload?.count);
-        return { count: Number.isFinite(count) && count >= 0 ? count : 106 };
-      } catch {
-        return { count: 106 };
-      }
+      const res = await fetch("/api/stats/free-lessons", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch free lessons stats");
+      const payload = await res.json();
+      const count = Number(payload?.count);
+      return { count: Number.isFinite(count) && count >= 0 ? count : 0 };
     },
-    placeholderData: (previousData) => previousData ?? { count: 106 },
+    placeholderData: (previousData) => previousData,
     retry: 1,
     staleTime: 30000,
     refetchInterval: 60000,
@@ -2801,7 +2797,7 @@ export default function Home() {
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">Casharada Free-ga ah</p>
-            <AnimatedCounter value={freeLessonsStats?.count > 0 ? freeLessonsStats.count : 106} />
+            <AnimatedCounter value={freeLessonsStats?.count ?? 0} loading={!freeLessonsStats && freeLessonsStatsLoading} />
             <p className="text-xs text-gray-400 mt-1 truncate">Dhambaal + Maaweelo + Archive</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">

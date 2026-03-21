@@ -11915,25 +11915,33 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
 
   app.get("/api/stats/free-lessons", async (_req, res) => {
     try {
-      const [archivedPromoCountResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(promoVideos)
-        .where(eq(promoVideos.isVisible, false));
+      const data = await getCached('stats-free-lessons', 120000, async () => {
+        const [archivedPromoCountResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(promoVideos)
+          .where(eq(promoVideos.isVisible, false));
 
-      const parentMessageCount = (await storage.getParentMessages(1000)).length;
-      const bedtimeStoryCount = (await storage.getBedtimeStories(1000)).length;
-      const archivedPromoCount = Number(archivedPromoCountResult?.count || 0);
+        const parentMessageCount = (await storage.getParentMessages(1000)).length;
+        const bedtimeStoryCount = (await storage.getBedtimeStories(1000)).length;
+        const archivedPromoCount = Number(archivedPromoCountResult?.count || 0);
 
-      res.json({
-        count: parentMessageCount + bedtimeStoryCount + archivedPromoCount,
-        breakdown: {
-          parentMessages: parentMessageCount,
-          bedtimeStories: bedtimeStoryCount,
-          archivedPromoVideos: archivedPromoCount,
-        },
+        return {
+          count: parentMessageCount + bedtimeStoryCount + archivedPromoCount,
+          breakdown: {
+            parentMessages: parentMessageCount,
+            bedtimeStories: bedtimeStoryCount,
+            archivedPromoVideos: archivedPromoCount,
+          },
+        };
       });
+
+      res.json(data);
     } catch (error) {
       console.error("Error fetching free lessons stats:", error);
+      const stale = apiCache.get('stats-free-lessons')?.data;
+      if (stale) {
+        return res.json(stale);
+      }
       res.json({
         count: 106,
         breakdown: {
