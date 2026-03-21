@@ -411,6 +411,14 @@ export async function generateAndSaveParentMessage(): Promise<void> {
       console.error(`[Parent Messages] Thumbnail upload failed:`, thumbError);
     }
 
+    if (!saved.thumbnailUrl && message.images && message.images.length > 0) {
+      try {
+        await storage.updateParentMessage(saved.id, { thumbnailUrl: message.images[0] });
+      } catch (thumbFallbackError) {
+        console.error(`[Parent Messages] Inline thumbnail fallback failed:`, thumbFallbackError);
+      }
+    }
+
     try {
       console.log(`[Parent Messages] Generating audio (Muuse voice)...`);
       const { generateAndUploadAudio } = await import("./tts");
@@ -615,7 +623,17 @@ export function registerParentMessageRoutes(app: Express): void {
           buildFallbackImageDataUrl(topicText, "Dhambaalka Waalidka", "#0f766e", "#0f172a"),
           buildFallbackImageDataUrl(topicText, "Talo maalinle ah", "#065f46", "#1e293b"),
         ];
-        const updated = await storage.updateParentMessage((message as any).id, { images: fallbackImages });
+        const updated = await storage.updateParentMessage((message as any).id, {
+          images: fallbackImages,
+          thumbnailUrl: (message as any).thumbnailUrl || fallbackImages[0],
+        });
+        if (updated) {
+          message = updated as any;
+        }
+      } else if (!(message as any).thumbnailUrl && Array.isArray((message as any).images) && (message as any).images[0]) {
+        const updated = await storage.updateParentMessage((message as any).id, {
+          thumbnailUrl: (message as any).images[0],
+        });
         if (updated) {
           message = updated as any;
         }

@@ -4955,7 +4955,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBedtimeStories(limit?: number): Promise<BedtimeStory[]> {
-    // Return thumbnailUrl for list view (lightweight), exclude base64 images array
+    // Return a lightweight list payload while preserving one displayable image.
     let query = db.select({
       id: bedtimeStories.id,
       title: bedtimeStories.title,
@@ -4965,8 +4965,12 @@ export class DatabaseStorage implements IStorage {
       characterType: bedtimeStories.characterType,
       moralLesson: bedtimeStories.moralLesson,
       ageRange: bedtimeStories.ageRange,
-      images: sql<string[]>`ARRAY[]::text[]`, // Empty for list view - use thumbnailUrl instead
-      thumbnailUrl: bedtimeStories.thumbnailUrl,
+      images: sql<string[]>`CASE
+        WHEN ${bedtimeStories.thumbnailUrl} IS NOT NULL THEN ARRAY[${bedtimeStories.thumbnailUrl}]::text[]
+        WHEN array_length(${bedtimeStories.images}, 1) > 0 THEN ${bedtimeStories.images}[1:1]
+        ELSE ARRAY[]::text[]
+      END`,
+      thumbnailUrl: sql<string | null>`coalesce(${bedtimeStories.thumbnailUrl}, ${bedtimeStories.images}[1])`,
       audioUrl: bedtimeStories.audioUrl,
       storyDate: bedtimeStories.storyDate,
       generatedAt: bedtimeStories.generatedAt,
@@ -5047,15 +5051,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParentMessages(limit: number = 53): Promise<ParentMessage[]> {
-    // Return thumbnailUrl for list view (lightweight), exclude base64 images array
+    // Return a lightweight list payload while preserving one displayable image.
     const results = await db.select({
       id: parentMessages.id,
       title: parentMessages.title,
       content: parentMessages.content,
       topic: parentMessages.topic,
       keyPoints: parentMessages.keyPoints,
-      images: sql<string[]>`ARRAY[]::text[]`, // Empty for list view - use thumbnailUrl instead
-      thumbnailUrl: parentMessages.thumbnailUrl,
+      images: sql<string[]>`CASE
+        WHEN ${parentMessages.thumbnailUrl} IS NOT NULL THEN ARRAY[${parentMessages.thumbnailUrl}]::text[]
+        WHEN array_length(${parentMessages.images}, 1) > 0 THEN ${parentMessages.images}[1:1]
+        ELSE ARRAY[]::text[]
+      END`,
+      thumbnailUrl: sql<string | null>`coalesce(${parentMessages.thumbnailUrl}, ${parentMessages.images}[1])`,
       audioUrl: parentMessages.audioUrl,
       messageDate: parentMessages.messageDate,
       generatedAt: parentMessages.generatedAt,

@@ -533,6 +533,14 @@ export async function generateDailyBedtimeStory(): Promise<void> {
     const newStory = await storage.createBedtimeStory(storyData);
     console.log(`[Bedtime Stories] Successfully created story: ${storyText.titleSomali}`);
 
+    if (!newStory.thumbnailUrl && images[0]) {
+      try {
+        await storage.updateBedtimeStory(newStory.id, { thumbnailUrl: images[0] });
+      } catch (thumbError) {
+        console.error(`[Bedtime Stories] Inline thumbnail fallback failed:`, thumbError);
+      }
+    }
+
     try {
       console.log(`[Bedtime Stories] Generating audio (Ubax voice)...`);
       const { generateAndUploadAudio } = await import("./tts");
@@ -646,7 +654,17 @@ export function registerBedtimeStoryRoutes(app: Express): void {
           buildFallbackImageDataUrl(story.titleSomali || "Maaweelo", story.characterName || "Sheeko", "#4c1d95", "#1e1b4b"),
           buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"),
         ];
-        const updated = await storage.updateBedtimeStory(story.id, { images: fallbackImages });
+        const updated = await storage.updateBedtimeStory(story.id, {
+          images: fallbackImages,
+          thumbnailUrl: story.thumbnailUrl || fallbackImages[0],
+        });
+        if (updated) {
+          story = updated as any;
+        }
+      } else if (!story.thumbnailUrl && Array.isArray(story.images) && story.images[0]) {
+        const updated = await storage.updateBedtimeStory(story.id, {
+          thumbnailUrl: story.images[0],
+        });
         if (updated) {
           story = updated as any;
         }
@@ -728,7 +746,17 @@ export function registerBedtimeStoryRoutes(app: Express): void {
           buildFallbackImageDataUrl((story as any).titleSomali || "Maaweelo", (story as any).characterName || "Sheeko", "#4c1d95", "#1e1b4b"),
           buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"),
         ];
-        const updated = await storage.updateBedtimeStory((story as any).id, { images: fallbackImages });
+        const updated = await storage.updateBedtimeStory((story as any).id, {
+          images: fallbackImages,
+          thumbnailUrl: (story as any).thumbnailUrl || fallbackImages[0],
+        });
+        if (updated) {
+          story = updated as any;
+        }
+      } else if (!(story as any).thumbnailUrl && Array.isArray((story as any).images) && (story as any).images[0]) {
+        const updated = await storage.updateBedtimeStory((story as any).id, {
+          thumbnailUrl: (story as any).images[0],
+        });
         if (updated) {
           story = updated as any;
         }
