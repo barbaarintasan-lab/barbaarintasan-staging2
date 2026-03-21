@@ -540,36 +540,6 @@ function PromoVideoSection() {
     return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi]);
 
-  if (isPromoLoading && videos.length === 0) {
-    return (
-      <div className="mt-6 px-4" data-testid="promo-videos-skeleton">
-        <div className="flex items-center gap-2 mb-3">
-          <Skeleton className="w-8 h-8 rounded-lg" />
-          <Skeleton className="h-6 w-40" />
-        </div>
-        <div className="space-y-3">
-          {[0, 1].map((idx) => (
-            <div key={idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <Skeleton className="w-full aspect-video" />
-              <div className="p-3 space-y-2">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (videos.length === 0) return null;
-
-  const archivedOnly = archivedVideos.filter(
-    (video) => !videos.some((current) => current.id === video.id),
-  );
-  const latestArchivedVideo = archivedOnly[0] ?? null;
-
   const getGDriveFileId = (url: string) => {
     const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (m1) return m1[1];
@@ -651,6 +621,36 @@ function PromoVideoSection() {
     overscan: 2,
     enabled: shouldVirtualizePromoList,
   });
+
+  const archivedOnly = archivedVideos.filter(
+    (video) => !videos.some((current) => current.id === video.id),
+  );
+  const latestArchivedVideo = archivedOnly[0] ?? null;
+
+  if (isPromoLoading && videos.length === 0) {
+    return (
+      <div className="mt-6 px-4" data-testid="promo-videos-skeleton">
+        <div className="flex items-center gap-2 mb-3">
+          <Skeleton className="w-8 h-8 rounded-lg" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <div className="space-y-3">
+          {[0, 1].map((idx) => (
+            <div key={idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <Skeleton className="w-full aspect-video" />
+              <div className="p-3 space-y-2">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (videos.length === 0) return null;
 
   return (
     <div className="mt-6 px-4" data-testid="promo-videos-section">
