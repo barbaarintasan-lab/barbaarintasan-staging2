@@ -1,6 +1,5 @@
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiRequest } from "@/lib/queryClient";
 import { scheduleIdleTask, trackedFetchJson, useDroppedFrameWarning, useExcessiveRenderWarning, useSlowRenderWarning } from "@/lib/performance";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
@@ -613,14 +612,6 @@ function PromoVideoSection() {
     [videos],
   );
 
-  const shouldVirtualizePromoList = promoRows.length > 4;
-  const promoVirtualizer = useVirtualizer({
-    count: promoRows.length,
-    getScrollElement: () => promoListRef.current,
-    estimateSize: () => 420,
-    overscan: 2,
-  });
-
   const archivedOnly = archivedVideos.filter(
     (video) => !videos.some((current) => current.id === video.id),
   );
@@ -670,53 +661,24 @@ function PromoVideoSection() {
 
       <div
         ref={promoListRef}
-        className={shouldVirtualizePromoList ? "max-h-[calc(100vh-14rem)] overflow-y-auto pr-1" : undefined}
+        className={promoRows.length > 4 ? "max-h-[calc(100vh-14rem)] overflow-y-auto pr-1" : undefined}
       >
-        {shouldVirtualizePromoList ? (
-          <div className="relative" style={{ height: `${promoVirtualizer.getTotalSize()}px` }}>
-            {promoVirtualizer.getVirtualItems().map((virtualItem) => {
-              const row = promoRows[virtualItem.index];
-              return (
-                <div
-                  key={row.video.id}
-                  ref={promoVirtualizer.measureElement}
-                  data-index={virtualItem.index}
-                  className="absolute left-0 top-0 w-full pb-3"
-                  style={{ transform: `translateY(${virtualItem.start}px)` }}
-                  data-testid={`promo-video-${row.video.id}`}
-                >
-                  <PromoVideoCard
-                    video={row.video}
-                    isActive={activeVideo === row.video.id}
-                    embedUrl={row.embedUrl}
-                    thumbnailUrl={row.thumbnailUrl}
-                    onPlay={handlePlayVideo}
-                    onClose={handleCloseActiveVideo}
-                    onShare={handleShareVideo}
-                    onOpenComments={handleOpenComments}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {promoRows.map((row) => (
-              <div key={row.video.id} className="w-full" data-testid={`promo-video-${row.video.id}`}>
-                <PromoVideoCard
-                  video={row.video}
-                  isActive={activeVideo === row.video.id}
-                  embedUrl={row.embedUrl}
-                  thumbnailUrl={row.thumbnailUrl}
-                  onPlay={handlePlayVideo}
-                  onClose={handleCloseActiveVideo}
-                  onShare={handleShareVideo}
-                  onOpenComments={handleOpenComments}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="space-y-3">
+          {promoRows.map((row) => (
+            <div key={row.video.id} className="w-full" data-testid={`promo-video-${row.video.id}`}>
+              <PromoVideoCard
+                video={row.video}
+                isActive={activeVideo === row.video.id}
+                embedUrl={row.embedUrl}
+                thumbnailUrl={row.thumbnailUrl}
+                onPlay={handlePlayVideo}
+                onClose={handleCloseActiveVideo}
+                onShare={handleShareVideo}
+                onOpenComments={handleOpenComments}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       <Dialog open={!!openCommentsForVideoId} onOpenChange={(open) => !open && setOpenCommentsForVideoId(null)}>

@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, Moon, Star, Calendar, BookOpen, Volume2, Play, Pause, RotateCcw, RotateCw, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,14 +115,6 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
   });
 
   const stories = useMemo(() => allStories.filter(story => story.isPublished), [allStories]);
-  const storyCount = stories.length;
-
-  const storyVirtualizer = useVirtualizer({
-    count: storyCount,
-    getScrollElement: () => listContainerRef.current,
-    estimateSize: () => 112,
-    overscan: 5,
-  });
 
   // Get current story index in the playlist
   const currentStoryIndex = selectedStory 
@@ -567,25 +558,15 @@ export default function BedtimeStoriesArchive({ onBack }: BedtimeStoriesArchiveP
             className="max-h-[70vh] overflow-y-auto pr-1"
             data-testid="bedtime-stories-virtual-list"
           >
-            <div className="relative" style={{ height: `${storyVirtualizer.getTotalSize()}px` }}>
-              {storyVirtualizer.getVirtualItems().map((virtualItem) => {
-                const story = stories[virtualItem.index];
-                return (
-                  <div
-                    key={story.id}
-                    ref={storyVirtualizer.measureElement}
-                    data-index={virtualItem.index}
-                    className="absolute left-0 top-0 w-full pb-4"
-                    style={{ transform: `translateY(${virtualItem.start}px)` }}
-                  >
-                    <StoryListCard
-                      story={story}
-                      formatDate={formatDate}
-                      onSelectStory={handleSelectStory}
-                    />
-                  </div>
-                );
-              })}
+            <div className="space-y-4">
+              {stories.map((story) => (
+                <StoryListCard
+                  key={story.id}
+                  story={story}
+                  formatDate={formatDate}
+                  onSelectStory={handleSelectStory}
+                />
+              ))}
             </div>
           </div>
         )}

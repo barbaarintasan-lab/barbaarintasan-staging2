@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -410,13 +409,6 @@ export default function Maaweelo() {
     [displayStories, effectiveTodayStory?.id, showOnlyFavorites],
   );
 
-  const storiesVirtualizer = useVirtualizer({
-    count: previousStories.length,
-    getScrollElement: () => storiesListRef.current,
-    estimateSize: () => 380,
-    overscan: 2,
-  });
-
   const StoryCard = ({ story, isToday = false, index = 0 }: { story: BedtimeStory; isToday?: boolean; index?: number }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -690,21 +682,10 @@ export default function Maaweelo() {
                   className="max-h-[75vh] overflow-y-auto pr-1"
                   data-testid="maaweelo-virtual-list"
                 >
-                  <div className="relative" style={{ height: `${storiesVirtualizer.getTotalSize()}px` }}>
-                    {storiesVirtualizer.getVirtualItems().map((virtualItem) => {
-                      const story = previousStories[virtualItem.index];
-                      return (
-                        <div
-                          key={story.id}
-                          ref={storiesVirtualizer.measureElement}
-                          data-index={virtualItem.index}
-                          className="absolute left-0 top-0 w-full pb-4"
-                          style={{ transform: `translateY(${virtualItem.start}px)` }}
-                        >
-                          <StoryCard story={story} index={virtualItem.index} />
-                        </div>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {previousStories.map((story, i) => (
+                      <StoryCard key={story.id} story={story} index={i} />
+                    ))}
                   </div>
                 </div>
               )}
