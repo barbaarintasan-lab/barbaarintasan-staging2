@@ -1,15 +1,18 @@
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiRequest } from "@/lib/queryClient";
+import { scheduleIdleTask, trackedFetchJson, useDroppedFrameWarning, useExcessiveRenderWarning, useSlowRenderWarning } from "@/lib/performance";
 import { useParentAuth } from "@/contexts/ParentAuthContext";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, Bell, ChevronRight, ChevronLeft, Play, Pause, Sparkles, LogOut, LogIn, Settings, Star, Lightbulb, Target, Award, BookOpen, Users, Video, X, Bot, Globe, Megaphone, UserPlus, ClipboardCheck, GraduationCap, User, CheckCircle, Radio, Calendar, Check, Plus, Moon, MessageCircle, RotateCcw, RotateCw, Volume2, Clock, ExternalLink, Crown, Eye, Share2 } from "lucide-react";
 import { openSSOLink } from "@/lib/api";
 import { VoiceSpaces } from "@/components/VoiceSpaces";
 import { InstallBanner } from "@/components/InstallBanner";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import useEmblaCarousel from "embla-carousel-react";
@@ -18,6 +21,14 @@ const barahaWaalidiintaImg = "/images/somali_parents_community_gathering.png";
 const bsaAppIcon = "/images/bsa_app_icon_orange_gradient.png";
 const sheekoAppIcon = "/images/sheeko_app_icon_purple_gradient.png";
 const tarbiyaddaLogo = "/images/tarbiyadda-logo.png";
+
+const HOME_QUERY_OPTIONS = {
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+  refetchOnMount: false,
+} as const;
 
 function getPromoViewerKey(): string | null {
   if (typeof window === "undefined") return null;
@@ -112,6 +123,27 @@ interface Course {
   isFree: boolean;
   duration: string | null;
   order: number;
+}
+
+interface LiveStats {
+  onlineCount: number;
+  enrolledCount: number;
+  totalUsers: number;
+}
+
+interface ParentStats {
+  count: number;
+  quranChildrenCount: number;
+  childrenCount: number;
+}
+
+interface TelegramStats {
+  count: number;
+}
+
+interface SearchResults {
+  courses: any[];
+  lessons: any[];
 }
 
 // Koorsooyinka diyaar ah (0-6 Bilood iyo Ilmo Is-Dabira)
@@ -343,40 +375,135 @@ function ScheduledSheekoCard({ room }: { room: VoiceRoom }) {
   );
 }
 
+interface PromoVideoItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  videoUrl: string;
+  thumbnailUrl?: string | null;
+  viewCount?: number;
+}
+
+const PromoVideoCard = memo(function PromoVideoCard({
+  video,
+  isActive,
+  embedUrl,
+  thumbnailUrl,
+  onPlay,
+  onClose,
+  onShare,
+  onOpenComments,
+}: {
+  video: PromoVideoItem;
+  isActive: boolean;
+  embedUrl: string;
+  thumbnailUrl: string | null;
+  onPlay: (videoId: string) => void;
+  onClose: () => void;
+  onShare: (video: PromoVideoItem) => void;
+  onOpenComments: (videoId: string) => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {isActive ? (
+        <div className="relative aspect-video bg-black">
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+          />
+          <button
+            onClick={onClose}
+            className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white z-10"
+            data-testid={`promo-close-${video.id}`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => onPlay(video.id)}
+          className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
+          data-testid={`promo-play-${video.id}`}
+        >
+          {thumbnailUrl ? (
+            <img src={thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Video className="w-16 h-16 text-blue-300" />
+            </div>
+          )}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
+            <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <Play className="w-7 h-7 text-blue-600 ml-1" />
+            </div>
+          </div>
+        </button>
+      )}
+      <div className="p-3">
+        <h4 className="font-semibold text-base text-gray-900 line-clamp-1">{video.title}</h4>
+        {video.description && (
+          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
+        )}
+        <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
+          <span className="inline-flex items-center gap-1" data-testid={`promo-views-${video.id}`}>
+            <Eye className="w-4 h-4" />
+            {video.viewCount || 0}
+          </span>
+          <button
+            onClick={() => onShare(video)}
+            className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
+            data-testid={`promo-share-${video.id}`}
+          >
+            <Share2 className="w-4 h-4" />
+            La wadaag
+          </button>
+        </div>
+        <div className="mt-3 bg-slate-900 rounded-xl p-3" data-testid={`promo-reactions-${video.id}`}>
+          <ContentReactions contentType="promo_video" contentId={video.id} />
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <button
+            onClick={() => onOpenComments(video.id)}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            data-testid={`promo-comments-open-${video.id}`}
+          >
+            Arag faallooyinka
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 function PromoVideoSection() {
   const { parent } = useParentAuth();
   const queryClient = useQueryClient();
   const viewedInSession = useRef<Set<string>>(new Set());
-  const { data: videos = [] } = useQuery<any[]>({
+  const promoListRef = useRef<HTMLDivElement | null>(null);
+
+  useExcessiveRenderWarning("PromoVideoSection", 3, 700);
+  useSlowRenderWarning("PromoVideoSection", 16);
+
+  const { data: videos = [], isLoading: isPromoLoading } = useQuery<PromoVideoItem[]>({
     queryKey: ["/api/promo-videos"],
-    queryFn: async () => {
-      const res = await fetch("/api/promo-videos", {
+    queryFn: () => trackedFetchJson<PromoVideoItem[]>("/api/promo-videos", {
         credentials: "include",
         cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Failed to fetch promo videos");
-      return res.json();
-    },
-    staleTime: 300_000,
-    gcTime: 600_000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+      }, "PromoVideoSection.list", { priority: "high" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
-  const { data: archivedVideos = [] } = useQuery<any[]>({
+  const { data: archivedVideos = [] } = useQuery<PromoVideoItem[]>({
     queryKey: ["/api/promo-videos/archive"],
-    queryFn: async () => {
-      const res = await fetch("/api/promo-videos/archive", {
+    queryFn: () => trackedFetchJson<PromoVideoItem[]>("/api/promo-videos/archive", {
         credentials: "include",
         cache: "no-store",
-      });
-      if (!res.ok) return [];
-      return res.json();
-    },
+      }, "PromoVideoSection.archive", { priority: "low" }).catch(() => []),
     enabled: !!parent,
-    staleTime: 300_000,
-    gcTime: 600_000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [openCommentsForVideoId, setOpenCommentsForVideoId] = useState<string | null>(null);
@@ -413,10 +540,33 @@ function PromoVideoSection() {
     return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi]);
 
+  if (isPromoLoading && videos.length === 0) {
+    return (
+      <div className="mt-6 px-4" data-testid="promo-videos-skeleton">
+        <div className="flex items-center gap-2 mb-3">
+          <Skeleton className="w-8 h-8 rounded-lg" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <div className="space-y-3">
+          {[0, 1].map((idx) => (
+            <div key={idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <Skeleton className="w-full aspect-video" />
+              <div className="p-3 space-y-2">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (videos.length === 0) return null;
 
   const archivedOnly = archivedVideos.filter(
-    (video: any) => !videos.some((current: any) => current.id === video.id),
+    (video) => !videos.some((current) => current.id === video.id),
   );
   const latestArchivedVideo = archivedOnly[0] ?? null;
 
@@ -440,7 +590,7 @@ function PromoVideoSection() {
     return url;
   };
 
-  const getThumb = (video: any) => {
+  const getThumb = (video: PromoVideoItem) => {
     if (video.thumbnailUrl) return video.thumbnailUrl;
     const gdriveId = getGDriveFileId(video.videoUrl);
     if (gdriveId) return `https://drive.google.com/thumbnail?id=${gdriveId}&sz=w480`;
@@ -449,7 +599,7 @@ function PromoVideoSection() {
     return null;
   };
 
-  const handleShareVideo = async (video: any) => {
+  const handleShareVideo = useCallback(async (video: PromoVideoItem) => {
     const shareData = {
       title: video.title,
       text: video.description || "Muuqaal cusub oo waxtar leh",
@@ -466,7 +616,41 @@ function PromoVideoSection() {
     } catch {
       // User canceled native share dialog; no toast needed.
     }
-  };
+  }, []);
+
+  const handlePlayVideo = useCallback((videoId: string) => {
+    setActiveVideo(videoId);
+    if (!viewedInSession.current.has(videoId)) {
+      viewedInSession.current.add(videoId);
+      trackViewMutation.mutate(videoId);
+    }
+  }, [trackViewMutation]);
+
+  const handleCloseActiveVideo = useCallback(() => {
+    setActiveVideo(null);
+  }, []);
+
+  const handleOpenComments = useCallback((videoId: string) => {
+    setOpenCommentsForVideoId(videoId);
+  }, []);
+
+  const promoRows = useMemo(
+    () => videos.map((video) => ({
+      video,
+      embedUrl: getEmbedUrl(video.videoUrl),
+      thumbnailUrl: getThumb(video),
+    })),
+    [videos],
+  );
+
+  const shouldVirtualizePromoList = promoRows.length > 4;
+  const promoVirtualizer = useVirtualizer({
+    count: promoRows.length,
+    getScrollElement: () => promoListRef.current,
+    estimateSize: () => 420,
+    overscan: 2,
+    enabled: shouldVirtualizePromoList,
+  });
 
   return (
     <div className="mt-6 px-4" data-testid="promo-videos-section">
@@ -485,87 +669,55 @@ function PromoVideoSection() {
         )}
       </div>
 
-      <div className="space-y-3">
-        {videos.map((video: any) => (
-          <div key={video.id} className="w-full" data-testid={`promo-video-${video.id}`}>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {activeVideo === video.id ? (
-                <div className="relative aspect-video bg-black">
-                  <iframe
-                    src={getEmbedUrl(video.videoUrl)}
-                    className="w-full h-full"
-                    allow="autoplay; encrypted-media; fullscreen"
-                    allowFullScreen
-                  />
-                  <button
-                    onClick={() => setActiveVideo(null)}
-                    className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white z-10"
-                    data-testid={`promo-close-${video.id}`}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setActiveVideo(video.id);
-                    if (!viewedInSession.current.has(video.id)) {
-                      viewedInSession.current.add(video.id);
-                      trackViewMutation.mutate(video.id);
-                    }
-                  }}
-                  className="relative w-full aspect-video bg-gradient-to-br from-blue-50 to-sky-100 group"
-                  data-testid={`promo-play-${video.id}`}
+      <div
+        ref={promoListRef}
+        className={shouldVirtualizePromoList ? "max-h-[calc(100vh-14rem)] overflow-y-auto pr-1" : undefined}
+      >
+        {shouldVirtualizePromoList ? (
+          <div className="relative" style={{ height: `${promoVirtualizer.getTotalSize()}px` }}>
+            {promoVirtualizer.getVirtualItems().map((virtualItem) => {
+              const row = promoRows[virtualItem.index];
+              return (
+                <div
+                  key={row.video.id}
+                  ref={promoVirtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  className="absolute left-0 top-0 w-full pb-3"
+                  style={{ transform: `translateY(${virtualItem.start}px)` }}
+                  data-testid={`promo-video-${row.video.id}`}
                 >
-                  {getThumb(video) ? (
-                    <img src={getThumb(video)} alt={video.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Video className="w-16 h-16 text-blue-300" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-all">
-                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                      <Play className="w-7 h-7 text-blue-600 ml-1" />
-                    </div>
-                  </div>
-                </button>
-              )}
-              <div className="p-3">
-                <h4 className="font-semibold text-base text-gray-900 line-clamp-1">{video.title}</h4>
-                {video.description && (
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{video.description}</p>
-                )}
-                <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
-                  <span className="inline-flex items-center gap-1" data-testid={`promo-views-${video.id}`}>
-                    <Eye className="w-4 h-4" />
-                    {video.viewCount || 0}
-                  </span>
-                  <button
-                    onClick={() => handleShareVideo(video)}
-                    className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
-                    data-testid={`promo-share-${video.id}`}
-                  >
-                    <Share2 className="w-4 h-4" />
-                    La wadaag
-                  </button>
+                  <PromoVideoCard
+                    video={row.video}
+                    isActive={activeVideo === row.video.id}
+                    embedUrl={row.embedUrl}
+                    thumbnailUrl={row.thumbnailUrl}
+                    onPlay={handlePlayVideo}
+                    onClose={handleCloseActiveVideo}
+                    onShare={handleShareVideo}
+                    onOpenComments={handleOpenComments}
+                  />
                 </div>
-                <div className="mt-3 bg-slate-900 rounded-xl p-3" data-testid={`promo-reactions-${video.id}`}>
-                  <ContentReactions contentType="promo_video" contentId={video.id} />
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <button
-                    onClick={() => setOpenCommentsForVideoId(video.id)}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                    data-testid={`promo-comments-open-${video.id}`}
-                  >
-                    Arag faallooyinka
-                  </button>
-                </div>
-                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {promoRows.map((row) => (
+              <div key={row.video.id} className="w-full" data-testid={`promo-video-${row.video.id}`}>
+                <PromoVideoCard
+                  video={row.video}
+                  isActive={activeVideo === row.video.id}
+                  embedUrl={row.embedUrl}
+                  thumbnailUrl={row.thumbnailUrl}
+                  onPlay={handlePlayVideo}
+                  onClose={handleCloseActiveVideo}
+                  onShare={handleShareVideo}
+                  onOpenComments={handleOpenComments}
+                />
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
       </div>
 
       <Dialog open={!!openCommentsForVideoId} onOpenChange={(open) => !open && setOpenCommentsForVideoId(null)}>
@@ -793,18 +945,17 @@ function DhambaalSection() {
 
   const { data: todayMessage } = useQuery<ParentMessage>({
     queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`],
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    queryFn: () => trackedFetchJson<ParentMessage>(`/api/parent-messages/today?lang=${apiLanguage}`, undefined, "DhambaalSection.today", { priority: "high" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
     retry: 2,
   });
 
   const { data: latestMessages = [] } = useQuery<ParentMessage[]>({
     queryKey: [`/api/parent-messages?limit=1&lang=${apiLanguage}`],
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    refetchOnWindowFocus: false,
+    queryFn: () => trackedFetchJson<ParentMessage[]>(`/api/parent-messages?limit=1&lang=${apiLanguage}`, undefined, "DhambaalSection.latest", { priority: "low" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
     retry: 1,
   });
 
@@ -866,18 +1017,12 @@ function MaaweeloSection() {
 
   const { data: effectiveTodayStory } = useQuery<BedtimeStory | null>({
     queryKey: [`/api/bedtime-stories/latest?lang=${apiLanguage}`],
-    queryFn: async () => {
-      const res = await fetch(`/api/bedtime-stories/latest?lang=${apiLanguage}`, {
+    queryFn: () => trackedFetchJson<BedtimeStory | null>(`/api/bedtime-stories/latest?lang=${apiLanguage}`, {
         credentials: "include",
         cache: "no-store",
-      });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 20_000,
-    refetchInterval: 45_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+      }, "MaaweeloSection.latest", { priority: "high" }).catch(() => null),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
     retry: 2,
   });
 
@@ -1045,11 +1190,9 @@ function CourseCard({ course, onComingSoonClick }: { course: Course; onComingSoo
 function MeetEventsSection({ parent }: { parent: any }) {
   const { data: events = [] } = useQuery<any[]>({
     queryKey: ["/api/meet-events"],
-    queryFn: async () => {
-      const res = await fetch("/api/meet-events");
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<any[]>("/api/meet-events", undefined, "MeetEventsSection", { priority: "high" }).catch(() => []),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   const [addedToCalendar, setAddedToCalendar] = useState<Set<number>>(() => {
@@ -1381,11 +1524,9 @@ function AiTipCard() {
 
   const { data: aiTip } = useQuery<AiTip | null>({
     queryKey: ["aiTipToday"],
-    queryFn: async () => {
-      const res = await fetch("/api/ai-tips/today");
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<AiTip>("/api/ai-tips/today", undefined, "AiTipCard", { priority: "low" }).catch(() => null),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   if (!aiTip) return null;
@@ -1548,11 +1689,9 @@ function DailyTipCard() {
   const { t } = useTranslation();
   const { data: tip } = useQuery<DailyTip | null>({
     queryKey: ["dailyTip"],
-    queryFn: async () => {
-      const res = await fetch("/api/daily-tip");
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<DailyTip>("/api/daily-tip", undefined, "DailyTipCard", { priority: "low" }).catch(() => null),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   if (!tip) return null;
@@ -1620,12 +1759,13 @@ const DEV_STAGE_LABELS: Record<string, { label: string; icon: string }> = {
 function HomepageTipsSection() {
   const { data: tips = [] } = useQuery<HomepageParentTip[]>({
     queryKey: ["homepage-parent-tips"],
-    queryFn: async () => {
-      const res = await fetch("/api/parent-tips/homepage");
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<HomepageParentTip[]>("/api/parent-tips/homepage", undefined, "HomepageTipsSection", { priority: "low" }).catch(() => []),
+    placeholderData: (prev) => prev,
     staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   const [playingTipId, setPlayingTipId] = useState<string | null>(null);
@@ -2031,13 +2171,11 @@ function RandomAnnouncement({ announcements }: { announcements: any[] }) {
 // AI Recommended Courses Section - Shows courses from the learning path
 function RecommendedCoursesSection() {
   const { t } = useTranslation();
-  const { data: learningPath } = useQuery({
+  const { data: learningPath } = useQuery<any>({
     queryKey: ["learningPath"],
-    queryFn: async () => {
-      const res = await fetch("/api/learning-path", { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<any>("/api/learning-path", { credentials: "include" }, "RecommendedCoursesSection", { priority: "high" }).catch(() => null),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   // Only show if there are recommendations
@@ -2389,7 +2527,10 @@ function GettingStartedGuide({
   );
 }
 
-function LiveStatsBar() {
+const LiveStatsBar = memo(function LiveStatsBar() {
+  useExcessiveRenderWarning("LiveStatsBar", 3, 700);
+  useSlowRenderWarning("LiveStatsBar");
+
   useEffect(() => {
     const ping = () => fetch("/api/stats/ping", { method: "POST" }).catch(() => {});
     ping();
@@ -2397,13 +2538,16 @@ function LiveStatsBar() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data: liveStats, isLoading } = useQuery({
+  const { data: liveStats, isLoading } = useQuery<LiveStats>({
     queryKey: ["liveStats"],
-    queryFn: async () => {
-      const res = await fetch("/api/stats/live");
-      if (!res.ok) return { onlineCount: 0, enrolledCount: 0, totalUsers: 0 };
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<LiveStats>("/api/stats/live", undefined, "LiveStatsBar", { priority: "high" }).catch(() => ({
+      onlineCount: 0,
+      enrolledCount: 0,
+      totalUsers: 0,
+    })),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     refetchInterval: 120000,
   });
 
@@ -2427,11 +2571,13 @@ function LiveStatsBar() {
       </div>
     </div>
   );
-}
+});
 
 export default function Home() {
   const { t, i18n } = useTranslation();
+  const { apiLanguage } = useLanguage();
   const { parent, isLoading, logout } = useParentAuth();
+  const queryClient = useQueryClient();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -2440,20 +2586,116 @@ export default function Home() {
   const [comingSoonCourse, setComingSoonCourse] = useState<Course | null>(null);
   const [deferHeavyQueries, setDeferHeavyQueries] = useState(false);
   const [, setLocation] = useLocation();
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const bottomPrefetchRef = useRef<HTMLDivElement | null>(null);
+  const lastNearBottomPrefetchRef = useRef(0);
+  const scrollPauseTimerRef = useRef<number | null>(null);
+
+  useExcessiveRenderWarning("Home", 3, 700);
+  useSlowRenderWarning("Home", 16);
+  useDroppedFrameWarning("Home", 16);
+
+  const prefetchLikelyEndpoints = useCallback((priority: "high" | "low") => {
+    const fetchOptions = { priority } as const;
+    queryClient.prefetchQuery({
+      queryKey: ["/api/promo-videos"],
+      queryFn: () => trackedFetchJson("/api/promo-videos", { credentials: "include", cache: "no-store" }, "Home.prefetch.promo", fetchOptions),
+      staleTime: 5 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: [`/api/bedtime-stories/latest?lang=${apiLanguage}`],
+      queryFn: () => trackedFetchJson(`/api/bedtime-stories/latest?lang=${apiLanguage}`, { credentials: "include", cache: "no-store" }, "Home.prefetch.bedtimeLatest", fetchOptions),
+      staleTime: 5 * 60 * 1000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: [`/api/parent-messages/today?lang=${apiLanguage}`],
+      queryFn: () => trackedFetchJson(`/api/parent-messages/today?lang=${apiLanguage}`, undefined, "Home.prefetch.parentToday", fetchOptions),
+      staleTime: 5 * 60 * 1000,
+    });
+  }, [apiLanguage, queryClient]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDeferHeavyQueries(true), 1200);
     return () => clearTimeout(timer);
   }, []);
 
-  const ageFilters = [
-    { value: null, label: t("common.all") },
-    { value: "0-6", label: `0-6 ${t("assessment.months")}` },
-    { value: "6-12", label: `6-12 ${t("assessment.months")}` },
-    { value: "1-2", label: `1-2 ${t("assessment.years")}` },
-    { value: "2-4", label: `2-4 ${t("assessment.years")}` },
-    { value: "4-7", label: `4-7 ${t("assessment.years")}` },
-  ];
+  useEffect(() => {
+    prefetchLikelyEndpoints("low");
+  }, [prefetchLikelyEndpoints]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const prefetchAdjacentContent = () => {
+      scheduleIdleTask(() => {
+        queryClient.prefetchQuery({
+          queryKey: ["/api/promo-videos/archive"],
+          queryFn: () => trackedFetchJson("/api/promo-videos/archive", { credentials: "include", cache: "no-store" }, "Home.prefetch.archive", { priority: "low" }).catch(() => []),
+          staleTime: 5 * 60 * 1000,
+        });
+        queryClient.prefetchQuery({
+          queryKey: [`/api/bedtime-stories?limit=20&lang=${apiLanguage}`],
+          queryFn: () => trackedFetchJson(`/api/bedtime-stories?limit=20&lang=${apiLanguage}`, undefined, "Home.prefetch.bedtimeList", { priority: "low" }).catch(() => []),
+          staleTime: 5 * 60 * 1000,
+        });
+        queryClient.prefetchQuery({
+          queryKey: [`/api/parent-messages?limit=1&lang=${apiLanguage}`],
+          queryFn: () => trackedFetchJson(`/api/parent-messages?limit=1&lang=${apiLanguage}`, undefined, "Home.prefetch.parentList", { priority: "low" }).catch(() => []),
+          staleTime: 5 * 60 * 1000,
+        });
+      }, 400);
+    };
+
+    const onScroll = () => {
+      const remaining = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
+      const now = Date.now();
+      if (remaining < 1400 && now - lastNearBottomPrefetchRef.current > 2000) {
+        lastNearBottomPrefetchRef.current = now;
+        prefetchLikelyEndpoints("low");
+      }
+
+      if (scrollPauseTimerRef.current) {
+        window.clearTimeout(scrollPauseTimerRef.current);
+      }
+      scrollPauseTimerRef.current = window.setTimeout(() => {
+        prefetchAdjacentContent();
+      }, 180);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          prefetchAdjacentContent();
+        }
+      },
+      { root: null, rootMargin: "1200px 0px 1200px 0px", threshold: 0.01 },
+    );
+
+    if (bottomPrefetchRef.current) {
+      observer.observe(bottomPrefetchRef.current);
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (scrollPauseTimerRef.current) {
+        window.clearTimeout(scrollPauseTimerRef.current);
+      }
+      observer.disconnect();
+    };
+  }, [apiLanguage, prefetchLikelyEndpoints, queryClient]);
+
+  const ageFilters = useMemo(
+    () => [
+      { value: null, label: t("common.all") },
+      { value: "0-6", label: `0-6 ${t("assessment.months")}` },
+      { value: "6-12", label: `6-12 ${t("assessment.months")}` },
+      { value: "1-2", label: `1-2 ${t("assessment.years")}` },
+      { value: "2-4", label: `2-4 ${t("assessment.years")}` },
+      { value: "4-7", label: `4-7 ${t("assessment.years")}` },
+    ],
+    [t],
+  );
 
   const handleLogout = async () => {
     await logout();
@@ -2462,97 +2704,79 @@ export default function Home() {
 
   const { data: courses = [] } = useQuery<Course[]>({
     queryKey: ["courses"],
-    queryFn: async () => {
-      const res = await fetch("/api/courses");
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<Course[]>("/api/courses", undefined, "Home.courses", { priority: "high" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
-  const { data: allLessons = [] } = useQuery({
+  const { data: allLessons = [] } = useQuery<any[]>({
     queryKey: ["allLessons"],
-    queryFn: async () => {
-      const res = await fetch("/api/lessons");
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson("/api/lessons", undefined, "Home.allLessons", { priority: "low" }),
     enabled: deferHeavyQueries,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
-  const { data: parentStats, isLoading: parentStatsLoading } = useQuery({
+  const { data: parentStats, isLoading: parentStatsLoading } = useQuery<ParentStats>({
     queryKey: ["parentStats"],
-    queryFn: async () => {
-      const res = await fetch("/api/stats/parents");
-      return res.json();
-    },
-    refetchInterval: 15000,
-    refetchIntervalInBackground: true,
+    queryFn: () => trackedFetchJson<ParentStats>("/api/stats/parents", undefined, "Home.parentStats", { priority: "high" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
-  const { data: telegramStats, isLoading: telegramStatsLoading } = useQuery({
+  const { data: telegramStats, isLoading: telegramStatsLoading } = useQuery<TelegramStats>({
     queryKey: ["telegramStats"],
-    queryFn: async () => {
-      const res = await fetch("/api/stats/telegram-members");
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<TelegramStats>("/api/stats/telegram-members", undefined, "Home.telegramStats", { priority: "low" }),
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   const { data: freeLessonsStats, isLoading: freeLessonsStatsLoading } = useQuery<{ count: number }>({
     queryKey: ["freeLessonsStats"],
     queryFn: async () => {
-      const res = await fetch("/api/stats/free-lessons", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch free lessons stats");
-      const payload = await res.json();
+      const payload = await trackedFetchJson<{ count?: number }>("/api/stats/free-lessons", { cache: "no-store" }, "Home.freeLessonsStats", { priority: "high" });
       const count = Number(payload?.count);
       return { count: Number.isFinite(count) && count >= 0 ? count : 0 };
     },
     placeholderData: (previousData) => previousData,
     retry: 1,
-    staleTime: 30000,
-    refetchInterval: 60000,
-    refetchOnWindowFocus: true,
+    ...HOME_QUERY_OPTIONS,
   });
 
-  const { data: enrollments = [] } = useQuery({
+  const { data: enrollments = [] } = useQuery<any[]>({
     queryKey: ["parentEnrollments", parent?.id],
-    queryFn: async () => {
-      const res = await fetch("/api/parent/enrollments", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson("/api/parent/enrollments", { credentials: "include" }, "Home.enrollments", { priority: "high" }).catch(() => []),
     enabled: !!parent,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   const recommendations: Course[] = [];
-  const recommendationReason = "popular";
+  const recommendationReason: "popular" | "personalized" | "discover" = "popular";
 
   const { data: parentFeedback = [] } = useQuery<any[]>({
     queryKey: ["parentFeedback"],
-    queryFn: async () => {
-      const res = await fetch("/api/telegram-referrals");
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<any[]>("/api/telegram-referrals", undefined, "Home.parentFeedback", { priority: "low" }).catch(() => []),
     enabled: deferHeavyQueries,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   const { data: announcements = [] } = useQuery<any[]>({
     queryKey: ["announcements"],
-    queryFn: async () => {
-      const res = await fetch("/api/announcements");
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<any[]>("/api/announcements", undefined, "Home.announcements", { priority: "low" }).catch(() => []),
     enabled: deferHeavyQueries,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   // Check if parent has completed any assessment (scoped by parent ID)
   const { data: assessmentHistory = [] } = useQuery<any[]>({
     queryKey: ["assessmentHistory", parent?.id],
-    queryFn: async () => {
-      const res = await fetch("/api/parent/assessment-history", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => trackedFetchJson<any[]>("/api/parent/assessment-history", { credentials: "include" }, "Home.assessmentHistory", { priority: "high" }).catch(() => []),
     enabled: !!parent,
+    placeholderData: (prev) => prev,
+    ...HOME_QUERY_OPTIONS,
   });
 
   // Only show completion if parent is logged in and has data
@@ -2562,9 +2786,7 @@ export default function Home() {
   const { data: homepageSections } = useQuery<any[]>({
     queryKey: ["homepage-sections"],
     queryFn: async () => {
-      const res = await fetch("/api/homepage-sections");
-      if (!res.ok) throw new Error("Failed to fetch sections");
-      const data = await res.json();
+      const data = await trackedFetchJson<any[]>("/api/homepage-sections", undefined, "Home.homepageSections", { priority: "high" });
       try {
         localStorage.setItem("homepage-sections-cache", JSON.stringify(data));
       } catch {
@@ -2572,8 +2794,8 @@ export default function Home() {
       }
       return data;
     },
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    ...HOME_QUERY_OPTIONS,
+    placeholderData: (prev) => prev,
     retry: 1,
   });
 
@@ -2585,7 +2807,10 @@ export default function Home() {
     return section !== undefined;
   };
 
-  const hasEnrollments = enrollments.filter((e: any) => e.status === "active").length > 0;
+  const hasEnrollments = useMemo(
+    () => enrollments.some((e: any) => e.status === "active"),
+    [enrollments],
+  );
 
   const filterByAge = (coursesToFilter: Course[]) => {
     if (!selectedAgeFilter) return coursesToFilter;
@@ -2595,17 +2820,28 @@ export default function Home() {
     });
   };
 
-  const generalCourses = filterByAge(courses.filter((c) => c.category === "general" && c.isLive)).sort((a, b) => a.order - b.order);
-  const specialCourses = courses.filter((c) => c.category === "special" && c.isLive).sort((a, b) => a.order - b.order);
+  const generalCourses = useMemo(
+    () => filterByAge(courses.filter((c) => c.category === "general" && c.isLive)).sort((a, b) => a.order - b.order),
+    [courses, selectedAgeFilter],
+  );
+  const specialCourses = useMemo(
+    () => courses.filter((c) => c.category === "special" && c.isLive).sort((a, b) => a.order - b.order),
+    [courses],
+  );
 
-  const { data: searchResults } = useQuery({
-    queryKey: ["search", searchQuery],
-    queryFn: async () => {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!res.ok) return { courses: [], lessons: [] };
-      return res.json();
-    },
-    enabled: searchQuery.length >= 2,
+  const { data: searchResults } = useQuery<SearchResults>({
+    queryKey: ["search", deferredSearchQuery],
+    queryFn: () => trackedFetchJson<SearchResults>(
+      `/api/search?q=${encodeURIComponent(deferredSearchQuery)}`,
+      undefined,
+      "Home.search",
+      { priority: "high" },
+    ).catch(() => ({ courses: [], lessons: [] })),
+    enabled: deferredSearchQuery.length >= 2,
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
 
@@ -3261,6 +3497,8 @@ export default function Home() {
           <RandomAnnouncement announcements={announcements} />
         </div>
       )}
+
+      <div ref={bottomPrefetchRef} className="h-1 w-full" aria-hidden="true" />
 
       {/* SEO Content Section - Crawlable content for search engines and AI */}
       <footer className="mx-4 mt-8 mb-24 lg:mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 max-w-7xl lg:mx-auto lg:p-8" role="contentinfo">
