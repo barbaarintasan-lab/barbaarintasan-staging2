@@ -70,13 +70,18 @@ export async function uploadToR2(
     throw new Error(`Unknown R2 bucket type: ${bucketType}`);
   }
   const key = `${folder}/${fileName}`;
+  const cacheControl = mimeType.startsWith('audio/')
+    ? 'public, max-age=3600'
+    : mimeType.startsWith('image/')
+      ? 'public, max-age=31536000, immutable'
+      : undefined;
 
   await client.send(new PutObjectCommand({
     Bucket: bucket.name,
     Key: key,
     Body: fileBuffer,
     ContentType: mimeType,
-    CacheControl: mimeType.startsWith('audio/') ? 'public, max-age=3600' : undefined,
+    CacheControl: cacheControl,
   }));
 
   const url = `${bucket.publicUrl}/${key}`;
