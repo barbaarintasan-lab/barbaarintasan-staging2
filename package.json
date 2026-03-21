@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "translate:initial": "tsx scripts/run-initial-translation.ts",
     "translate:status": "tsx scripts/check-translation-status.ts",
-    "maaweelo:migrate-images-r2": "tsx scripts/migrate-bedtime-images-to-r2.ts"
+    "maaweelo:migrate-images-r2": "tsx scripts/migrate-bedtime-images-to-r2.ts",
+    "maaweelo:backfill-image-cache": "tsx scripts/backfill-maaweelo-image-cache-control.ts"
   },
   "notes": "removed framer motion dependency",
   "dependencies": {

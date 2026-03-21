@@ -27,10 +27,10 @@ const GAME_INFO: Record<string, { label: string; emoji: string }> = {
   somali_flashcards: { label: "Kaarka", emoji: "📚" },
 };
 const GAME_ROUTES: Record<string, string> = {
-  word_puzzle: "/quran-word-puzzle",
-  memory_match: "/quran-memory-match",
-  surah_quiz: "/quran-surah-quiz",
-  somali_flashcards: "/quran-flashcards",
+  word_puzzle: "/quran-game/word-puzzle",
+  memory_match: "/quran-game/memory-match",
+  surah_quiz: "/quran-game/surah-quiz",
+  somali_flashcards: "/quran-game/somali-flashcards",
 };
 
 interface AyahProgress {
