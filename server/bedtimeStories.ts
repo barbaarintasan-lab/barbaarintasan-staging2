@@ -701,6 +701,12 @@ const LIST_STORIES_TTL = 120000;
 const BEDTIME_STORY_COVER_TTL = 300000;
 const BEDTIME_STORY_DATA_BUFFER_TTL = 300000;
 
+function setBedtimeStoryApiNoStore(res: Response): void {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+}
+
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
   todayStoryCache.clear();
@@ -751,6 +757,7 @@ async function applyTranslationsToStories<T extends Record<string, any> & { id: 
 export function registerBedtimeStoryRoutes(app: Express): void {
   app.get("/api/bedtime-stories/latest", async (req: Request, res: Response) => {
     try {
+      setBedtimeStoryApiNoStore(res);
       const lang = req.query.lang as string;
       let todayStory = await storage.getTodayBedtimeStory();
       if (!todayStory) {
@@ -806,6 +813,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories", async (req: Request, res: Response) => {
     try {
+      setBedtimeStoryApiNoStore(res);
       const lang = req.query.lang as string;
       const requestedLimit = Number.parseInt(String(req.query.limit || "60"), 10);
       const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 120) : 60;
@@ -879,6 +887,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories/today", async (req: Request, res: Response) => {
     try {
+      setBedtimeStoryApiNoStore(res);
       const lang = req.query.lang as string;
       const cacheKey = `bs-today-${lang || 'so'}`;
       const cached = todayStoryCache.get(cacheKey);
@@ -938,6 +947,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories/:id", async (req: Request, res: Response) => {
     try {
+      setBedtimeStoryApiNoStore(res);
       const lang = req.query.lang as string;
       let story = await storage.getBedtimeStory(req.params.id);
       if (!story) {

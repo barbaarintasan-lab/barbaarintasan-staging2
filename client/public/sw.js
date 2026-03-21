@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v17';
 const CACHE_NAME = `barbaarintasan-${CACHE_VERSION}`;
 const API_CACHE_NAME = `barbaarintasan-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -46,6 +46,17 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
+
+  const isBedtimeStoryJsonApi =
+    url.pathname === '/api/bedtime-stories' ||
+    url.pathname === '/api/bedtime-stories/latest' ||
+    url.pathname === '/api/bedtime-stories/today' ||
+    /^\/api\/bedtime-stories\/[^/]+$/.test(url.pathname);
+
+  if (isBedtimeStoryJsonApi) {
+    event.respondWith(networkOnlyNoStore(event.request));
+    return;
+  }
 
   if (url.pathname === '/api/promo-videos' || url.pathname === '/api/promo-videos/archive') {
     event.respondWith(networkOnlyNoStore(event.request));
