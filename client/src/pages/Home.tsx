@@ -874,10 +874,10 @@ function MaaweeloSection() {
       if (!res.ok) return null;
       return res.json();
     },
-    staleTime: 20_000,
-    refetchInterval: 45_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 60 * 5,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
     retry: 2,
   });
 
@@ -2483,8 +2483,10 @@ export default function Home() {
       const res = await fetch("/api/stats/parents");
       return res.json();
     },
-    refetchInterval: 15000,
-    refetchIntervalInBackground: true,
+    staleTime: 1000 * 60 * 2,
+    refetchInterval: 1000 * 60 * 2,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: telegramStats, isLoading: telegramStatsLoading } = useQuery({
