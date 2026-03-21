@@ -2493,13 +2493,22 @@ export default function Home() {
     },
   });
 
-  const { data: freeLessonsStats, isLoading: freeLessonsStatsLoading } = useQuery({
+  const { data: freeLessonsStats = { count: 106 } } = useQuery<{ count: number }>({
     queryKey: ["freeLessonsStats"],
     queryFn: async () => {
-      const res = await fetch("/api/stats/free-lessons");
-      if (!res.ok) return { count: 106 };
-      return res.json();
+      try {
+        const res = await fetch("/api/stats/free-lessons", { cache: "no-store" });
+        if (!res.ok) return { count: 106 };
+        const payload = await res.json();
+        const count = Number(payload?.count);
+        return { count: Number.isFinite(count) && count >= 0 ? count : 106 };
+      } catch {
+        return { count: 106 };
+      }
     },
+    placeholderData: (previousData) => previousData ?? { count: 106 },
+    retry: 1,
+    staleTime: 30000,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
   });
@@ -2792,7 +2801,7 @@ export default function Home() {
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">Casharada Free-ga ah</p>
-            <AnimatedCounter value={freeLessonsStats?.count > 0 ? freeLessonsStats.count : 106} loading={freeLessonsStatsLoading} />
+            <AnimatedCounter value={freeLessonsStats?.count > 0 ? freeLessonsStats.count : 106} />
             <p className="text-xs text-gray-400 mt-1 truncate">Dhambaal + Maaweelo + Archive</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
