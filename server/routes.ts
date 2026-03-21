@@ -1133,6 +1133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tableName: "session",
         createTableIfMissing: true,
         pruneSessionInterval: 600,
+        // Reduce write pressure when DB is under stress.
+        disableTouch: true,
       }),
       secret: sessionSecret || "barbaarintasan-academy-dev-secret-key",
       resave: false,

@@ -43,10 +43,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  max: isProduction ? 10 : 5,
+  // Keep production pool conservative across multiple Fly machines.
+  max: isProduction ? 6 : 5,
   min: 1,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 20000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+  query_timeout: 30000,
+  statement_timeout: 30000,
+  application_name: "barbaarintasan-api",
 });
 
 pool.on('connect', (client) => {
@@ -65,7 +71,7 @@ async function warmupPool() {
     console.log('[DB Pool] Connection warmed up successfully');
   } catch (err: unknown) {
     console.error('[DB Pool] Warmup failed:', err);
-    throw err;
+    // Do not crash boot on transient DB network issues.
   }
 }
 warmupPool();
