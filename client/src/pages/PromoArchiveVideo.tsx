@@ -4,10 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, Play, Share2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/queryClient";
-import { trackedFetchJson } from "@/lib/performance";
 import { ContentComments, ContentReactions } from "@/components/engagement";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import BottomNav from "@/components/BottomNav";
 
 type PromoArchiveVideo = {
@@ -28,16 +26,18 @@ export default function PromoArchiveVideoPage() {
 
   const { data: archivedVideos = [], isLoading } = useQuery<PromoArchiveVideo[]>({
     queryKey: ["/api/promo-videos/archive"],
-    queryFn: () => trackedFetchJson<PromoArchiveVideo[]>("/api/promo-videos/archive", {
+    queryFn: async () => {
+      const res = await fetch("/api/promo-videos/archive", {
         credentials: "include",
         cache: "no-store",
-      }, "PromoArchiveVideo.archive", { priority: "high" }),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    placeholderData: (prev) => prev,
+      });
+      if (!res.ok) throw new Error("Failed to fetch archived promo videos");
+      return res.json();
+    },
+    staleTime: 5_000,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 
   const video = useMemo(
@@ -112,22 +112,7 @@ export default function PromoArchiveVideoPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 pb-24">
-        <div className="max-w-3xl mx-auto px-4 py-6">
-          <Skeleton className="h-6 w-40 mb-4" />
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <Skeleton className="w-full aspect-video" />
-            <div className="p-4 space-y-3">
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </div>
-        </div>
-        <BottomNav />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center">Waa la soo dejinayaa...</div>;
   }
 
   if (!video) {
