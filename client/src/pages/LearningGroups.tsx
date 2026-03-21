@@ -2346,7 +2346,7 @@ function GroupDashboard({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">
+                        <p className="text-gray-900 text-sm font-semibold truncate">
                           {member.name || "Aan la aqoon"}
                           {isSelf && <span className="text-gray-500 text-xs ml-1">(Adiga)</span>}
                         </p>
@@ -2368,8 +2368,8 @@ function GroupDashboard({
                       <Badge
                         className={
                           member.role === "admin"
-                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                            : "bg-blue-100 text-gray-500 border-blue-500/30"
+                            ? "bg-amber-100 text-amber-700 border-amber-300"
+                            : "bg-blue-100 text-blue-700 border-blue-300"
                         }
                       >
                         {member.role === "admin" ? (
@@ -2423,7 +2423,7 @@ function GroupDashboard({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <span className="text-white text-sm font-semibold block truncate">
+                          <span className="text-gray-900 text-sm font-semibold block truncate">
                             {member.name || "Aan la aqoon"}
                           </span>
                           <div className="flex items-center gap-3 mt-0.5">
