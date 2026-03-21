@@ -24,8 +24,11 @@ import {
   flashcards,
   parents,
   pushSubscriptions,
+  promoVideos,
+  parentMessages,
+  bedtimeStories,
 } from "@shared/schema";
-import { eq, and, lte, gte, lt, isNull, or } from "drizzle-orm";
+import { eq, and, lte, gte, lt, isNull, or, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import webpush from "web-push";
@@ -969,6 +972,46 @@ export async function ensureDailyContentAvailable(source: string = "manual") {
   }
 }
 
+export async function refreshStatsCache(): Promise<void> {
+  try {
+    const [archivedPromoCountResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(promoVideos)
+      .where(eq(promoVideos.isVisible, false));
+
+    const [parentMessageCountResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(parentMessages)
+      .where(eq(parentMessages.isPublished, true));
+
+    const [bedtimeStoryCountResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(bedtimeStories)
+      .where(eq(bedtimeStories.isPublished, true));
+
+    const payload = {
+      count:
+        Number(parentMessageCountResult?.count || 0) +
+        Number(bedtimeStoryCountResult?.count || 0) +
+        Number(archivedPromoCountResult?.count || 0),
+      breakdown: {
+        parentMessages: Number(parentMessageCountResult?.count || 0),
+        bedtimeStories: Number(bedtimeStoryCountResult?.count || 0),
+        archivedPromoVideos: Number(archivedPromoCountResult?.count || 0),
+      },
+    };
+
+    await db.execute(sql`
+      INSERT INTO stats_cache (key, payload, computed_at)
+      VALUES ('free_lessons', ${JSON.stringify(payload)}::jsonb, NOW())
+      ON CONFLICT (key)
+      DO UPDATE SET payload = EXCLUDED.payload, computed_at = NOW()
+    `);
+  } catch (error) {
+    console.error("[CRON] Error refreshing stats cache:", error);
+  }
+}
+
 export function startCronJobs() {
   console.log("[CRON] Starting subscription management cron jobs...");
 
@@ -977,6 +1020,11 @@ export function startCronJobs() {
     await checkExpiringSubscriptions();
     await expireSubscriptions();
     await sendDailyStudyReminders();
+  });
+
+  // Refresh precomputed heavy stats every 2 minutes.
+  cron.schedule("*/2 * * * *", async () => {
+    await refreshStatsCache();
   });
 
   // Send event reminders every 30 minutes
@@ -1051,6 +1099,7 @@ export function startCronJobs() {
     console.log("[CRON] Running initial subscription check...");
     await checkExpiringSubscriptions();
     await expireSubscriptions();
+    await refreshStatsCache();
   }, 10000);
 
   // Startup self-heal: if content for today is missing, generate it once.

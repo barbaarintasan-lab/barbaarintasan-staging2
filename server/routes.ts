@@ -11916,6 +11916,19 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
   app.get("/api/stats/free-lessons", async (_req, res) => {
     try {
       const data = await getCached('stats-free-lessons', 120000, async () => {
+        const cachedRows = await db.execute(sql`
+          SELECT payload, computed_at
+          FROM stats_cache
+          WHERE key = 'free_lessons'
+            AND computed_at > NOW() - INTERVAL '5 minutes'
+          LIMIT 1
+        `);
+
+        const cachedPayload = (cachedRows as any)?.rows?.[0]?.payload;
+        if (cachedPayload && typeof cachedPayload === "object") {
+          return cachedPayload;
+        }
+
         const [archivedPromoCountResult] = await db
           .select({ count: sql<number>`count(*)` })
           .from(promoVideos)
@@ -11935,7 +11948,7 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
         const bedtimeStoryCount = Number(bedtimeStoryCountResult?.count || 0);
         const archivedPromoCount = Number(archivedPromoCountResult?.count || 0);
 
-        return {
+        const payload = {
           count: parentMessageCount + bedtimeStoryCount + archivedPromoCount,
           breakdown: {
             parentMessages: parentMessageCount,
@@ -11943,6 +11956,15 @@ Make it a warm, realistic scene showing Somali family life and parenting.`
             archivedPromoVideos: archivedPromoCount,
           },
         };
+
+        await db.execute(sql`
+          INSERT INTO stats_cache (key, payload, computed_at)
+          VALUES ('free_lessons', ${JSON.stringify(payload)}::jsonb, NOW())
+          ON CONFLICT (key)
+          DO UPDATE SET payload = EXCLUDED.payload, computed_at = NOW()
+        `);
+
+        return payload;
       });
 
       res.json(data);

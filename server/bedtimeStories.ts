@@ -532,6 +532,7 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 
     const newStory = await storage.createBedtimeStory(storyData);
     console.log(`[Bedtime Stories] Successfully created story: ${storyText.titleSomali}`);
+    clearBedtimeStoriesCache();
 
     if (!newStory.thumbnailUrl && images[0]) {
       try {
@@ -585,10 +586,13 @@ export async function generateDailyBedtimeStory(): Promise<void> {
 let bedtimeStoriesCache: { data: any[]; timestamp: number } | null = null;
 const STORIES_CACHE_TTL = 30000;
 const todayStoryCache = new Map<string, { data: any; expiry: number }>();
+const listStoriesCache = new Map<string, { data: any[]; expiry: number }>();
+const LIST_STORIES_TTL = 120000;
 
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
   todayStoryCache.clear();
+  listStoriesCache.clear();
 }
 
 async function applyTranslationsToStories<T extends Record<string, any> & { id: string }>(
@@ -689,8 +693,17 @@ export function registerBedtimeStoryRoutes(app: Express): void {
   app.get("/api/bedtime-stories", async (req: Request, res: Response) => {
     try {
       const lang = req.query.lang as string;
-      let stories = await storage.getBedtimeStories();
+      const requestedLimit = Number.parseInt(String(req.query.limit || "60"), 10);
+      const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 120) : 60;
+      const cacheKey = `bs-list-${lang || 'so'}-${limit}`;
+      const cached = listStoriesCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiry) {
+        return res.json(cached.data);
+      }
+
+      let stories = await storage.getBedtimeStories(limit);
       stories = await applyTranslationsToStories(stories, lang);
+      listStoriesCache.set(cacheKey, { data: stories as any[], expiry: Date.now() + LIST_STORIES_TTL });
       res.json(stories);
     } catch (error) {
       console.error("Error fetching bedtime stories:", error);
@@ -790,6 +803,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
   app.post("/api/bedtime-stories/generate", async (req: Request, res: Response) => {
     try {
       await generateDailyBedtimeStory();
+      clearBedtimeStoriesCache();
       const story = await storage.getTodayBedtimeStory();
       res.json(story);
     } catch (error) {
@@ -829,6 +843,8 @@ export function registerBedtimeStoryRoutes(app: Express): void {
         return res.status(404).json({ error: "Story not found" });
       }
 
+      clearBedtimeStoriesCache();
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating story:", error);
@@ -865,6 +881,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       }
 
       console.log(`[MAAWEELO] Republished story: ${updated.titleSomali}`);
+      clearBedtimeStoriesCache();
       res.json(updated);
     } catch (error) {
       console.error("Error republishing story:", error);
@@ -895,6 +912,7 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       
       const updated = await storage.updateBedtimeStory(id, { audioUrl });
       console.log(`[TTS] Audio generated and saved for story ${id}`);
+      clearBedtimeStoriesCache();
       
       res.json(updated);
     } catch (error) {
