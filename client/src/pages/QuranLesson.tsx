@@ -866,10 +866,10 @@ export default function QuranLesson() {
   const nextSurahNumber = getNextSurahNumber(surahNumber);
 
   const currentAyahMistakes = currentAyah ? (ayahMistakes[currentAyah.number] || 0) : 0;
-  const canRecord = !isCurrentCompleted && !autoAdvancing;
+  const canRecord = !autoAdvancing;
   const stageOrder: AyahLearningStage[] = ["listening", "repeating", "memorizing"];
   const currentStageIndex = stageOrder.indexOf(currentStage);
-  const isTextHidden = currentStage === "memorizing" && !isCurrentCompleted;
+  const isTextHidden = currentStage === "memorizing";
   const stageDescriptions: Record<AyahLearningStage, { title: string; detail: string }> = {
     listening: {
       title: "Dhageyso",
@@ -1218,54 +1218,52 @@ export default function QuranLesson() {
               </div>
 
               <div className="text-right mb-5" dir="rtl">
-                {isCurrentCompleted ? (
+                {isTextHidden ? (
+                  <div className="rounded-2xl p-4 transition-all duration-500 border border-purple-400/30 bg-purple-500/10" data-testid="text-ayah-arabic">
+                    <div className="py-5 text-center">
+                      <p className="text-white/20 text-3xl tracking-[0.35em] select-none">░░░░░░░░░░░░</p>
+                      <p className="mt-3 text-sm font-bold text-purple-200">Qoraalka waa qarsan yahay</p>
+                      <p className="mt-1 text-xs text-white/55">Qalbigaaga ka akhri hadda.</p>
+                    </div>
+                  </div>
+                ) : isCurrentCompleted ? (
                   <div className="rounded-2xl border-2 border-green-400/40 bg-green-500/10 p-4" data-testid="text-ayah-arabic">
                     <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
                       {currentAyah.text}
                     </p>
                   </div>
                 ) : (
-                  <div className={`rounded-2xl p-4 transition-all duration-500 ${isTextHidden ? "border border-purple-400/30 bg-purple-500/10" : isPlaying ? "border-2 border-[#4ECDC4]/60 bg-[#4ECDC4]/10 shadow-lg shadow-[#4ECDC4]/10" : "border border-white/15 bg-white/5"}`} data-testid="text-ayah-arabic">
+                  <div className={`rounded-2xl p-4 transition-all duration-500 ${isPlaying ? "border-2 border-[#4ECDC4]/60 bg-[#4ECDC4]/10 shadow-lg shadow-[#4ECDC4]/10" : "border border-white/15 bg-white/5"}`} data-testid="text-ayah-arabic">
                     {isPlaying && currentStage === "listening" && (
                       <p className="text-[#4ECDC4] text-xs font-bold mb-2 text-center tracking-wide">🔊 Dhageyso aayada</p>
                     )}
-                    {isTextHidden ? (
-                      <div className="py-5 text-center">
-                        <p className="text-white/20 text-3xl tracking-[0.35em] select-none">░░░░░░░░░░░░</p>
-                        <p className="mt-3 text-sm font-bold text-purple-200">Qoraalka waa qarsan yahay</p>
-                        <p className="mt-1 text-xs text-white/55">Qalbigaaga ka akhri hadda.</p>
-                      </div>
-                    ) : (
-                      <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
-                        {currentAyah.text}
-                      </p>
-                    )}
+                    <p className="text-white text-3xl leading-[2.4] font-['Amiri',_serif]">
+                      {currentAyah.text}
+                    </p>
                   </div>
                 )}
               </div>
 
-              {!isCurrentCompleted && (
-                <div className="flex items-center gap-2 mb-4 px-1">
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount > 0 ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount > 0 ? "bg-green-500/30" : "bg-white/10"}`}>
-                      {listenCount > 0 ? "✓" : "1"}
-                    </span>
-                    Dhageyso ikhtiyaari
-                  </div>
-                  <div className="flex-1 h-px bg-white/10" />
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/20 text-[#FFD93D]" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/30" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{currentStageIndex > 1 || isCurrentCompleted ? "✓" : "2"}</span>
-                    Ku celi
-                  </div>
-                  <div className="flex-1 h-px bg-white/10" />
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "memorizing" ? "bg-purple-500/20 text-purple-200" : isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "memorizing" ? "bg-purple-500/30" : isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{isCurrentCompleted ? "✓" : "3"}</span>
-                    Qalbiga
-                  </div>
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${listenCount > 0 ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${listenCount > 0 ? "bg-green-500/30" : "bg-white/10"}`}>
+                    {listenCount > 0 ? "✓" : "1"}
+                  </span>
+                  Dhageyso ikhtiyaari
                 </div>
-              )}
+                <div className="flex-1 h-px bg-white/10" />
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/20 text-[#FFD93D]" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "repeating" ? "bg-[#FFD93D]/30" : currentStageIndex > 1 || isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{currentStageIndex > 1 || isCurrentCompleted ? "✓" : "2"}</span>
+                  Ku celi
+                </div>
+                <div className="flex-1 h-px bg-white/10" />
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${currentStage === "memorizing" ? "bg-purple-500/20 text-purple-200" : isCurrentCompleted ? "bg-green-500/20 text-green-300" : "bg-white/5 text-white/50"}`}>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${currentStage === "memorizing" ? "bg-purple-500/30" : isCurrentCompleted ? "bg-green-500/30" : "bg-white/10"}`}>{isCurrentCompleted ? "✓" : "3"}</span>
+                  Qalbiga
+                </div>
+              </div>
 
-              {slowMode && !isCurrentCompleted && (
+              {slowMode && (
                 <div className="mb-4 flex justify-center">
                   <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-300">
                     Cod gaaban wuu shaqaynayaa
@@ -1320,7 +1318,9 @@ export default function QuranLesson() {
 
               {canRecord && !isRecording && !isChecking && !autoAdvancing && (
                 <p className="text-center text-[#FFD93D]/80 text-sm mt-4 px-2">
-                  {currentStage === "repeating" ? "🎙️ Ku celi" : "🎙️ Qalbiga ka akhri"}
+                  {currentStage === "repeating"
+                    ? (isCurrentCompleted ? "🎙️ Mar kale ku celi si aad u naqiito" : "🎙️ Ku celi")
+                    : "🎙️ Qalbiga ka akhri"}
                 </p>
               )}
 
@@ -1334,7 +1334,7 @@ export default function QuranLesson() {
                 </button>
               )}
 
-              {hintAvailable && currentStage === "memorizing" && !isCurrentCompleted && !isRecording && !isChecking && !autoAdvancing && (
+              {hintAvailable && currentStage === "memorizing" && !isRecording && !isChecking && !autoAdvancing && (
                 <button
                   onClick={playHintAndRecord}
                   disabled={hintPlaying}
