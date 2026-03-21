@@ -69,12 +69,31 @@ function getCoverFallbackUrl(storyId: string): string {
   return `/api/bedtime-stories/${storyId}/cover`;
 }
 
+function getStaticImageFallbackUrl(): string {
+  return "/images/sheeko_app_icon_purple_gradient.png";
+}
+
 function getPrimaryStoryImage(story: BedtimeStory): string {
-  return story.thumbnailUrl || story.images?.[0] || getCoverFallbackUrl(story.id);
+  return story.thumbnailUrl || story.images?.[0] || getStaticImageFallbackUrl();
 }
 
 function getStorySlideImage(story: BedtimeStory, index: number): string {
-  return story.images?.[index] || story.thumbnailUrl || getCoverFallbackUrl(story.id);
+  return story.images?.[index] || story.thumbnailUrl || getStaticImageFallbackUrl();
+}
+
+function applyRobustImageFallback(target: HTMLImageElement, storyId: string) {
+  const fallbackStage = target.dataset.fallbackStage || "0";
+
+  if (fallbackStage === "0") {
+    target.dataset.fallbackStage = "1";
+    target.src = getCoverFallbackUrl(storyId);
+    return;
+  }
+
+  if (fallbackStage === "1") {
+    target.dataset.fallbackStage = "2";
+    target.src = getStaticImageFallbackUrl();
+  }
 }
 
 const MoonWithStars = ({ className = "" }: { className?: string }) => (
@@ -208,10 +227,14 @@ export default function Maaweelo() {
 
   const { data: todayStory, isLoading: loadingToday } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/today?lang=${apiLanguage}`],
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allStories, isLoading: loadingAll } = useQuery<BedtimeStory[]>({
     queryKey: [`/api/bedtime-stories?lang=${apiLanguage}`],
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 
   const effectiveTodayStory = todayStory || allStories?.[0] || null;
@@ -219,6 +242,8 @@ export default function Maaweelo() {
   const { data: fullStoryDetail } = useQuery<BedtimeStory>({
     queryKey: [`/api/bedtime-stories/${selectedStoryId}?lang=${apiLanguage}`],
     enabled: !!selectedStoryId,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 
   const selectedStory = fullStoryDetail || (selectedStoryId ? allStories?.find(s => s.id === selectedStoryId) : null) || null;
@@ -436,12 +461,7 @@ export default function Maaweelo() {
             alt={story.titleSomali}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             onError={(event) => {
-              const target = event.currentTarget;
-              const fallback = getCoverFallbackUrl(story.id);
-              if (!target.dataset.fallbackTried) {
-                target.dataset.fallbackTried = "1";
-                target.src = fallback;
-              }
+              applyRobustImageFallback(event.currentTarget, story.id);
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -653,12 +673,7 @@ export default function Maaweelo() {
                       alt={selectedStory.titleSomali}
                       className="w-full h-full object-cover"
                       onError={(event) => {
-                        const target = event.currentTarget;
-                        const fallback = getCoverFallbackUrl(selectedStory.id);
-                        if (!target.dataset.fallbackTried) {
-                          target.dataset.fallbackTried = "1";
-                          target.src = fallback;
-                        }
+                        applyRobustImageFallback(event.currentTarget, selectedStory.id);
                       }}
                     />
                   </AnimatePresence>
