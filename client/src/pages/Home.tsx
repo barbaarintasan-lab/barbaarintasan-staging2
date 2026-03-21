@@ -357,10 +357,10 @@ function PromoVideoSection() {
       if (!res.ok) throw new Error("Failed to fetch promo videos");
       return res.json();
     },
-    staleTime: 5_000,
+    staleTime: 300_000,
+    gcTime: 600_000,
     refetchOnWindowFocus: false,
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
+    refetchOnReconnect: false,
   });
   const { data: archivedVideos = [] } = useQuery<any[]>({
     queryKey: ["/api/promo-videos/archive"],
@@ -373,8 +373,10 @@ function PromoVideoSection() {
       return res.json();
     },
     enabled: !!parent,
-    staleTime: 60_000,
+    staleTime: 300_000,
+    gcTime: 600_000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [openCommentsForVideoId, setOpenCommentsForVideoId] = useState<string | null>(null);
