@@ -608,6 +608,19 @@ export function registerParentMessageRoutes(app: Express): void {
           message = latestMessages[0] as any;
         }
       }
+
+      if (!Array.isArray((message as any).images) || (message as any).images.length === 0) {
+        const topicText = (message as any).topic || "Dhambaalka Waalidka";
+        const fallbackImages = [
+          buildFallbackImageDataUrl(topicText, "Dhambaalka Waalidka", "#0f766e", "#0f172a"),
+          buildFallbackImageDataUrl(topicText, "Talo maalinle ah", "#065f46", "#1e293b"),
+        ];
+        const updated = await storage.updateParentMessage((message as any).id, { images: fallbackImages });
+        if (updated) {
+          message = updated as any;
+        }
+      }
+
       const translated = await applyTranslationsToMessages([message], lang);
       const result = translated[0];
       todayCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });

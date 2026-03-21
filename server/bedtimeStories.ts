@@ -640,8 +640,20 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       if (stories.length === 0) {
         return res.status(404).json({ error: "No story available" });
       }
-      const translated = await applyTranslationsToStories([stories[0]], lang);
-      const story = translated[0] as any;
+      let story = stories[0] as any;
+      if (!Array.isArray(story.images) || story.images.length === 0) {
+        const fallbackImages = [
+          buildFallbackImageDataUrl(story.titleSomali || "Maaweelo", story.characterName || "Sheeko", "#4c1d95", "#1e1b4b"),
+          buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"),
+        ];
+        const updated = await storage.updateBedtimeStory(story.id, { images: fallbackImages });
+        if (updated) {
+          story = updated as any;
+        }
+      }
+
+      const translated = await applyTranslationsToStories([story], lang);
+      story = translated[0] as any;
       res.json({
         id: story.id,
         titleSomali: story.titleSomali,
@@ -710,6 +722,18 @@ export function registerBedtimeStoryRoutes(app: Express): void {
           story = latestStories[0] as any;
         }
       }
+
+      if (!Array.isArray((story as any).images) || (story as any).images.length === 0) {
+        const fallbackImages = [
+          buildFallbackImageDataUrl((story as any).titleSomali || "Maaweelo", (story as any).characterName || "Sheeko", "#4c1d95", "#1e1b4b"),
+          buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"),
+        ];
+        const updated = await storage.updateBedtimeStory((story as any).id, { images: fallbackImages });
+        if (updated) {
+          story = updated as any;
+        }
+      }
+
       const translated = await applyTranslationsToStories([story], lang);
       const result = translated[0];
       todayStoryCache.set(cacheKey, { data: result, expiry: Date.now() + 120000 });
