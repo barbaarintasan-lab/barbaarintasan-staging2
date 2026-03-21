@@ -65,6 +65,18 @@ interface BedtimeStory {
   isPublished: boolean;
 }
 
+function getCoverFallbackUrl(storyId: string): string {
+  return `/api/bedtime-stories/${storyId}/cover`;
+}
+
+function getPrimaryStoryImage(story: BedtimeStory): string {
+  return story.thumbnailUrl || story.images?.[0] || getCoverFallbackUrl(story.id);
+}
+
+function getStorySlideImage(story: BedtimeStory, index: number): string {
+  return story.images?.[index] || story.thumbnailUrl || getCoverFallbackUrl(story.id);
+}
+
 const MoonWithStars = ({ className = "" }: { className?: string }) => (
   <div className={`relative flex items-center justify-center ${className}`}>
     <Moon className="w-full h-full fill-current text-[#FFD93D]" />
@@ -420,9 +432,17 @@ export default function Maaweelo() {
       {(story.thumbnailUrl || story.images?.length > 0) && (
         <div className="relative aspect-[16/10] mb-4 rounded-xl overflow-hidden">
           <img 
-            src={story.thumbnailUrl || story.images?.[0]} 
+            src={getPrimaryStoryImage(story)} 
             alt={story.titleSomali}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            onError={(event) => {
+              const target = event.currentTarget;
+              const fallback = getCoverFallbackUrl(story.id);
+              if (!target.dataset.fallbackTried) {
+                target.dataset.fallbackTried = "1";
+                target.src = fallback;
+              }
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           {parent && readIds.has(story.id) && (
@@ -629,9 +649,17 @@ export default function Maaweelo() {
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 1.2 }}
-                      src={selectedStory.images[currentImageIndex]}
+                      src={getStorySlideImage(selectedStory, currentImageIndex)}
                       alt={selectedStory.titleSomali}
                       className="w-full h-full object-cover"
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        const fallback = getCoverFallbackUrl(selectedStory.id);
+                        if (!target.dataset.fallbackTried) {
+                          target.dataset.fallbackTried = "1";
+                          target.src = fallback;
+                        }
+                      }}
                     />
                   </AnimatePresence>
                 ) : (
