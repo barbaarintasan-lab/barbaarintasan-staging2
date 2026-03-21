@@ -2787,28 +2787,28 @@ export default function Home() {
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.lessons")}</p>
-            <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 70} />
+            <AnimatedCounter value={allLessons.length > 0 ? allLessons.length : 125} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.available")}</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
+            <p className="text-xs text-gray-500 font-medium mb-1 truncate">Casharada Free-ga ah</p>
+            <AnimatedCounter value={113} loading={freeLessonsStatsLoading} />
+            <p className="text-xs text-gray-400 mt-1 truncate">Dhambaal + Maaweelo + Archive</p>
+          </div>
+          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">{t("home.stats.parents")}</p>
-            <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 8} loading={parentStatsLoading} />
+            <AnimatedCounter value={parentStats?.count > 0 ? parentStats.count : 416} loading={parentStatsLoading} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.inApp")}</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">Caruurta Quraanka</p>
-            <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 18)} loading={parentStatsLoading} />
+            <AnimatedCounter value={parentStats?.quranChildrenCount > 0 ? parentStats.quranChildrenCount : (parentStats?.childrenCount > 0 ? parentStats.childrenCount : 22)} loading={parentStatsLoading} />
             <p className="text-xs text-gray-400 mt-1 truncate">Barata</p>
           </div>
           <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
             <p className="text-xs text-gray-500 font-medium mb-1 truncate">Telegram</p>
             <AnimatedCounter value={telegramStats?.count > 0 ? telegramStats.count : 9905} loading={telegramStatsLoading} />
             <p className="text-xs text-gray-400 mt-1 truncate">{t("home.stats.followUs")}</p>
-          </div>
-          <div className="text-center bg-white rounded-2xl py-3 px-2 shadow-sm border border-gray-100">
-            <p className="text-xs text-gray-500 font-medium mb-1 truncate">Casharada Free-ga ah</p>
-            <AnimatedCounter value={freeLessonsStats?.count > 0 ? freeLessonsStats.count : 106} loading={freeLessonsStatsLoading} />
-            <p className="text-xs text-gray-400 mt-1 truncate">Dhambaal + Maaweelo + Archive</p>
           </div>
         </div>
       </div>
