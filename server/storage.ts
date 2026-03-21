@@ -461,6 +461,7 @@ export interface IStorage {
   createBedtimeStory(story: InsertBedtimeStory): Promise<BedtimeStory>;
   getBedtimeStories(limit?: number): Promise<BedtimeStory[]>;
   getAllBedtimeStories(): Promise<BedtimeStory[]>;
+  getBedtimeStoryCover(id: string): Promise<{ id: string; thumbnailUrl: string | null; coverImage: string | null } | undefined>;
   getBedtimeStory(id: string): Promise<BedtimeStory | undefined>;
   getTodayBedtimeStory(): Promise<BedtimeStory | undefined>;
   getBedtimeStoryByDate(date: string): Promise<BedtimeStory | undefined>;
@@ -4993,6 +4994,21 @@ export class DatabaseStorage implements IStorage {
     return await db.select()
       .from(bedtimeStories)
       .orderBy(desc(bedtimeStories.generatedAt));
+  }
+
+  async getBedtimeStoryCover(id: string): Promise<{ id: string; thumbnailUrl: string | null; coverImage: string | null } | undefined> {
+    const [story] = await db.select({
+      id: bedtimeStories.id,
+      thumbnailUrl: bedtimeStories.thumbnailUrl,
+      coverImage: sql<string | null>`${bedtimeStories.images}[1]`,
+    })
+      .from(bedtimeStories)
+      .where(and(
+        eq(bedtimeStories.id, id),
+        eq(bedtimeStories.isPublished, true)
+      ))
+      .limit(1);
+    return story || undefined;
   }
 
   async getBedtimeStory(id: string): Promise<BedtimeStory | undefined> {

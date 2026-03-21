@@ -609,12 +609,15 @@ let bedtimeStoriesCache: { data: any[]; timestamp: number } | null = null;
 const STORIES_CACHE_TTL = 30000;
 const todayStoryCache = new Map<string, { data: any; expiry: number }>();
 const listStoriesCache = new Map<string, { data: any[]; expiry: number }>();
+const bedtimeStoryCoverCache = new Map<string, { source: string; expiry: number }>();
 const LIST_STORIES_TTL = 120000;
+const BEDTIME_STORY_COVER_TTL = 300000;
 
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
   todayStoryCache.clear();
   listStoriesCache.clear();
+  bedtimeStoryCoverCache.clear();
 }
 
 async function applyTranslationsToStories<T extends Record<string, any> & { id: string }>(
@@ -740,15 +743,29 @@ export function registerBedtimeStoryRoutes(app: Express): void {
 
   app.get("/api/bedtime-stories/:id/cover", async (req: Request, res: Response) => {
     try {
-      const story = await storage.getBedtimeStory(req.params.id);
+      const cached = bedtimeStoryCoverCache.get(req.params.id);
+      if (cached && Date.now() < cached.expiry) {
+        return sendImageSource(res, cached.source, "/images/sheeko_app_icon_purple_gradient.png");
+      }
+
+      const story = await storage.getBedtimeStoryCover(req.params.id);
       if (!story) {
+        bedtimeStoryCoverCache.delete(req.params.id);
         return res.redirect("/images/sheeko_app_icon_purple_gradient.png");
       }
 
-      const source = resolveImageResponseSource(story as any, "/images/sheeko_app_icon_purple_gradient.png");
+      const source = resolveImageResponseSource({
+        thumbnailUrl: story.thumbnailUrl,
+        images: story.coverImage ? [story.coverImage] : [],
+      }, "/images/sheeko_app_icon_purple_gradient.png");
+      bedtimeStoryCoverCache.set(req.params.id, {
+        source,
+        expiry: Date.now() + BEDTIME_STORY_COVER_TTL,
+      });
       return sendImageSource(res, source, "/images/sheeko_app_icon_purple_gradient.png");
     } catch (error) {
       console.error("Error fetching bedtime story cover:", error);
+      bedtimeStoryCoverCache.delete(req.params.id);
       return res.redirect("/images/sheeko_app_icon_purple_gradient.png");
     }
   });
