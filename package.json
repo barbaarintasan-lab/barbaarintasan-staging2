@@ -11,7 +11,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "translate:initial": "tsx scripts/run-initial-translation.ts",
-    "translate:status": "tsx scripts/check-translation-status.ts"
+    "translate:status": "tsx scripts/check-translation-status.ts",
+    "maaweelo:migrate-images-r2": "tsx scripts/migrate-bedtime-images-to-r2.ts"
   },
   "notes": "removed framer motion dependency",
   "dependencies": {
