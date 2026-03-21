@@ -492,6 +492,19 @@ function isRemoteImageUrl(value: string): boolean {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+function getListThumbnailSource(record: { thumbnailUrl?: string | null; images?: string[] | null }): string | null {
+  const directCandidates = [record.thumbnailUrl, ...(Array.isArray(record.images) ? record.images : [])]
+    .filter((item): item is string => typeof item === "string" && item.length > 0);
+
+  for (const candidate of directCandidates) {
+    if (isRemoteImageUrl(candidate) || candidate.startsWith("/images/")) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 async function uploadBedtimeImageToR2(
   imageSource: string,
   storyDate: string,
@@ -828,7 +841,8 @@ export function registerBedtimeStoryRoutes(app: Express): void {
       const lightweightStories = stories.map((story) => ({
         ...story,
         images: [],
-        thumbnailUrl: `/api/bedtime-stories/${story.id}/cover`,
+        // Prefer direct CDN/static thumbnails to avoid an extra /cover redirect hop.
+        thumbnailUrl: getListThumbnailSource(story as any) || `/api/bedtime-stories/${story.id}/cover`,
       }));
       listStoriesCache.set(cacheKey, { data: lightweightStories as any[], expiry: Date.now() + LIST_STORIES_TTL });
       res.json(lightweightStories);
