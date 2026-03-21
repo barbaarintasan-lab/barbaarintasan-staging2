@@ -472,7 +472,7 @@ export async function generateAndUploadAudio(
         audioBuffer,
         `${fileName}.mp3`,
         "audio/mpeg",
-        "Audio",
+        folderName,
         bucketType
       );
       console.log(`[TTS] Uploaded MP3 audio to R2: ${result.url}`);
