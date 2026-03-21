@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 import type { InsertBedtimeStory } from "@shared/schema";
 import { generateBedtimeStoryAudio } from "./tts";
@@ -527,10 +528,33 @@ function sendImageSource(res: Response, source: string, fallbackPath: string): v
   res.setHeader("Cache-Control", "public, max-age=300");
 
   if (finalSource.startsWith("data:")) {
+    const etag = `W/"cover-${createHash("sha1").update(finalSource).digest("base64url")}"`;
+    res.setHeader("ETag", etag);
+
+    const ifNoneMatch = res.req?.headers["if-none-match"];
+    if (typeof ifNoneMatch === "string" && ifNoneMatch.includes(etag)) {
+      res.status(304).end();
+      return;
+    }
+
+    const cached = bedtimeStoryDecodedBufferCache.get(finalSource);
+    if (cached && Date.now() < cached.expiry) {
+      res.setHeader("Content-Type", cached.contentType);
+      res.send(cached.buffer);
+      return;
+    }
+
     const match = finalSource.match(/^data:([^;]+);base64,(.+)$/);
     if (match) {
-      res.setHeader("Content-Type", match[1]);
-      res.send(Buffer.from(match[2], "base64"));
+      const contentType = match[1];
+      const buffer = Buffer.from(match[2], "base64");
+      bedtimeStoryDecodedBufferCache.set(finalSource, {
+        buffer,
+        contentType,
+        expiry: Date.now() + BEDTIME_STORY_DATA_BUFFER_TTL,
+      });
+      res.setHeader("Content-Type", contentType);
+      res.send(buffer);
       return;
     }
   }
@@ -672,14 +696,17 @@ const STORIES_CACHE_TTL = 30000;
 const todayStoryCache = new Map<string, { data: any; expiry: number }>();
 const listStoriesCache = new Map<string, { data: any[]; expiry: number }>();
 const bedtimeStoryCoverCache = new Map<string, { source: string; expiry: number }>();
+const bedtimeStoryDecodedBufferCache = new Map<string, { buffer: Buffer; contentType: string; expiry: number }>();
 const LIST_STORIES_TTL = 120000;
 const BEDTIME_STORY_COVER_TTL = 300000;
+const BEDTIME_STORY_DATA_BUFFER_TTL = 300000;
 
 export function clearBedtimeStoriesCache(): void {
   bedtimeStoriesCache = null;
   todayStoryCache.clear();
   listStoriesCache.clear();
   bedtimeStoryCoverCache.clear();
+  bedtimeStoryDecodedBufferCache.clear();
 }
 
 async function applyTranslationsToStories<T extends Record<string, any> & { id: string }>(
