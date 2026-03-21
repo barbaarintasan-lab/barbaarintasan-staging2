@@ -9,6 +9,7 @@ import { db } from "./db";
 import { translations } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { isSomaliLanguage, normalizeLanguageCode } from "./utils/translations";
+import { uploadToR2, isR2Configured } from "./r2Storage";
 
 function getSomaliaToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Mogadishu' });
@@ -470,8 +471,59 @@ function resolveImageResponseSource(record: { thumbnailUrl?: string | null; imag
   return fallbackPath;
 }
 
+function parseDataImage(dataUrl: string): { buffer: Buffer; mimeType: string; extension: string } {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("Invalid data URL image format");
+  }
+  const mimeType = match[1];
+  const base64Payload = match[2];
+  const rawExt = mimeType.split("/")[1] || "png";
+  const extension = rawExt.includes("+") ? rawExt.split("+")[0] : rawExt;
+  return {
+    buffer: Buffer.from(base64Payload, "base64"),
+    mimeType,
+    extension,
+  };
+}
+
+function isRemoteImageUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+async function uploadBedtimeImageToR2(
+  imageSource: string,
+  storyDate: string,
+  storyLabel: string,
+  imageIndex: number
+): Promise<string> {
+  if (!imageSource.startsWith("data:image")) {
+    return imageSource;
+  }
+
+  if (!isR2Configured()) {
+    return imageSource;
+  }
+
+  const parsed = parseDataImage(imageSource);
+  const fileName = `maaweelo-${storyDate}-${storyLabel}-${imageIndex + 1}.${parsed.extension}`;
+  try {
+    const { url } = await uploadToR2(parsed.buffer, fileName, parsed.mimeType, "Images/maaweelo", "sheeko");
+    return url;
+  } catch (error) {
+    console.error(`[Bedtime Stories] R2 image upload failed for ${fileName}, keeping legacy data URL:`, error);
+    return imageSource;
+  }
+}
+
 function sendImageSource(res: Response, source: string, fallbackPath: string): void {
   const finalSource = source || fallbackPath;
+  if (isRemoteImageUrl(finalSource)) {
+    // Remote R2/CDN images can be cached longer by clients.
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    return res.redirect(finalSource);
+  }
+
   res.setHeader("Cache-Control", "public, max-age=300");
 
   if (finalSource.startsWith("data:")) {
@@ -539,6 +591,15 @@ export async function generateDailyBedtimeStory(): Promise<void> {
       images.push(buildFallbackImageDataUrl("Caawa Sheeko Cusub", "Maaweelo", "#6d28d9", "#312e81"));
     }
 
+    const storyLabel = Date.now().toString(36);
+    const normalizedImages: string[] = [];
+    for (let i = 0; i < images.length; i++) {
+      const uploaded = await uploadBedtimeImageToR2(images[i], today, storyLabel, i);
+      normalizedImages.push(uploaded);
+    }
+
+    const preferredThumbnail = normalizedImages[0] || images[0] || null;
+
     const storyData: InsertBedtimeStory = {
       title: storyText.title,
       titleSomali: storyText.titleSomali,
@@ -547,7 +608,8 @@ export async function generateDailyBedtimeStory(): Promise<void> {
       characterType: character.type,
       moralLesson: storyText.moralLesson,
       ageRange: "3-8",
-      images,
+      images: normalizedImages,
+      thumbnailUrl: preferredThumbnail,
       storyDate: today,
       isPublished: true, // Auto-publish for daily cron job
     };
@@ -556,9 +618,9 @@ export async function generateDailyBedtimeStory(): Promise<void> {
     console.log(`[Bedtime Stories] Successfully created story: ${storyText.titleSomali}`);
     clearBedtimeStoriesCache();
 
-    if (!newStory.thumbnailUrl && images[0]) {
+    if (!newStory.thumbnailUrl && preferredThumbnail) {
       try {
-        await storage.updateBedtimeStory(newStory.id, { thumbnailUrl: images[0] });
+        await storage.updateBedtimeStory(newStory.id, { thumbnailUrl: preferredThumbnail });
       } catch (thumbError) {
         console.error(`[Bedtime Stories] Inline thumbnail fallback failed:`, thumbError);
       }
@@ -758,6 +820,9 @@ export function registerBedtimeStoryRoutes(app: Express): void {
         thumbnailUrl: story.thumbnailUrl,
         images: story.coverImage ? [story.coverImage] : [],
       }, "/images/sheeko_app_icon_purple_gradient.png");
+      if (source.startsWith("data:image")) {
+        console.warn(`[Bedtime Stories] Legacy data URL used in /cover for story ${req.params.id} (migration-needed)`);
+      }
       bedtimeStoryCoverCache.set(req.params.id, {
         source,
         expiry: Date.now() + BEDTIME_STORY_COVER_TTL,
