@@ -1,6 +1,6 @@
 import { db } from "../server/db";
 import { bedtimeStories } from "../shared/schema";
-import { eq } from "drizzle-orm";
+import { asc, eq, gt } from "drizzle-orm";
 import { uploadToR2, isR2Configured } from "../server/r2Storage";
 
 type StoryRow = {
@@ -13,6 +13,7 @@ type StoryRow = {
 const BATCH_SIZE = Number.parseInt(process.env.BEDTIME_MIGRATION_BATCH_SIZE || "50", 10);
 const BATCH_SLEEP_MS = Number.parseInt(process.env.BEDTIME_MIGRATION_BATCH_SLEEP_MS || "75", 10);
 const RETRY_COUNT = Number.parseInt(process.env.BEDTIME_MIGRATION_RETRIES || "3", 10);
+const READ_RETRY_COUNT = Number.parseInt(process.env.BEDTIME_MIGRATION_READ_RETRIES || "4", 10);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -42,6 +43,51 @@ function needsMigration(story: StoryRow): boolean {
   const thumbNeeds = !!story.thumbnailUrl && story.thumbnailUrl.startsWith("data:image");
   const imageNeeds = Array.isArray(story.images) && story.images.some((img) => img.startsWith("data:image"));
   return thumbNeeds || imageNeeds;
+}
+
+function isReadTimeoutError(error: unknown): boolean {
+  const message = (error as any)?.message || "";
+  return typeof message === "string" && message.toLowerCase().includes("query read timeout");
+}
+
+async function fetchStoriesPage(lastId?: string): Promise<StoryRow[]> {
+  for (let attempt = 1; attempt <= READ_RETRY_COUNT; attempt++) {
+    try {
+      if (lastId) {
+        return (await db
+          .select({
+            id: bedtimeStories.id,
+            storyDate: bedtimeStories.storyDate,
+            images: bedtimeStories.images,
+            thumbnailUrl: bedtimeStories.thumbnailUrl,
+          })
+          .from(bedtimeStories)
+          .where(gt(bedtimeStories.id, lastId))
+          .orderBy(asc(bedtimeStories.id))
+          .limit(BATCH_SIZE)) as StoryRow[];
+      }
+
+      return (await db
+        .select({
+          id: bedtimeStories.id,
+          storyDate: bedtimeStories.storyDate,
+          images: bedtimeStories.images,
+          thumbnailUrl: bedtimeStories.thumbnailUrl,
+        })
+        .from(bedtimeStories)
+        .orderBy(asc(bedtimeStories.id))
+        .limit(BATCH_SIZE)) as StoryRow[];
+    } catch (error) {
+      if (!isReadTimeoutError(error) || attempt === READ_RETRY_COUNT) {
+        throw error;
+      }
+      const waitMs = 300 * attempt;
+      console.warn(`[Maaweelo Migration] Read timeout on page fetch, retry ${attempt}/${READ_RETRY_COUNT} in ${waitMs}ms`);
+      await sleep(waitMs);
+    }
+  }
+
+  return [];
 }
 
 async function uploadWithRetry(
@@ -126,25 +172,30 @@ async function main(): Promise<void> {
     throw new Error("R2 is not configured. Set CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.");
   }
 
-  const allStories = (await db.select({
-    id: bedtimeStories.id,
-    storyDate: bedtimeStories.storyDate,
-    images: bedtimeStories.images,
-    thumbnailUrl: bedtimeStories.thumbnailUrl,
-  }).from(bedtimeStories)) as StoryRow[];
-
-  const candidates = allStories.filter(needsMigration);
-  console.log(`Found ${allStories.length} bedtime stories, ${candidates.length} require migration`);
-
   let updated = 0;
   let skipped = 0;
   let failed = 0;
+  let scanned = 0;
+  let candidatesSeen = 0;
+  let batchNumber = 0;
+  let lastId: string | undefined;
 
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE);
-    console.log(`\n[Batch ${Math.floor(i / BATCH_SIZE) + 1}] Processing ${batch.length} stories...`);
+  while (true) {
+    const page = await fetchStoriesPage(lastId);
+    if (page.length === 0) {
+      break;
+    }
 
-    for (const story of batch) {
+    batchNumber++;
+    scanned += page.length;
+    lastId = page[page.length - 1].id;
+
+    const batchCandidates = page.filter(needsMigration);
+    candidatesSeen += batchCandidates.length;
+
+    console.log(`\n[Batch ${batchNumber}] Scanned ${page.length} rows, candidates ${batchCandidates.length} (total scanned ${scanned})`);
+
+    for (const story of batchCandidates) {
       const result = await migrateStory(story);
       if (result.error) {
         failed++;
@@ -160,12 +211,12 @@ async function main(): Promise<void> {
       }
     }
 
-    if (i + BATCH_SIZE < candidates.length) {
-      await sleep(BATCH_SLEEP_MS);
-    }
+    await sleep(BATCH_SLEEP_MS);
   }
 
   console.log("\n=== Migration Summary ===");
+  console.log(`Scanned: ${scanned}`);
+  console.log(`Candidates: ${candidatesSeen}`);
   console.log(`Updated: ${updated}`);
   console.log(`Skipped: ${skipped}`);
   console.log(`Failed: ${failed}`);
