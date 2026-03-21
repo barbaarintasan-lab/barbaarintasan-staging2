@@ -714,10 +714,12 @@ export default function QuranLesson() {
       const isSoftPass = submitResult?.isSoftPass ?? false;
       const nextAttemptCount = submitResult?.attemptNumber ?? ((ayahProgress[currentAyah.number]?.attempts || 0) + 1);
       const completedNow = submitResult?.completed ?? (learningMode === "memorize" && wasPassed);
+      // Strict gate: ayah completion only counts when AI passes while child is in memorization mode.
+      const completedFromMemoryNow = learningMode === "memorize" && wasPassed && completedNow;
       const nextResult: CheckResult = wasPassed
         ? {
             outcome: "correct",
-            completed: completedNow,
+        completed: completedFromMemoryNow,
             score: result.score,
             message: learningMode === "repeat"
               ? "Fiican! Hadda qoraalka waan qarinaynaa, qalbigaagana ka akhri."
@@ -734,7 +736,7 @@ export default function QuranLesson() {
           attempts: nextAttemptCount,
           bestScore: Math.max(ayahProgress[currentAyah.number]?.bestScore || 0, result.score || 0),
           lastScore: result.score || 0,
-          completed: completedNow || wasAlreadyCompleted,
+          completed: completedFromMemoryNow || wasAlreadyCompleted,
         }
       };
       setAyahProgress(updatedProgress);
@@ -757,7 +759,7 @@ export default function QuranLesson() {
         feedbackTimeoutRef.current = setTimeout(() => {
           setCheckResult(null);
         }, CHECK_UI_CLEAR_MS);
-      } else if (wasPassed && completedNow && !wasAlreadyCompleted) {
+      } else if (wasPassed && completedFromMemoryNow && !wasAlreadyCompleted) {
         setCurrentAyahFailures(0);
         setSlowMode(false);
         setHintAvailable(false);
@@ -1553,7 +1555,7 @@ export default function QuranLesson() {
         </>
         )} {/* end activeTab === "quran" */}
 
-        {/* Games tab — session-based unlock: requires 2+ ayahs learned THIS session */}
+        {/* Games tab — session-based unlock: requires 2+ ayahs memorized THIS session */}
         {activeTab === "games" && (
           <div className="px-4 pb-6">
             <div className="mb-4">
@@ -1562,7 +1564,7 @@ export default function QuranLesson() {
                 Ciyaaraha Farxad leh
               </h3>
               <p className="text-white/40 text-xs">
-                Casharkaas ku dhex baranba 2 aayah, ciyaaruhu way furnaadaan.
+                Marka aad 2 aayah qalbiga ka akhrido oo AI-ku xaqiijiyo, ciyaaruhu way furmaan.
               </p>
             </div>
 
@@ -1572,10 +1574,10 @@ export default function QuranLesson() {
                 <h4 className="text-white/60 font-semibold mb-2">
                   {sessionLearned.length === 0
                     ? "Weli aayah ma baranin"
-                    : `${sessionLearned.length}/2 aayah — mid oo kale baranba waa furnaadaan!`}
+                    : `${sessionLearned.length}/2 aayah qalbi — mid kale oo la xaqiijiyo ayaa furaya!`}
                 </h4>
                 <p className="text-white/30 text-sm">
-                  Casharkaas ku baranba 2 aayah, ciyaaraha si toos ah bay u furmaan.
+                  Kaliya 2 aayah oo qalbi laga akhriyo, AI-na xaqiijiyo, ayaa ciyaaraha fura.
                 </p>
                 <button
                   onClick={() => setActiveTab("quran")}
@@ -1590,7 +1592,7 @@ export default function QuranLesson() {
                 <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-3 flex items-center gap-2 mb-2">
                   <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
                   <p className="text-green-300 text-sm font-semibold">
-                    {sessionLearned.length} aayah baratay — ciyaaruhu waa furan yihiin!
+                    {sessionLearned.length} aayah qalbi ayaa la xaqiijiyay — ciyaaruhu waa furan yihiin!
                   </p>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
@@ -1667,7 +1669,7 @@ export default function QuranLesson() {
           </div>
         )}
 
-        {/* Floating "Diyaar ma ahay" button — shows when 2+ ayahs learned this session */}
+        {/* Floating "Diyaar ma ahay" button — shows when 2+ ayahs memorized this session */}
         {sessionLearned.length >= 2 && !surahComplete && lessonFlow === "ayah_learning" && activeTab === "quran" && (
           <div className="fixed bottom-6 left-4 right-4 z-40">
             <button
@@ -1675,7 +1677,7 @@ export default function QuranLesson() {
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-4 rounded-2xl font-black text-base shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
               data-testid="button-ready-to-leave"
             >
-              ✅ {sessionLearned.length} aayad waad baratay — Ciyaaraha fur
+                ✅ {sessionLearned.length} aayah qalbi waa la xaqiijiyay — Ciyaaraha fur
             </button>
           </div>
         )}
